@@ -2,204 +2,225 @@
 import api from '../axios';
 
 /**
- * Get all products with optional filtering
- * @param {Object} filters - Optional filters for products
- * @returns {Promise} - Promise with products data
+ * Fetch all products with optional filters
+ * @param {Object} filters - Optional filters (category, sort)
+ * @returns {Promise<Array>} Array of products
  */
 export const getAllProducts = async (filters = {}) => {
   try {
-    // Create query parameters according to the API documentation
-    const queryParams = new URLSearchParams();
+    // Construct URL with query parameters
+    let url = '/fetch-products';
+    const params = new URLSearchParams();
     
-    // Handle category filter - API expects 'filter' parameter
+    // Add filters according to API documentation
     if (filters.category) {
-      // API expects comma-separated list of categories in 'filter' parameter
-      queryParams.append('filter', filters.category);
+      params.append('category', filters.category);
     }
     
-    // Handle sorting if needed
     if (filters.sort) {
-      queryParams.append('sort', filters.sort);
+      params.append('sort', filters.sort);
     }
     
-    // Handle product IDs array if specified
-    if (filters.productIds && filters.productIds.length > 0) {
-      queryParams.append('products_ids_array', filters.productIds.join(','));
-    }
+    // API expects POST request with query parameters
+    const response = await api.post(
+      params.toString() ? `${url}?${params.toString()}` : url
+    );
     
-    // IMPORTANT FIX: Use POST request instead of GET based on API documentation
-    const response = await api.post(`/api/fetch-products${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
-    
-    // Check if response has expected structure
-    if (response.data && response.data.code === 200 && response.data.products) {
-      // Format product data if needed
-      return response.data.products.map(product => ({
-        ...product,
-        // Ensure expected fields in component are available
-        id: product.product_id,
-        image: product.images && product.images.length > 0 ? product.images[0] : null,
-        // Add any other field transformations needed
-      }));
-    }
-    
-    // Handle success response with no products
     if (response.data && response.data.code === 200) {
-      console.log('API returned success but no products array found');
+      return response.data.products || [];
+    } else {
+      console.error('Unexpected API response:', response.data);
       return [];
     }
-    
-    // Handle unexpected response structure
-    console.error('Unexpected API response format:', response.data);
-    throw new Error('Unexpected API response format');
-    
   } catch (error) {
-    console.error('Error fetching products:', error.response || error);
+    console.error('Error fetching products:', error);
     throw error;
   }
 };
 
 /**
  * Get a single product by ID
- * @param {string} productId - Product ID
- * @returns {Promise} - Promise with product data
+ * @param {string} productId - The product ID to fetch
+ * @returns {Promise<Object>} Product object
  */
 export const getProductById = async (productId) => {
   try {
-    // IMPORTANT FIX: Use POST request instead of GET based on API documentation
-    const response = await api.post(`/api/fetch-product?product_id=${encodeURIComponent(productId)}`);
+    // API expects a POST request for fetch-product
+    const response = await api.post(`/fetch-product?product_id=${productId}`);
     
     if (response.data && response.data.code === 200 && response.data.product) {
-      return {
-        ...response.data.product,
-        id: response.data.product.product_id,
-        image: response.data.product.images && response.data.product.images.length > 0 
-          ? response.data.product.images[0] 
-          : null,
-      };
+      return response.data.product;
     }
     
     throw new Error('Product not found');
   } catch (error) {
-    console.error('Error fetching product by ID:', error.response || error);
+    console.error('Error fetching product by ID:', error);
     throw error;
   }
 };
 
 /**
- * Get related products (products in the same category)
- * @param {string} productId - Current product ID to exclude
- * @param {string} category - Category to match
- * @param {number} limit - Maximum number of related products to return
- * @returns {Promise} - Promise with related products data
+ * Login as admin
+ * @param {string} username - Admin username
+ * @param {string} password - Admin password
+ * @returns {Promise<Object>} Login response with token
  */
-export const getRelatedProducts = async (productId, category, limit = 4) => {
+export const loginAdmin = async (username, password) => {
   try {
-    // Create query parameters for the API
-    const queryParams = new URLSearchParams();
+    const url = `/admin/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+    const response = await api.post(url);
     
-    // Filter by the same category
-    if (category) {
-      queryParams.append('filter', category);
+    if (response.data.code === 200) {
+      // Store auth token and user data
+      if (response.data.token) {
+        localStorage.setItem('auth_token', response.data.token);
+      }
+      if (response.data.user) {
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+      return response.data;
+    } else {
+      throw new Error(response.data.message || 'Login failed');
     }
-    
-    // Use POST request for consistency
-    const response = await api.post(`/api/fetch-products${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
-    
-    if (response.data && response.data.code === 200 && response.data.products) {
-      // Filter out the current product and limit the results
-      const relatedProducts = response.data.products
-        .filter(product => product.product_id !== productId)
-        .slice(0, limit)
-        .map(product => ({
-          ...product,
-          id: product.product_id,
-          image: product.images && product.images.length > 0 ? product.images[0] : null,
-        }));
-        
-      return relatedProducts;
-    }
-    
-    return [];
   } catch (error) {
-    console.error('Error fetching related products:', error.response || error);
-    return []; // Return empty array on error to prevent UI issues
-  }
-};
-
-/**
- * Search products by keyword (name or description)
- * @param {string} keyword - Search term
- * @returns {Promise} - Promise with matching products
- */
-export const searchProducts = async (keyword) => {
-  try {
-    // Get all products first (API doesn't support search parameter)
-    const response = await api.post('/api/fetch-products');
-    
-    if (response.data && response.data.code === 200 && response.data.products) {
-      // Filter products by keyword client-side
-      const searchTerm = keyword.toLowerCase().trim();
-      
-      // Return empty array if no search term
-      if (!searchTerm) return [];
-      
-      // Filter products by name or description
-      const matchingProducts = response.data.products
-        .filter(product => 
-          (product.name && product.name.toLowerCase().includes(searchTerm)) ||
-          (product.description && product.description.toLowerCase().includes(searchTerm))
-        )
-        .map(product => ({
-          ...product,
-          id: product.product_id,
-          image: product.images && product.images.length > 0 ? product.images[0] : null,
-        }));
-        
-      return matchingProducts;
-    }
-    
-    return [];
-  } catch (error) {
-    console.error('Error searching products:', error.response || error);
+    console.error('Login error:', error);
     throw error;
   }
 };
 
 /**
- * Get featured products (for homepage or special sections)
+ * Add a new product (Admin only)
+ * @param {Object} productData - Product data to add
+ * @returns {Promise<Object>} Response with product ID
+ */
+export const addProduct = async (productData) => {
+  try {
+    const formData = new FormData();
+    
+    // Add text fields
+    Object.keys(productData).forEach(key => {
+      if (key !== 'images') {
+        formData.append(key, productData[key]);
+      }
+    });
+    
+    // Add images if present
+    if (productData.images && productData.images.length > 0) {
+      productData.images.forEach(image => {
+        formData.append('images', image);
+      });
+    }
+    
+    const response = await api.post('/admin/add-product', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    if (response.data.code === 200) {
+      return response.data;
+    } else {
+      throw new Error(response.data.message || 'Failed to add product');
+    }
+  } catch (error) {
+    console.error('Error adding product:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update an existing product (Admin only)
+ * @param {string} productId - ID of product to update
+ * @param {Object} productData - Updated product data
+ * @returns {Promise<Object>} Response with status
+ */
+export const updateProduct = async (productId, productData) => {
+  try {
+    const formData = new FormData();
+    
+    // Add product ID
+    formData.append('product_id', productId);
+    
+    // Add other fields
+    Object.keys(productData).forEach(key => {
+      if (key !== 'images') {
+        formData.append(key, productData[key]);
+      }
+    });
+    
+    // Add images if present
+    if (productData.images && productData.images.length > 0) {
+      productData.images.forEach(image => {
+        formData.append('images', image);
+      });
+    }
+    
+    const response = await api.post('/admin/edit-product', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    if (response.data.code === 200) {
+      return response.data;
+    } else {
+      throw new Error(response.data.message || 'Failed to update product');
+    }
+  } catch (error) {
+    console.error('Error updating product:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a product (Admin only)
+ * @param {string} productId - ID of product to delete
+ * @returns {Promise<Object>} Response with status
+ */
+export const deleteProduct = async (productId) => {
+  try {
+    const url = `/admin/delete-product?product_id=${encodeURIComponent(productId)}`;
+    
+    const response = await api.post(url);
+    
+    if (response.data.code === 200) {
+      return response.data;
+    } else {
+      throw new Error(response.data.message || 'Failed to delete product');
+    }
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get featured products
  * @param {number} limit - Maximum number of products to return
- * @returns {Promise} - Promise with featured products
+ * @returns {Promise<Array>} Featured products array
  */
 export const getFeaturedProducts = async (limit = 8) => {
   try {
-    // We could add a featured flag in the future, but for now we'll just get the most recent products
-    const response = await api.post('/api/fetch-products');
+    const response = await api.post('/fetch-products');
     
     if (response.data && response.data.code === 200 && response.data.products) {
-      // Just take the first {limit} products for now
-      const featuredProducts = response.data.products
-        .slice(0, limit)
-        .map(product => ({
-          ...product,
-          id: product.product_id,
-          image: product.images && product.images.length > 0 ? product.images[0] : null,
-        }));
-        
-      return featuredProducts;
+      // For now, just return the first few products as featured
+      return response.data.products.slice(0, limit);
     }
     
     return [];
   } catch (error) {
-    console.error('Error fetching featured products:', error.response || error);
-    return []; // Return empty array on error to prevent UI issues
+    console.error('Error fetching featured products:', error);
+    return [];
   }
 };
 
-// Export individual functions instead of including the api instance
 export default {
   getAllProducts,
   getProductById,
-  getRelatedProducts,
-  searchProducts,
+  loginAdmin,
+  addProduct,
+  updateProduct,
+  deleteProduct,
   getFeaturedProducts
 };

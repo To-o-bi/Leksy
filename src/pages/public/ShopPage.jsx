@@ -1,3 +1,4 @@
+// src/pages/public/ShopPage.js
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ProductGrid from '../../components/product/ProductGrid';
@@ -6,14 +7,21 @@ import Breadcrumb from '../../components/common/Breadcrumb';
 import Pagination from '../../components/common/Pagination';
 import Loader from '../../components/common/Loader';
 import Hero from '../../components/shop/Hero';
-import { getAllProducts } from '../../api/services/productService';
+import { useProducts } from '../../contexts/ProductContext';
 
 const ShopPage = () => { 
   const navigate = useNavigate();
   const location = useLocation();
-  const [loading, setLoading] = useState(true);
-  const [productsList, setProductsList] = useState([]);
-  const [error, setError] = useState(null);
+  
+  // Use the ProductContext instead of direct API calls
+  const { 
+    products: productsList, 
+    loading, 
+    error, 
+    fetchAllProducts, 
+    fetchProductsByCategory 
+  } = useProducts();
+  
   const [currentPage, setCurrentPage] = useState(1);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [totalPages, setTotalPages] = useState(1);
@@ -58,56 +66,25 @@ const ShopPage = () => {
     }
   }, [location, navigate, selectedFilters]);
 
+  // Fetch products based on selected category
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        setLoading(true);
-        setError(null);
-        
-        // Prepare API filters
-        const apiFilters = {};
-        
         // Only add category filter if it's set and not 'All Products'
         if (selectedFilters.category && selectedFilters.category !== 'All Products') {
-          apiFilters.category = selectedFilters.category;
+          await fetchProductsByCategory(selectedFilters.category);
+        } else {
+          await fetchAllProducts();
         }
-        
-        // Add other API filters if needed
-        
-        console.log('Fetching products with filters:', apiFilters);
-        
-        // Fetch products from the API
-        const productsData = await getAllProducts(apiFilters);
-        
-        console.log('Products fetched:', productsData);
-        
-        if (!productsData || productsData.length === 0) {
-          console.log('No products found');
-          setProductsList([]);
-          return;
-        }
-        
-        // Filter products by concerns if needed (client-side filtering since API doesn't support concerns filtering)
-        let filteredData = productsData;
-        if (selectedFilters.concerns && selectedFilters.concerns.length > 0) {
-          filteredData = filteredData.filter(p => 
-            p.concerns && selectedFilters.concerns.some(concern => p.concerns.includes(concern))
-          );
-        }
-        
-        setProductsList(filteredData);
       } catch (err) {
         console.error('Error fetching products:', err);
-        setError("Failed to load products");
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchProducts();
-  }, [selectedFilters]);
+  }, [selectedFilters.category, fetchAllProducts, fetchProductsByCategory]);
 
-  // Filter products based on search query and handle pagination
+  // Filter products based on search query and concerns
   useEffect(() => {
     if (!productsList || productsList.length === 0) {
       setFilteredProducts([]);
@@ -125,6 +102,13 @@ const ShopPage = () => {
       );
     }
     
+    // Apply concerns filter (client-side filtering for concerns)
+    if (selectedFilters.concerns && selectedFilters.concerns.length > 0) {
+      result = result.filter(p => 
+        p.concerns && selectedFilters.concerns.some(concern => p.concerns.includes(concern))
+      );
+    }
+    
     // Calculate total pages based on filtered results before pagination
     const totalFilteredProducts = result.length;
     setTotalPages(Math.ceil(totalFilteredProducts / productsPerPage));
@@ -134,7 +118,7 @@ const ShopPage = () => {
     const paginatedProducts = result.slice(startIndex, startIndex + productsPerPage);
     
     setFilteredProducts(paginatedProducts);
-  }, [productsList, searchQuery, currentPage, productsPerPage]);
+  }, [productsList, searchQuery, currentPage, productsPerPage, selectedFilters.concerns]);
 
   const handleFilterChange = (filters) => {
     setSelectedFilters(prev => ({ ...prev, ...filters }));
@@ -213,21 +197,22 @@ const ShopPage = () => {
 
   return (
     <div className="flex flex-col min-h-screen">
-     
-      {/* Full width hero banner */}
+      {/* Breadcrumb navigation */}
       <Breadcrumb 
-          items={[
-            { label: 'Home', path: '/' },
-            { label: 'Shop', path: '/shop' },
-            ...(selectedFilters.category ? [{ label: selectedFilters.category, path: `/shop?category=${encodeURIComponent(selectedFilters.category)}` }] : [])
-          ]} 
-        />
+        items={[
+          { label: 'Home', path: '/' },
+          { label: 'Shop', path: '/shop' },
+          ...(selectedFilters.category ? [{ label: selectedFilters.category, path: `/shop?category=${encodeURIComponent(selectedFilters.category)}` }] : [])
+        ]} 
+      />
+      
+      {/* Hero banner */}
       <Hero />
       
       {/* Content with proper margins */}
       <div className="container mx-auto px-4 md:px-8 lg:px-12 max-w-7xl py-8">
         
-        {/* New filters layout */}
+        {/* Filters and search */}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
             {/* Search on the left */}
@@ -262,7 +247,7 @@ const ShopPage = () => {
                   selectedFilters={selectedFilters}
                   onFilterChange={handleFilterChange}
                   horizontal={true}
-                  compact={true} // Set compact to true to hide the redundant selected filters display
+                  compact={true}
                 />
               </div>
               
@@ -285,7 +270,7 @@ const ShopPage = () => {
               <ProductFilters 
                 selectedFilters={selectedFilters}
                 onFilterChange={handleFilterChange}
-                compact={true} // Set compact to true to hide the redundant selected filters display
+                compact={true}
               />
             </div>
           )}
@@ -359,7 +344,7 @@ const ShopPage = () => {
           )}
         </div>
         
-        {/* Full width product grid */}
+        {/* Product grid */}
         <ProductGrid products={filteredProducts} />
         
         {/* No products found message */}
@@ -377,7 +362,7 @@ const ShopPage = () => {
           </div>
         )}
         
-        {/* Pagination at the bottom of products */}
+        {/* Pagination */}
         {totalPages > 1 && filteredProducts.length > 0 && (
           <div className="mt-8 mb-12">
             <Pagination 

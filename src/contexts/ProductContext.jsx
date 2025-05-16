@@ -1,5 +1,6 @@
+// src/contexts/ProductContext.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { productService } from '../services/apiService';
+import * as productService from '../api/services/productService';
 
 const ProductContext = createContext();
 
@@ -33,8 +34,8 @@ export const ProductProvider = ({ children }) => {
   const fetchAllProducts = async () => {
     setLoading(true);
     try {
-      const response = await productService.fetchProducts();
-      setProducts(response.products || []);
+      const productList = await productService.getAllProducts();
+      setProducts(productList || []);
       setError(null);
     } catch (err) {
       console.error('Failed to fetch products:', err);
@@ -47,10 +48,10 @@ export const ProductProvider = ({ children }) => {
   const fetchProductsByCategory = async (categoryFilter) => {
     setLoading(true);
     try {
-      const response = await productService.fetchProducts({ 
-        filter: Array.isArray(categoryFilter) ? categoryFilter : [categoryFilter] 
+      const productList = await productService.getAllProducts({ 
+        category: categoryFilter
       });
-      setProducts(response.products || []);
+      setProducts(productList || []);
       setError(null);
     } catch (err) {
       console.error('Failed to fetch products by category:', err);
@@ -63,8 +64,8 @@ export const ProductProvider = ({ children }) => {
   const fetchProductById = async (productId) => {
     setLoading(true);
     try {
-      const response = await productService.fetchProduct(productId);
-      return response.product;
+      const product = await productService.getProductById(productId);
+      return product;
     } catch (err) {
       console.error('Failed to fetch product details:', err);
       setError('Failed to load product details. Please try again later.');
@@ -77,8 +78,13 @@ export const ProductProvider = ({ children }) => {
   const fetchProductsByIds = async (productIds) => {
     setLoading(true);
     try {
-      const response = await productService.fetchProducts({ productIds });
-      return response.products || [];
+      // Since there's no direct API to fetch by IDs,
+      // we'll fetch all and filter by ID
+      const allProducts = await productService.getAllProducts();
+      const filteredProducts = allProducts.filter(product => 
+        productIds.includes(product.product_id)
+      );
+      return filteredProducts || [];
     } catch (err) {
       console.error('Failed to fetch products by IDs:', err);
       setError('Failed to load specific products. Please try again later.');
@@ -92,7 +98,14 @@ export const ProductProvider = ({ children }) => {
   const addProduct = async (productData) => {
     setLoading(true);
     try {
-      const response = await productService.addProduct(productData);
+      // Get token from auth context or localStorage
+      const token = localStorage.getItem('authToken');
+      
+      if (!token) {
+        throw new Error('You must be logged in to perform this action');
+      }
+      
+      const response = await productService.addProduct(productData, token);
       // Refresh products list after adding
       await fetchAllProducts();
       return response;
@@ -108,7 +121,14 @@ export const ProductProvider = ({ children }) => {
   const updateProduct = async (productId, productData) => {
     setLoading(true);
     try {
-      const response = await productService.updateProduct(productId, productData);
+      // Get token from auth context or localStorage
+      const token = localStorage.getItem('authToken');
+      
+      if (!token) {
+        throw new Error('You must be logged in to perform this action');
+      }
+      
+      const response = await productService.updateProduct(productId, productData, token);
       // Refresh products list after updating
       await fetchAllProducts();
       return response;
@@ -124,7 +144,14 @@ export const ProductProvider = ({ children }) => {
   const deleteProduct = async (productId) => {
     setLoading(true);
     try {
-      const response = await productService.deleteProduct(productId);
+      // Get token from auth context or localStorage
+      const token = localStorage.getItem('authToken');
+      
+      if (!token) {
+        throw new Error('You must be logged in to perform this action');
+      }
+      
+      const response = await productService.deleteProduct(productId, token);
       // Refresh products list after deleting
       await fetchAllProducts();
       return response;
@@ -140,8 +167,8 @@ export const ProductProvider = ({ children }) => {
   const sortProducts = async (sortBy) => {
     setLoading(true);
     try {
-      const response = await productService.fetchProducts({ sort: sortBy });
-      setProducts(response.products || []);
+      const productList = await productService.getAllProducts({ sort: sortBy });
+      setProducts(productList || []);
       setError(null);
     } catch (err) {
       console.error('Failed to sort products:', err);
