@@ -1,6 +1,7 @@
+// src/App.js
 import React from 'react';
-import { HashRouter } from 'react-router-dom';
-import AuthProvider from './contexts/AuthContext'; // Import the proper AuthProvider
+import { BrowserRouter } from 'react-router-dom';
+import AuthProvider from './contexts/AuthContext';
 import { MessageProvider } from './contexts/MessageContext';
 import { CartProvider } from './contexts/CartContext';
 import { WishlistProvider } from './contexts/WishlistContext';
@@ -11,7 +12,7 @@ const App = () => {
   return (
     <AuthProvider>
       <MessageProvider>
-        <HashRouter>
+        <BrowserRouter>
           <ProductProvider>
             <CartProvider>
               <WishlistProvider>
@@ -19,7 +20,7 @@ const App = () => {
               </WishlistProvider>       
             </CartProvider>
           </ProductProvider>
-        </HashRouter>
+        </BrowserRouter>
       </MessageProvider>
     </AuthProvider>
   );
