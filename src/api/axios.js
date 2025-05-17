@@ -1,4 +1,3 @@
-// src/api/axios.js
 import axios from 'axios';
 
 const instance = axios.create({
@@ -6,7 +5,8 @@ const instance = axios.create({
   baseURL: import.meta.env.PROD 
     ? 'https://leksycosmetics.com/api' 
     : '/api',
-  timeout: 15000,
+  timeout: 30000, // Increased timeout for slow connections (30 seconds)
+
   headers: {
     'Accept': 'application/json'
   }
@@ -88,6 +88,15 @@ instance.interceptors.response.use(
       // Redirect to login if not already there
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
+      }
+    }
+    
+    // Convert network errors to user-friendly messages
+    if (!response) {
+      if (error.code === 'ECONNABORTED') {
+        error.message = 'Request timed out. Please check your connection and try again.';
+      } else if (error.message.includes('Network Error')) {
+        error.message = 'Network error. Please check your connection and try again.';
       }
     }
     

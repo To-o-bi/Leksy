@@ -1,4 +1,3 @@
-// src/pages/public/ShopPage.js
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ProductGrid from '../../components/product/ProductGrid';
@@ -13,13 +12,14 @@ const ShopPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Use the ProductContext instead of direct API calls
+  // Use the ProductContext
   const { 
     products: productsList, 
     loading, 
     error, 
     fetchAllProducts, 
-    fetchProductsByCategory 
+    fetchProductsByCategory,
+    clearError 
   } = useProducts();
   
   const [currentPage, setCurrentPage] = useState(1);
@@ -31,6 +31,7 @@ const ShopPage = () => {
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   const productsPerPage = 20; // Show 20 products per page
 
   // Extract category from URL parameters and concerns from location state
@@ -69,6 +70,9 @@ const ShopPage = () => {
   // Fetch products based on selected category
   useEffect(() => {
     const fetchProducts = async () => {
+      // Clear any previous errors
+      clearError();
+      
       try {
         // Only add category filter if it's set and not 'All Products'
         if (selectedFilters.category && selectedFilters.category !== 'All Products') {
@@ -76,13 +80,15 @@ const ShopPage = () => {
         } else {
           await fetchAllProducts();
         }
+        setIsRetrying(false);
       } catch (err) {
-        console.error('Error fetching products:', err);
+        console.error('Error fetching products in component:', err);
+        // Error is already handled in the context
       }
     };
 
     fetchProducts();
-  }, [selectedFilters.category, fetchAllProducts, fetchProductsByCategory]);
+  }, [selectedFilters.category, fetchAllProducts, fetchProductsByCategory, clearError, isRetrying]);
 
   // Filter products based on search query and concerns
   useEffect(() => {
@@ -161,6 +167,12 @@ const ShopPage = () => {
     navigate(location.pathname, { replace: true });
   };
   
+  // Handle retry after error
+  const handleRetry = () => {
+    clearError();
+    setIsRetrying(true); // This will trigger the useEffect to refetch
+  };
+  
   // Simple loading state
   if (loading) {
     return (
@@ -177,14 +189,22 @@ const ShopPage = () => {
   if (error) {
     return (
       <div className="container mx-auto px-4 md:px-8 lg:px-12 max-w-7xl py-16 text-center">
-        <h2 className="text-2xl font-semibold text-red-600">{error}</h2>
-        <p className="mt-2 text-gray-600">Sorry, we couldn't find the products you're looking for.</p>
-        <button 
-          className="mt-6 px-6 py-2 bg-primary text-white rounded-md hover:bg-primary-dark"
-          onClick={() => navigate('/')}
-        >
-          Back to Home
-        </button>
+        <h2 className="text-2xl font-semibold text-red-600">Error Loading Products</h2>
+        <p className="mt-2 text-gray-600">{error}</p>
+        <div className="mt-6 flex flex-col sm:flex-row justify-center gap-4">
+          <button 
+            className="px-6 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600"
+            onClick={handleRetry}
+          >
+            Try Again
+          </button>
+          <button 
+            className="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+            onClick={() => navigate('/')}
+          >
+            Back to Home
+          </button>
+        </div>
       </div>
     );
   }
@@ -348,7 +368,7 @@ const ShopPage = () => {
         <ProductGrid products={filteredProducts} />
         
         {/* No products found message */}
-        {filteredProducts.length === 0 && (
+        {filteredProducts.length === 0 && !loading && !error && (
           <div className="text-center py-12">
             <div className="text-5xl mb-4">😕</div>
             <h3 className="text-xl font-medium text-gray-800 mb-2">No products found</h3>

@@ -10,19 +10,24 @@ export {
 
 // Export API endpoint constants for consistent usage across the app
 export const ENDPOINTS = {
+
   // Auth endpoints
   LOGIN: '/admin/login',
   
   // Product endpoints
   FETCH_PRODUCTS: '/fetch-products',
+
   FETCH_PRODUCT: '/fetch-product',
+
   ADD_PRODUCT: '/admin/add-product',
+
   EDIT_PRODUCT: '/admin/edit-product',
+
   DELETE_PRODUCT: '/admin/delete-product',
   
   // User endpoints
   USER_PROFILE: '/user/profile',
+
   CONTACT: '/contact',
-  
-  // Other endpoints can be added here as needed
+
 };

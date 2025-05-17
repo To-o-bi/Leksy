@@ -1,4 +1,3 @@
-// src/api/services/productService.js
 import api from '../axios';
 
 /**
@@ -34,12 +33,13 @@ export const getAllProducts = async (filters = {}) => {
     if (response.data && response.data.code === 200) {
       return response.data.products || [];
     } else {
-      console.error('Unexpected API response:', response.data);
-      return [];
+      const errorMessage = response.data?.message || 'Unexpected API response';
+      console.error(errorMessage, response.data);
+      throw new Error(errorMessage);
     }
   } catch (error) {
     console.error('Error fetching products:', error);
-    return []; // Return empty array to prevent UI errors
+    throw error; // Propagate the error instead of silently returning empty array
   }
 };
 
@@ -98,9 +98,10 @@ export const loginAdmin = async (username, password) => {
 /**
  * Add a new product (Admin only)
  * @param {Object} productData - Product data to add
+ * @param {string} token - Authentication token
  * @returns {Promise<Object>} Response with product ID
  */
-export const addProduct = async (productData) => {
+export const addProduct = async (productData, token) => {
   try {
     const formData = new FormData();
     
@@ -121,6 +122,7 @@ export const addProduct = async (productData) => {
     const response = await api.post('/admin/add-product', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${token}`
       },
     });
     
@@ -139,9 +141,10 @@ export const addProduct = async (productData) => {
  * Update an existing product (Admin only)
  * @param {string} productId - ID of product to update
  * @param {Object} productData - Updated product data
+ * @param {string} token - Authentication token
  * @returns {Promise<Object>} Response with status
  */
-export const updateProduct = async (productId, productData) => {
+export const updateProduct = async (productId, productData, token) => {
   try {
     const formData = new FormData();
     
@@ -165,6 +168,7 @@ export const updateProduct = async (productId, productData) => {
     const response = await api.post('/admin/edit-product', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${token}`
       },
     });
     
@@ -182,13 +186,18 @@ export const updateProduct = async (productId, productData) => {
 /**
  * Delete a product (Admin only)
  * @param {string} productId - ID of product to delete
+ * @param {string} token - Authentication token
  * @returns {Promise<Object>} Response with status
  */
-export const deleteProduct = async (productId) => {
+export const deleteProduct = async (productId, token) => {
   try {
     const url = `/admin/delete-product?product_id=${encodeURIComponent(productId)}`;
     
-    const response = await api.post(url);
+    const response = await api.post(url, {}, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
     
     if (response.data.code === 200) {
       return response.data;
@@ -218,7 +227,7 @@ export const getRelatedProducts = async (category, currentProductId, limit = 4) 
       .slice(0, limit);
   } catch (error) {
     console.error('Error fetching related products:', error);
-    return []; // Return empty array to prevent UI errors
+    throw error; // Propagate the error instead of silently returning empty array
   }
 };
 
