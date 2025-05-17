@@ -72,10 +72,20 @@ export const getToken = () => {
   return localStorage.getItem('auth_token');
 };
 
+/**
+ * Check if user has admin role
+ * @returns {boolean} True if user is admin
+ */
+export const isAdmin = () => {
+  const user = getAuthUser();
+  return user && (user.role === 'admin' || user.role === 'superadmin');
+};
+
 export default {
   loginAdmin,
   logout,
   isAuthenticated,
   getAuthUser,
-  getToken
+  getToken,
+  isAdmin
 };

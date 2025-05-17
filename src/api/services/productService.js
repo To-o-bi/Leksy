@@ -2,30 +2,35 @@
 import api from '../axios';
 
 /**
- * Fetch all products with optional filters
+ * Fetch all products with optional filtering
  * @param {Object} filters - Optional filters (category, sort)
  * @returns {Promise<Array>} Array of products
  */
 export const getAllProducts = async (filters = {}) => {
   try {
-    // Construct URL with query parameters
+    // Construct URL with query parameters according to the documentation
     let url = '/fetch-products';
     const params = new URLSearchParams();
     
-    // Add filters according to API documentation
+    // Add category filter if specified
     if (filters.category) {
       params.append('category', filters.category);
     }
     
+    // Add sorting if specified
     if (filters.sort) {
       params.append('sort', filters.sort);
     }
     
-    // API expects POST request with query parameters
-    const response = await api.post(
-      params.toString() ? `${url}?${params.toString()}` : url
-    );
+    // Add query parameters to URL if any exist
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
     
+    // The API expects a POST request
+    const response = await api.post(url);
+    
+    // Check for success response
     if (response.data && response.data.code === 200) {
       return response.data.products || [];
     } else {
@@ -34,7 +39,7 @@ export const getAllProducts = async (filters = {}) => {
     }
   } catch (error) {
     console.error('Error fetching products:', error);
-    throw error;
+    return []; // Return empty array to prevent UI errors
   }
 };
 
@@ -45,14 +50,16 @@ export const getAllProducts = async (filters = {}) => {
  */
 export const getProductById = async (productId) => {
   try {
-    // API expects a POST request for fetch-product
-    const response = await api.post(`/fetch-product?product_id=${productId}`);
+    // Since there's no direct endpoint to get a product by ID in the docs,
+    // we'll fetch all products and filter by ID
+    const allProducts = await getAllProducts();
+    const product = allProducts.find(p => p.product_id === productId);
     
-    if (response.data && response.data.code === 200 && response.data.product) {
-      return response.data.product;
+    if (!product) {
+      throw new Error('Product not found');
     }
     
-    throw new Error('Product not found');
+    return product;
   } catch (error) {
     console.error('Error fetching product by ID:', error);
     throw error;
@@ -195,23 +202,23 @@ export const deleteProduct = async (productId) => {
 };
 
 /**
- * Get featured products
+ * Get related products (products in the same category)
+ * @param {string} category - Category to match
+ * @param {string} currentProductId - Product ID to exclude
  * @param {number} limit - Maximum number of products to return
- * @returns {Promise<Array>} Featured products array
+ * @returns {Promise<Array>} Related products array
  */
-export const getFeaturedProducts = async (limit = 8) => {
+export const getRelatedProducts = async (category, currentProductId, limit = 4) => {
   try {
-    const response = await api.post('/fetch-products');
+    const products = await getAllProducts({ category });
     
-    if (response.data && response.data.code === 200 && response.data.products) {
-      // For now, just return the first few products as featured
-      return response.data.products.slice(0, limit);
-    }
-    
-    return [];
+    // Filter out the current product
+    return products
+      .filter(product => product.product_id !== currentProductId)
+      .slice(0, limit);
   } catch (error) {
-    console.error('Error fetching featured products:', error);
-    return [];
+    console.error('Error fetching related products:', error);
+    return []; // Return empty array to prevent UI errors
   }
 };
 
@@ -222,5 +229,5 @@ export default {
   addProduct,
   updateProduct,
   deleteProduct,
-  getFeaturedProducts
+  getRelatedProducts
 };

@@ -1,10 +1,11 @@
 // src/api/axios.js
 import axios from 'axios';
 
-// Create axios instance with simple configuration
-// No need to specify full base URL since we're using Vercel's proxy
+// Create axios instance with environment-aware configuration
 const instance = axios.create({
-  baseURL: '/api', // This will be proxied through Vercel to your actual backend
+  // In production (Vercel), use the API proxy set up in vercel.json
+  // which will route /api/* to https://leksycosmetics.com/api/*
+  baseURL: '/api',
   timeout: 15000,
   headers: {
     'Accept': 'application/json'
@@ -57,7 +58,7 @@ instance.interceptors.response.use(
       });
     }
   
-    // Extract token from response if available
+    // Extract token from response if available (for token refresh)
     if (response.data && response.data.token) {
       localStorage.setItem('auth_token', response.data.token);
     }
@@ -71,6 +72,8 @@ instance.interceptors.response.use(
       if (error.response) {
         console.error('Response data:', error.response.data);
         console.error('Response status:', error.response.status);
+      } else if (error.request) {
+        console.error('No response received:', error.request);
       }
     }
   
