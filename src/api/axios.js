@@ -1,11 +1,11 @@
 // src/api/axios.js
 import axios from 'axios';
 
-// Create axios instance with environment-aware configuration
 const instance = axios.create({
-  // In production (Vercel), use the API proxy set up in vercel.json
-  // which will route /api/* to https://leksycosmetics.com/api/*
-  baseURL: '/api',
+  // Use absolute URL in production, relative in development
+  baseURL: import.meta.env.PROD 
+    ? 'https://leksycosmetics.com/api' 
+    : '/api',
   timeout: 15000,
   headers: {
     'Accept': 'application/json'

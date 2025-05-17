@@ -27,7 +27,14 @@ export default defineConfig(({ mode }) => {
     
     build: {
       outDir: 'dist',
-      sourcemap: mode !== 'production'
+      sourcemap: mode !== 'production',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom', 'react-router-dom'],
+          }
+        }
+      }
     }
   }
 })
