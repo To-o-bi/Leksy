@@ -1,3 +1,4 @@
+// src/pages/public/ShopPage.js
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ProductGrid from '../../components/product/ProductGrid';
@@ -19,7 +20,8 @@ const ShopPage = () => {
     error, 
     fetchAllProducts, 
     fetchProductsByCategory,
-    clearError 
+    clearError,
+    handleRetry
   } = useProducts();
   
   const [currentPage, setCurrentPage] = useState(1);
@@ -31,7 +33,6 @@ const ShopPage = () => {
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [isRetrying, setIsRetrying] = useState(false);
   const productsPerPage = 20; // Show 20 products per page
 
   // Extract category from URL parameters and concerns from location state
@@ -80,7 +81,6 @@ const ShopPage = () => {
         } else {
           await fetchAllProducts();
         }
-        setIsRetrying(false);
       } catch (err) {
         console.error('Error fetching products in component:', err);
         // Error is already handled in the context
@@ -88,7 +88,7 @@ const ShopPage = () => {
     };
 
     fetchProducts();
-  }, [selectedFilters.category, fetchAllProducts, fetchProductsByCategory, clearError, isRetrying]);
+  }, [selectedFilters.category, fetchAllProducts, fetchProductsByCategory, clearError]);
 
   // Filter products based on search query and concerns
   useEffect(() => {
@@ -165,12 +165,6 @@ const ShopPage = () => {
     });
     setSearchQuery('');
     navigate(location.pathname, { replace: true });
-  };
-  
-  // Handle retry after error
-  const handleRetry = () => {
-    clearError();
-    setIsRetrying(true); // This will trigger the useEffect to refetch
   };
   
   // Simple loading state
