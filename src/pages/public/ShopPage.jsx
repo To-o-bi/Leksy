@@ -1,5 +1,5 @@
 // src/pages/public/ShopPage.js
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ProductGrid from '../../components/product/ProductGrid';
 import ProductFilters from '../../components/product/ProductFilters';
@@ -34,6 +34,21 @@ const ShopPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const productsPerPage = 20; // Show 20 products per page
+  
+  // Create a stable fetchProducts function using useCallback
+  const fetchProducts = useCallback(async () => {
+    clearError();
+    
+    try {
+      if (selectedFilters.category && selectedFilters.category !== 'All Products') {
+        await fetchProductsByCategory(selectedFilters.category);
+      } else {
+        await fetchAllProducts();
+      }
+    } catch (err) {
+      console.error('Error fetching products in component:', err);
+    }
+  }, [selectedFilters.category, fetchAllProducts, fetchProductsByCategory, clearError]);
 
   // Extract category from URL parameters and concerns from location state
   useEffect(() => {
@@ -70,25 +85,10 @@ const ShopPage = () => {
 
   // Fetch products based on selected category
   useEffect(() => {
-    const fetchProducts = async () => {
-      // Clear any previous errors
-      clearError();
-      
-      try {
-        // Only add category filter if it's set and not 'All Products'
-        if (selectedFilters.category && selectedFilters.category !== 'All Products') {
-          await fetchProductsByCategory(selectedFilters.category);
-        } else {
-          await fetchAllProducts();
-        }
-      } catch (err) {
-        console.error('Error fetching products in component:', err);
-        // Error is already handled in the context
-      }
-    };
-
     fetchProducts();
-  }, [selectedFilters.category, fetchAllProducts, fetchProductsByCategory, clearError]);
+    // This effect should only run when the fetchProducts function changes
+    // which happens when selectedFilters.category changes
+  }, [fetchProducts]);
 
   // Filter products based on search query and concerns
   useEffect(() => {
@@ -126,7 +126,13 @@ const ShopPage = () => {
     setFilteredProducts(paginatedProducts);
   }, [productsList, searchQuery, currentPage, productsPerPage, selectedFilters.concerns]);
 
-  const handleFilterChange = (filters) => {
+  // Debounced search handler
+  const handleSearchChange = useCallback((e) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1); // Reset to first page when search changes
+  }, []);
+
+  const handleFilterChange = useCallback((filters) => {
     setSelectedFilters(prev => ({ ...prev, ...filters }));
     setCurrentPage(1); // Reset to first page when filters change
     
@@ -145,27 +151,22 @@ const ShopPage = () => {
         search: searchParams.toString()
       }, { replace: true });
     }
-  };
+  }, [location.search, navigate, selectedFilters.category]);
   
-  const handleSearchChange = (e) => {
-    setSearchQuery(e.target.value);
-    setCurrentPage(1); // Reset to first page when search changes
-  };
-  
-  const handlePageChange = (page) => {
+  const handlePageChange = useCallback((page) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' }); // Smooth scroll to top
-  };
+  }, []);
   
   // Clear all filters
-  const clearAllFilters = () => {
+  const clearAllFilters = useCallback(() => {
     setSelectedFilters({
       category: '',
       concerns: []
     });
     setSearchQuery('');
     navigate(location.pathname, { replace: true });
-  };
+  }, [navigate]);
   
   // Simple loading state
   if (loading) {
@@ -203,9 +204,6 @@ const ShopPage = () => {
     );
   }
 
-  // Extract category options from products for the dropdown
-  const categoryOptions = Array.from(new Set(productsList.map(p => p.category))).filter(Boolean);
-  
   // Check if any filters are applied
   const hasActiveFilters = selectedFilters.category || selectedFilters.concerns.length > 0 || searchQuery.trim();
 
