@@ -1,6 +1,6 @@
 import React from 'react';
 import { HashRouter } from 'react-router-dom';
-import AuthProvider from './contexts/AuthContext'; // Import AuthProvider as default export
+import AuthProvider from './contexts/AuthContext'; // Import the proper AuthProvider
 import { MessageProvider } from './contexts/MessageContext';
 import { CartProvider } from './contexts/CartContext';
 import { WishlistProvider } from './contexts/WishlistContext';

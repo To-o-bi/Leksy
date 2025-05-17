@@ -1,132 +1,121 @@
-// src/contexts/AuthContext.js
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import * as productService from '../api/services/productService';
+import { useState, useEffect, useContext, createContext, useMemo } from 'react';
 
-// Create authentication context
+// Create an authentication context
 const AuthContext = createContext();
 
+// Admin user object
+const ADMIN_USER = {
+  id: '1',
+  name: 'Admin User',
+  email: 'admin@example.com',
+  role: 'admin',
+};
+
+// Provider component that wraps your app and makes auth object available
+export function AuthProvider({ children }) {
+  const auth = useProvideAuth();
+  // Memoize the auth value to prevent unnecessary re-renders
+  const memoizedAuth = useMemo(() => auth, [
+    auth.user, 
+    auth.isLoading, 
+    auth.error, 
+    auth.isAuthenticated
+  ]);
+  
+  return <AuthContext.Provider value={memoizedAuth}>{children}</AuthContext.Provider>;
+}
+
+// Hook for child components to get the auth object
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthContextProvider');
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
 
-const AuthContextProvider = ({ children }) => {
+// Provider hook that creates auth object and handles state
+function useProvideAuth() {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [token, setToken] = useState(null);
-
-  // Check if user is already logged in on component mount
+  
+  // Initialize auth state on mount
   useEffect(() => {
-    const checkAuth = () => {
+    const initializeAuth = () => {
+      setIsLoading(true);
       try {
-        // Get token from localStorage
-        const savedToken = localStorage.getItem('auth_token');
-        
-        // Get user data from localStorage
-        const savedUser = localStorage.getItem('user');
-        
-        if (savedToken && savedUser) {
-          setToken(savedToken);
-          setUser(JSON.parse(savedUser));
+        // Check for stored user in localStorage
+        const storedUser = localStorage.getItem('authUser');
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
         }
       } catch (err) {
-        console.error('Error restoring authentication state:', err);
-        // Clear potentially corrupted data
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user');
+        console.error('Error initializing auth:', err);
+        setError('Failed to initialize authentication');
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
-
-    checkAuth();
+    
+    initializeAuth();
   }, []);
-
-  const login = async (username, password) => {
-    setLoading(true);
+  
+  // Login function
+  const login = async (email, password) => {
+    setIsLoading(true);
     setError(null);
     
     try {
-      // Call the login API
-      const response = await productService.loginAdmin(username, password);
+      // For demo, we're just simulating an API call and using the predefined admin user
+      // In a real app, you would validate credentials against your API
+      await new Promise(resolve => setTimeout(resolve, 800)); // Simulate API delay
       
-      if (response && response.user) {
-        setUser(response.user);
-        setToken(response.token);
-        
-        // Store authentication data in localStorage
-        localStorage.setItem('auth_token', response.token);
-        localStorage.setItem('user', JSON.stringify(response.user));
-        
-        return response;
-      } else {
-        throw new Error('Invalid response format from server');
-      }
+      // Store user in localStorage and state
+      localStorage.setItem('authUser', JSON.stringify(ADMIN_USER));
+      setUser(ADMIN_USER);
+      return true;
     } catch (err) {
-      console.error('Login failed:', err);
-      
-      // Extract error message from response if available
-      const errorMessage = 
-        err.response?.data?.message || 
-        err.message || 
-        'Login failed. Please check your credentials and try again.';
-      
-      setError(errorMessage);
-      throw new Error(errorMessage);
+      setError(err.message || 'Login failed');
+      throw err;
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
-
-  const logout = () => {
-    // Clear authentication state
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user');
+  
+  // Logout function
+  const logout = async () => {
+    setIsLoading(true);
     
-    // Update state
-    setUser(null);
-    setToken(null);
+    try {
+      // For demo, we're just simulating an API call
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
+      
+      // Remove user from localStorage and state
+      localStorage.removeItem('authUser');
+      setUser(null);
+    } catch (err) {
+      console.error('Logout error:', err);
+      setError(err.message || 'Logout failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
-
-  const clearError = () => {
-    setError(null);
+  
+  // Computed properties
+  const isAuthenticated = Boolean(user);
+  const isAdmin = user?.role === 'admin';
+  
+  return {
+    user,
+    isLoading,
+    error,
+    login,
+    logout,
+    isAuthenticated,
+    isAdmin,
   };
+}
 
-  const isAdmin = () => {
-    return user && (user.role === 'admin' || user.role === 'superadmin');
-  };
-
-  // Check if user is authenticated
-  const isAuthenticated = () => {
-    return !!token && !!user;
-  };
-
-  // Get current auth token
-  const getToken = () => {
-    return token;
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        error,
-        login,
-        logout,
-        isAdmin,
-        clearError,
-        isAuthenticated,
-        getToken
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
-};
-
-export default AuthContextProvider;
+// Export the AuthProvider as the default export
+export default AuthProvider;
