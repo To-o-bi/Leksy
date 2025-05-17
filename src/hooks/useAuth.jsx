@@ -117,4 +117,5 @@ function useProvideAuth() {
   };
 }
 
-export default useAuth;
+// Change the default export to be the AuthProvider component
+export default AuthProvider;

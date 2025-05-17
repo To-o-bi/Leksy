@@ -1,6 +1,6 @@
 import React from 'react';
 import { HashRouter } from 'react-router-dom';
-import AuthContextProvider from './contexts/AuthContext';
+import AuthProvider from './contexts/AuthContext'; // Import AuthProvider as default export
 import { MessageProvider } from './contexts/MessageContext';
 import { CartProvider } from './contexts/CartContext';
 import { WishlistProvider } from './contexts/WishlistContext';
@@ -9,7 +9,7 @@ import AppRoutes from './routes/AppRoutes';
 
 const App = () => {
   return (
-    <AuthContextProvider>
+    <AuthProvider>
       <MessageProvider>
         <HashRouter>
           <ProductProvider>
@@ -21,7 +21,7 @@ const App = () => {
           </ProductProvider>
         </HashRouter>
       </MessageProvider>
-    </AuthContextProvider>
+    </AuthProvider>
   );
 };
 
