@@ -1,20 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-
-// Mock data instead of importing productService
-const mockProducts = [
-  { id: 1, name: 'Premium Headphones', price: 199.99, category: 'Electronics', featured: true, bestseller: true, newArrival: false, imageUrl: '/api/placeholder/300/300', description: 'High-quality noise-cancelling headphones with superior sound.' },
-  { id: 2, name: 'Wireless Mouse', price: 49.99, category: 'Electronics', featured: false, bestseller: true, newArrival: false, imageUrl: '/api/placeholder/300/300', description: 'Ergonomic wireless mouse with long battery life.' },
-  { id: 3, name: 'Smart Watch', price: 299.99, category: 'Electronics', featured: true, bestseller: false, newArrival: true, imageUrl: '/api/placeholder/300/300', description: 'Track your fitness and stay connected with this stylish smart watch.' },
-  { id: 4, name: 'Laptop Backpack', price: 79.99, category: 'Accessories', featured: false, bestseller: false, newArrival: true, imageUrl: '/api/placeholder/300/300', description: 'Water-resistant backpack with dedicated laptop compartment.' },
-  { id: 5, name: 'Bluetooth Speaker', price: 129.99, category: 'Electronics', featured: true, bestseller: true, newArrival: true, imageUrl: '/api/placeholder/300/300', description: 'Portable speaker with impressive sound quality.' },
-];
-
-const mockCategories = [
-  { id: 1, name: 'Electronics' },
-  { id: 2, name: 'Accessories' },
-  { id: 3, name: 'Clothing' },
-  { id: 4, name: 'Home & Kitchen' },
-];
+// src/hooks/useProduct.js
+import { useState, useCallback } from 'react';
+import * as productService from '../api/services/productService';
 
 export const useProduct = () => {
   const [products, setProducts] = useState([]);
@@ -22,41 +8,33 @@ export const useProduct = () => {
   const [error, setError] = useState(null);
   const [categories, setCategories] = useState([]);
   
+  // Clear any existing error
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+  
   // Get all products with filters
   const getProducts = useCallback(async (filters = {}) => {
     setLoading(true);
     setError(null);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
     try {
-      // Apply filters to mock data
-      let filteredProducts = [...mockProducts];
+      console.log('Fetching products with filters:', filters);
+      const data = await productService.getAllProducts(filters);
+      setProducts(data || []);
       
-      if (filters.category) {
-        filteredProducts = filteredProducts.filter(p => p.category === filters.category);
+      // Extract unique categories from products
+      if (data && data.length > 0) {
+        const uniqueCategories = [...new Set(data.map(p => p.category))].filter(Boolean);
+        setCategories(uniqueCategories);
       }
       
-      if (filters.minPrice) {
-        filteredProducts = filteredProducts.filter(p => p.price >= filters.minPrice);
-      }
-      
-      if (filters.maxPrice) {
-        filteredProducts = filteredProducts.filter(p => p.price <= filters.maxPrice);
-      }
-      
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        filteredProducts = filteredProducts.filter(p => 
-          p.name.toLowerCase().includes(searchLower) || 
-          p.description.toLowerCase().includes(searchLower)
-        );
-      }
-      
-      setProducts(filteredProducts);
+      return data;
     } catch (err) {
-      setError('Failed to load products.');
+      console.error('Error in getProducts:', err);
+      const errorMessage = err.message || 'Failed to load products. Please try again.';
+      setError(errorMessage);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -67,71 +45,54 @@ export const useProduct = () => {
     setLoading(true);
     setError(null);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
     try {
-      const product = mockProducts.find(p => p.id === parseInt(id));
-      if (!product) {
-        throw new Error('Product not found');
-      }
+      console.log(`Fetching product with ID: ${id}`);
+      const product = await productService.getProductById(id);
       return product;
     } catch (err) {
-      setError(err.message || 'Failed to load product details.');
+      console.error('Error in getProductById:', err);
+      const errorMessage = err.message || 'Failed to load product details.';
+      setError(errorMessage);
       return null;
     } finally {
       setLoading(false);
     }
   }, []);
   
-  // Load categories
-  const getCategories = useCallback(async () => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    try {
-      setCategories(mockCategories);
-    } catch (err) {
-      console.error('Failed to load categories:', err);
-    }
-  }, []);
-  
-  useEffect(() => {
-    getCategories();
-  }, [getCategories]);
-  
-  // Get featured products
+  // Get featured products - we'll use a filter on the main product list
   const getFeaturedProducts = useCallback(async () => {
     setLoading(true);
     setError(null);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 400));
-    
     try {
-      const featuredProducts = mockProducts.filter(p => p.featured);
+      // Get all products and filter for featured
+      const allProducts = await productService.getAllProducts();
+      const featuredProducts = allProducts.filter(p => p.featured);
       return featuredProducts;
     } catch (err) {
-      setError('Failed to load featured products.');
+      console.error('Error in getFeaturedProducts:', err);
+      const errorMessage = err.message || 'Failed to load featured products.';
+      setError(errorMessage);
       return [];
     } finally {
       setLoading(false);
     }
   }, []);
   
-  // Get bestsellers
+  // Get bestseller products
   const getBestsellers = useCallback(async () => {
     setLoading(true);
     setError(null);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 400));
-    
     try {
-      const bestsellers = mockProducts.filter(p => p.bestseller);
+      // Get all products and filter for bestsellers
+      const allProducts = await productService.getAllProducts();
+      const bestsellers = allProducts.filter(p => p.bestseller);
       return bestsellers;
     } catch (err) {
-      setError('Failed to load bestsellers.');
+      console.error('Error in getBestsellers:', err);
+      const errorMessage = err.message || 'Failed to load bestsellers.';
+      setError(errorMessage);
       return [];
     } finally {
       setLoading(false);
@@ -143,19 +104,44 @@ export const useProduct = () => {
     setLoading(true);
     setError(null);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 400));
-    
     try {
-      const newArrivals = mockProducts.filter(p => p.newArrival);
+      // Get all products and filter for new arrivals
+      const allProducts = await productService.getAllProducts();
+      const newArrivals = allProducts.filter(p => p.newArrival);
       return newArrivals;
     } catch (err) {
-      setError('Failed to load new arrivals.');
+      console.error('Error in getNewArrivals:', err);
+      const errorMessage = err.message || 'Failed to load new arrivals.';
+      setError(errorMessage);
       return [];
     } finally {
       setLoading(false);
     }
   }, []);
+  
+  // Get related products
+  const getRelatedProducts = useCallback(async (productId, category, limit = 4) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const relatedProducts = await productService.getRelatedProducts(category, productId, limit);
+      return relatedProducts;
+    } catch (err) {
+      console.error('Error in getRelatedProducts:', err);
+      const errorMessage = err.message || 'Failed to load related products.';
+      setError(errorMessage);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  
+  // Retry mechanism for failed requests
+  const retry = useCallback(async (operation, ...args) => {
+    clearError();
+    return operation(...args);
+  }, [clearError]);
   
   return {
     products,
@@ -166,7 +152,10 @@ export const useProduct = () => {
     getProductById,
     getFeaturedProducts,
     getBestsellers,
-    getNewArrivals
+    getNewArrivals,
+    getRelatedProducts,
+    clearError,
+    retry
   };
 };
 
