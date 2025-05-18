@@ -1,19 +1,19 @@
 // vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [
-    react(),
-    tailwindcss()
+    react()
   ],
   base: '/',
   
   server: {
     port: 3000,
     host: true,
-    historyApiFallback: true
+    // Note: historyApiFallback is not directly supported in Vite
+    // Use the following instead if you need history fallback
+    // middlewareMode: true
   },
   
   build: {
