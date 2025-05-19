@@ -1,4 +1,3 @@
-// src/api/endpoints.js
 import authService from './services/authService';
 import productService from './services/productService';
 

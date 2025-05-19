@@ -1,4 +1,3 @@
-// src/contexts/WishlistContext.jsx
 import React, { createContext, useState, useEffect, useCallback, useContext } from 'react';
 import { useMessage } from './MessageContext';
 

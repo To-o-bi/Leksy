@@ -1,20 +1,10 @@
 import { useState, useEffect, useContext, createContext, useMemo } from 'react';
+import authService from '../api/services/authService';
 
-// Create an authentication context
 const AuthContext = createContext();
 
-// Admin user object
-const ADMIN_USER = {
-  id: '1',
-  name: 'Admin User',
-  email: 'admin@example.com',
-  role: 'admin',
-};
-
-// Provider component that wraps your app and makes auth object available
 export function AuthProvider({ children }) {
   const auth = useProvideAuth();
-  // Memoize the auth value to prevent unnecessary re-renders
   const memoizedAuth = useMemo(() => auth, [
     auth.user, 
     auth.isLoading, 
@@ -25,7 +15,6 @@ export function AuthProvider({ children }) {
   return <AuthContext.Provider value={memoizedAuth}>{children}</AuthContext.Provider>;
 }
 
-// Hook for child components to get the auth object
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -34,7 +23,6 @@ export const useAuth = () => {
   return context;
 };
 
-// Provider hook that creates auth object and handles state
 function useProvideAuth() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,14 +33,15 @@ function useProvideAuth() {
     const initializeAuth = () => {
       setIsLoading(true);
       try {
-        // Check for stored user in localStorage
-        const storedUser = localStorage.getItem('authUser');
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
+        // Check if we have a valid token and user data
+        if (authService.isAuthenticated()) {
+          setUser(authService.getAuthUser());
         }
       } catch (err) {
         console.error('Error initializing auth:', err);
         setError('Failed to initialize authentication');
+        // Clear potentially corrupted auth data
+        authService.logout();
       } finally {
         setIsLoading(false);
       }
@@ -67,13 +56,14 @@ function useProvideAuth() {
     setError(null);
     
     try {
-      // For demo, we're just simulating an API call and using the predefined admin user
-      // In a real app, you would validate credentials against your API
-      await new Promise(resolve => setTimeout(resolve, 800)); // Simulate API delay
+      // Make sure both email and password are provided
+      if (!email || !password) {
+        throw new Error('Email and password are required');
+      }
       
-      // Store user in localStorage and state
-      localStorage.setItem('authUser', JSON.stringify(ADMIN_USER));
-      setUser(ADMIN_USER);
+      // Use the authService to authenticate with the API
+      const result = await authService.loginAdmin(email, password);
+      setUser(result.user);
       return true;
     } catch (err) {
       setError(err.message || 'Login failed');
@@ -88,11 +78,7 @@ function useProvideAuth() {
     setIsLoading(true);
     
     try {
-      // For demo, we're just simulating an API call
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
-      
-      // Remove user from localStorage and state
-      localStorage.removeItem('authUser');
+      authService.logout();
       setUser(null);
     } catch (err) {
       console.error('Logout error:', err);
@@ -104,7 +90,7 @@ function useProvideAuth() {
   
   // Computed properties
   const isAuthenticated = Boolean(user);
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   
   return {
     user,
@@ -117,5 +103,4 @@ function useProvideAuth() {
   };
 }
 
-// Export the AuthProvider as the default export
 export default AuthProvider;
