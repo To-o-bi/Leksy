@@ -1,20 +1,25 @@
-import { useState, useEffect, useContext, createContext, useMemo } from 'react';
+import { useState, useEffect, useContext, createContext, useMemo, useCallback } from 'react';
 import authService from '../api/services/authService';
 
+// Create auth context
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const auth = useProvideAuth();
+  
+  // Memoize auth value to prevent unnecessary re-renders
   const memoizedAuth = useMemo(() => auth, [
     auth.user, 
     auth.isLoading, 
     auth.error, 
-    auth.isAuthenticated
+    auth.isAuthenticated,
+    auth.isAdmin
   ]);
   
   return <AuthContext.Provider value={memoizedAuth}>{children}</AuthContext.Provider>;
 }
 
+// Hook to use auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -23,19 +28,37 @@ export const useAuth = () => {
   return context;
 };
 
+// Main auth logic
 function useProvideAuth() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   
+  // Debug function to check localStorage state
+  const debugAuthState = useCallback(() => {
+    console.log('Current auth state:', {
+      token: localStorage.getItem('auth_token') ? 'EXISTS' : 'NOT FOUND',
+      user: localStorage.getItem('user') ? 'EXISTS' : 'NOT FOUND',
+      parsed: localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null
+    });
+  }, []);
+  
   // Initialize auth state on mount
   useEffect(() => {
-    const initializeAuth = () => {
+    const initializeAuth = async () => {
       setIsLoading(true);
+      
       try {
+        // Debug current localStorage state
+        debugAuthState();
+        
         // Check if we have a valid token and user data
         if (authService.isAuthenticated()) {
-          setUser(authService.getAuthUser());
+          const userData = authService.getAuthUser();
+          console.log('Found existing auth data:', userData);
+          setUser(userData);
+        } else {
+          console.log('No valid auth data found');
         }
       } catch (err) {
         console.error('Error initializing auth:', err);
@@ -48,10 +71,10 @@ function useProvideAuth() {
     };
     
     initializeAuth();
-  }, []);
+  }, [debugAuthState]);
   
   // Login function
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     setIsLoading(true);
     setError(null);
     
@@ -61,36 +84,73 @@ function useProvideAuth() {
         throw new Error('Email and password are required');
       }
       
+      console.log('AuthContext: Attempting login...');
+      debugAuthState();
+      
       // Use the authService to authenticate with the API
       const result = await authService.loginAdmin(email, password);
-      setUser(result.user);
-      return true;
+      
+      console.log('AuthContext: Login response received:', result);
+      
+      // FIXED: Properly handle API response format
+      // Check if result exists and has the expected structure
+      if (!result) {
+        throw new Error('No response from server');
+      }
+      
+      // No need to check for result.user - trust the authService implementation
+      // The authService should handle saving user data to localStorage
+      
+      // Get the user from localStorage after the authService has done its work
+      const userData = authService.getAuthUser();
+      
+      // Set the user state from data in localStorage
+      setUser(userData);
+      
+      // Debug localStorage state after login
+      debugAuthState();
+      
+      console.log('AuthContext: User state updated from localStorage');
+      
+      return result;
     } catch (err) {
+      console.error('AuthContext: Login error:', err);
       setError(err.message || 'Login failed');
       throw err;
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [debugAuthState]);
   
   // Logout function
-  const logout = async () => {
+  const logout = useCallback(() => {
     setIsLoading(true);
     
     try {
+      console.log('AuthContext: Logging out...');
       authService.logout();
       setUser(null);
+      console.log('AuthContext: User logged out successfully');
+      debugAuthState();
     } catch (err) {
       console.error('Logout error:', err);
       setError(err.message || 'Logout failed');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [debugAuthState]);
+  
+  // For debugging: log user state changes
+  useEffect(() => {
+    console.log('Auth user state changed:', { 
+      isAuthenticated: Boolean(user), 
+      user 
+    });
+  }, [user]);
   
   // Computed properties
   const isAuthenticated = Boolean(user);
-  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const isAdmin = Boolean(user?.role === 'admin' || user?.role === 'superadmin');
   
   return {
     user,

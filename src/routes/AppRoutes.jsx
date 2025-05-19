@@ -1,7 +1,6 @@
-import React, { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { lazy, Suspense, useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import PublicRoutes from './PublicRoutes';
-import AdminRoutes from './AdminRoutes';
 import ProtectedRoute from './ProtectedRoute';
 import InboxPage from '../admin/pages/InboxPage';
 import AdminLayout from '../admin/components/layout/AdminLayout';
@@ -38,12 +37,42 @@ const BookingsPage = lazy(() => import('../admin/pages/BookingsPage'));
 const NewBookingPage = lazy(() => import('../admin/pages/NewBookingPage'));
 const EditBookingPage = lazy(() => import('../admin/pages/EditBookingPage'));
 
+// LoginWrapper component to handle redirection after login
+const LoginWrapper = () => {
+  const { isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  useEffect(() => {
+    // If authenticated, redirect to dashboard or the page they were trying to access
+    if (!isLoading && isAuthenticated) {
+      console.log('User is authenticated on login page, redirecting');
+      const from = location.state?.from?.pathname || "/admin/dashboard";
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, isLoading, navigate, location]);
+  
+  // Display login page if not authenticated
+  return <LoginPage />;
+};
+
 const AppRoutes = () => {
+  const location = useLocation();
+  const { isAuthenticated } = useAuth();
+  
+  // Log navigation for debugging
+  useEffect(() => {
+    console.log('Navigation to:', location.pathname, {
+      isAuthenticated,
+      state: location.state
+    });
+  }, [location, isAuthenticated]);
+  
   return (
     <Suspense fallback={<LoadingFallback />}>
       <Routes>
-        {/* Login Route */}
-        <Route path="/login" element={<LoginPage />} />
+        {/* Login Route with special wrapper to handle redirection */}
+        <Route path="/login" element={<LoginWrapper />} />
         
         {/* Public Routes */}
         <Route element={<PublicRoutes />}>
