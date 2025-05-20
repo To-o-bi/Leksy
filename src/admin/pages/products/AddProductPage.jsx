@@ -1,11 +1,16 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import productService from '../../../api/services/productService';
-import { XCircle, Upload, Check, X } from 'lucide-react';
+import { ChevronLeft, AlertCircle } from 'lucide-react';
+import api from '../../../api/axios';
 
+// Updated AddProductPage with direct API handling
 const AddProductPage = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -14,14 +19,11 @@ const AddProductPage = () => {
     description: '',
     quantity: '',
     category: '',
-    images: []
   });
   
-  const [errors, setErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [submitError, setSubmitError] = useState('');
+  const [imageFiles, setImageFiles] = useState([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState([]);
+  const [errors, setErrors] = useState({});
   
   // Available product categories
   const productCategories = [
@@ -77,10 +79,7 @@ const AddProductPage = () => {
     });
     
     if (validFiles.length > 0) {
-      setFormData({
-        ...formData,
-        images: [...formData.images, ...validFiles]
-      });
+      setImageFiles([...imageFiles, ...validFiles]);
       
       // Generate image previews
       validFiles.forEach(file => {
@@ -108,16 +107,13 @@ const AddProductPage = () => {
   
   // Remove an image from the selection
   const handleRemoveImage = (index) => {
-    const updatedImages = [...formData.images];
-    updatedImages.splice(index, 1);
+    const updatedFiles = [...imageFiles];
+    updatedFiles.splice(index, 1);
     
     const updatedPreviews = [...imagePreviewUrls];
     updatedPreviews.splice(index, 1);
     
-    setFormData({
-      ...formData,
-      images: updatedImages
-    });
+    setImageFiles(updatedFiles);
     setImagePreviewUrls(updatedPreviews);
   };
   
@@ -146,7 +142,7 @@ const AddProductPage = () => {
     }
     
     // At least one image required
-    if (formData.images.length === 0) {
+    if (imageFiles.length === 0) {
       newErrors.images = 'At least one product image is required';
     }
     
@@ -154,13 +150,9 @@ const AddProductPage = () => {
     return Object.keys(newErrors).length === 0;
   };
   
-  // Handle form submission
+  // Handle form submission - directly using axios instead of productService
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Reset submission states
-    setSubmitSuccess(false);
-    setSubmitError('');
     
     // Validate form
     if (!validateForm()) {
@@ -168,74 +160,108 @@ const AddProductPage = () => {
     }
     
     setIsSubmitting(true);
+    setError(null);
     
     try {
-      // Convert numeric values
-      const productData = {
-        ...formData,
-        price: parseFloat(formData.price),
-        slashed_price: formData.slashed_price ? parseFloat(formData.slashed_price) : '',
-        quantity: parseInt(formData.quantity, 10)
-      };
+      // Create a standard HTML form for better compatibility
+      const submissionForm = new FormData();
       
-      const response = await productService.addProduct(productData);
+      // Add all text fields
+      submissionForm.append('name', formData.name);
+      submissionForm.append('price', parseFloat(formData.price));
+      submissionForm.append('description', formData.description);
+      submissionForm.append('quantity', parseInt(formData.quantity, 10));
+      submissionForm.append('category', formData.category);
       
-      if (response && response.code === 200) {
-        setSubmitSuccess(true);
-        
-        // Reset form after successful submission
-        setFormData({
-          name: '',
-          price: '',
-          slashed_price: '',
-          description: '',
-          quantity: '',
-          category: '',
-          images: []
-        });
-        setImagePreviewUrls([]);
-        
-        // Navigate to products page after short delay
-        setTimeout(() => {
-          navigate('/admin/products');
-        }, 2000);
-      } else {
-        setSubmitError(response.message || 'Failed to add product. Please try again.');
+      if (formData.slashed_price) {
+        submissionForm.append('slashed_price', parseFloat(formData.slashed_price));
       }
-    } catch (error) {
-      setSubmitError(error.message || 'An error occurred while adding the product.');
+      
+      // Add images with the exact expected field name format
+      for (let i = 0; i < imageFiles.length; i++) {
+        // Using exactly the field name format the backend expects
+        submissionForm.append('images[]', imageFiles[i]);
+      }
+      
+      // Log the submission form entries for debugging
+      console.log("Form data being submitted:");
+      for (let [key, value] of submissionForm.entries()) {
+        console.log(`${key}: ${value instanceof File ? `File: ${value.name}` : value}`);
+      }
+      
+      // Make direct API call instead of using productService
+      const response = await api.post('/admin/add-product', submissionForm, {
+        headers: {
+          // Remove Content-Type to let the browser set it with the correct boundary
+          'Content-Type': undefined
+        }
+      });
+      
+      console.log('Product added successfully:', response.data);
+      setSuccess(true);
+      
+      // Redirect after a brief delay to show success message
+      setTimeout(() => {
+        navigate('/admin/products/stock', {
+          state: {
+            notification: {
+              type: 'success',
+              message: `Product "${formData.name}" has been added successfully.`
+            }
+          }
+        });
+      }, 1500);
+      
+    } catch (err) {
+      console.error('Error adding product:', err);
+      setError(err.message || 'Failed to add product. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
   
+  // Handle cancel button
+  const handleCancel = () => {
+    navigate('/admin/products/stock');
+  };
+  
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-gray-800">Add New Product</h1>
+        <div className="flex items-center">
+          <button
+            onClick={() => navigate('/admin/products/stock')}
+            className="flex items-center text-gray-600 hover:text-gray-800 mr-4"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <h1 className="text-2xl font-semibold text-gray-800">Add New Product</h1>
+        </div>
         <button
-          onClick={() => navigate('/admin/products')}
+          onClick={() => navigate('/admin/products/stock')}
           className="px-4 py-2 text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md transition-colors"
         >
           Back to Products
         </button>
       </div>
       
-      {submitSuccess && (
+      {success && (
         <div className="mb-6 p-4 bg-green-100 border border-green-200 text-green-700 rounded-md flex items-center">
-          <Check size={20} className="mr-2" />
+          <svg className="w-5 h-5 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
           <span>Product added successfully! Redirecting to products list...</span>
         </div>
       )}
       
-      {submitError && (
+      {error && (
         <div className="mb-6 p-4 bg-red-100 border border-red-200 text-red-700 rounded-md flex items-center">
-          <XCircle size={20} className="mr-2" />
-          <span>{submitError}</span>
+          <AlertCircle size={20} className="mr-2" />
+          <span>{error}</span>
         </div>
       )}
       
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6" encType="multipart/form-data">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Product Name */}
           <div>
@@ -378,7 +404,7 @@ const AddProductPage = () => {
             )}
           </div>
           
-          {/* Product Images */}
+          {/* Product Images - WITH THE CORRECT NAME ATTRIBUTE */}
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Product Images <span className="text-red-500">*</span>
@@ -390,22 +416,36 @@ const AddProductPage = () => {
               }`}
             >
               <div className="space-y-1 text-center">
-                <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                <svg
+                  className="mx-auto h-12 w-12 text-gray-400"
+                  stroke="currentColor"
+                  fill="none"
+                  viewBox="0 0 48 48"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
                 <div className="flex text-sm text-gray-600">
                   <label
-                    htmlFor="images"
+                    htmlFor="images[]"
                     className="relative cursor-pointer bg-white rounded-md font-medium text-pink-600 hover:text-pink-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-pink-500"
                   >
                     <span>Upload images</span>
+                    {/* IMPORTANT: Setting name="images[]" as required by backend */}
                     <input
-                      id="images"
-                      name="images"
+                      id="images[]"
+                      name="images[]"
                       type="file"
                       ref={fileInputRef}
+                      className="sr-only"
                       multiple
                       accept="image/*"
                       onChange={handleImageChange}
-                      className="sr-only"
                     />
                   </label>
                   <p className="pl-1">or drag and drop</p>
@@ -439,7 +479,9 @@ const AddProductPage = () => {
                         onClick={() => handleRemoveImage(index)}
                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-sm hover:bg-red-600"
                       >
-                        <X size={16} />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       </button>
                     </div>
                   ))}
@@ -453,8 +495,9 @@ const AddProductPage = () => {
         <div className="flex justify-end mt-8">
           <button
             type="button"
-            onClick={() => navigate('/admin/products')}
+            onClick={handleCancel}
             className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 mr-3"
+            disabled={isSubmitting}
           >
             Cancel
           </button>

@@ -5,7 +5,9 @@ const ProductForm = ({ product = null, onSubmit, onCancel }) => {
     name: product?.name || '',
     category: product?.category || '',
     price: product?.price || '',
-    piece: product?.piece || '',
+    slashed_price: product?.slashed_price || '',
+    quantity: product?.quantity || product?.piece || '', // Support both field names
+    description: product?.description || '',
     image: null,
     imagePreview: product?.image || null
   });
@@ -63,11 +65,17 @@ const ProductForm = ({ product = null, onSubmit, onCancel }) => {
     else if (isNaN(parseFloat(formData.price)) || parseFloat(formData.price) <= 0) {
       newErrors.price = 'Price must be a positive number';
     }
-    if (!formData.piece) newErrors.piece = 'Stock quantity is required';
-    else if (isNaN(parseInt(formData.piece)) || parseInt(formData.piece) < 0) {
-      newErrors.piece = 'Stock quantity must be a non-negative number';
+    if (!formData.quantity) newErrors.quantity = 'Stock quantity is required';
+    else if (isNaN(parseInt(formData.quantity)) || parseInt(formData.quantity) < 0) {
+      newErrors.quantity = 'Stock quantity must be a non-negative number';
     }
+    if (!formData.description.trim()) newErrors.description = 'Description is required';
     if (!product && !formData.image) newErrors.image = 'Product image is required';
+
+    // Slashed price is optional but if provided, must be valid
+    if (formData.slashed_price && (isNaN(parseFloat(formData.slashed_price)) || parseFloat(formData.slashed_price) <= 0)) {
+      newErrors.slashed_price = 'Slashed price must be a positive number';
+    }
 
     return newErrors;
   };
@@ -86,13 +94,12 @@ const ProductForm = ({ product = null, onSubmit, onCancel }) => {
     setIsLoading(true);
 
     try {
-      // In a real app, you would upload the image to a server and get a URL back
-      
       // Prepare form data for submission
       const productData = {
         ...formData,
         price: parseFloat(formData.price),
-        piece: parseInt(formData.piece),
+        quantity: parseInt(formData.quantity),
+        slashed_price: formData.slashed_price ? parseFloat(formData.slashed_price) : 0,
         // In a real app, you would include the image URL here
       };
       
@@ -123,7 +130,7 @@ const ProductForm = ({ product = null, onSubmit, onCancel }) => {
           {/* Product Name */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-              Product Name
+              Product Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -144,7 +151,7 @@ const ProductForm = ({ product = null, onSubmit, onCancel }) => {
           {/* Category */}
           <div>
             <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-              Category
+              Category <span className="text-red-500">*</span>
             </label>
             <select
               id="category"
@@ -170,7 +177,7 @@ const ProductForm = ({ product = null, onSubmit, onCancel }) => {
           {/* Price */}
           <div>
             <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">
-              Price (₦)
+              Price (₦) <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -189,34 +196,77 @@ const ProductForm = ({ product = null, onSubmit, onCancel }) => {
             )}
           </div>
 
-          {/* Stock Quantity */}
+          {/* Slashed Price (Sale Price) */}
           <div>
-            <label htmlFor="piece" className="block text-sm font-medium text-gray-700 mb-1">
-              Stock Quantity
+            <label htmlFor="slashed_price" className="block text-sm font-medium text-gray-700 mb-1">
+              Sale Price (₦)
             </label>
             <input
               type="number"
-              id="piece"
-              name="piece"
-              value={formData.piece}
+              step="0.01"
+              id="slashed_price"
+              name="slashed_price"
+              value={formData.slashed_price}
               onChange={handleChange}
               className={`w-full px-4 py-2 border ${
-                errors.piece ? 'border-red-500' : 'border-gray-300'
+                errors.slashed_price ? 'border-red-500' : 'border-gray-300'
+              } rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500`}
+              placeholder="0.00 (Optional)"
+            />
+            {errors.slashed_price && (
+              <p className="mt-1 text-sm text-red-500">{errors.slashed_price}</p>
+            )}
+          </div>
+
+          {/* Stock Quantity */}
+          <div>
+            <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
+              Stock Quantity <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              id="quantity"
+              name="quantity"
+              value={formData.quantity}
+              onChange={handleChange}
+              className={`w-full px-4 py-2 border ${
+                errors.quantity ? 'border-red-500' : 'border-gray-300'
               } rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500`}
               placeholder="0"
             />
-            {errors.piece && (
-              <p className="mt-1 text-sm text-red-500">{errors.piece}</p>
+            {errors.quantity && (
+              <p className="mt-1 text-sm text-red-500">{errors.quantity}</p>
             )}
           </div>
         </div>
 
         {/* Right Column */}
-        <div>
+        <div className="space-y-6">
+          {/* Product Description */}
+          <div>
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+              Description <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              rows="5"
+              className={`w-full px-4 py-2 border ${
+                errors.description ? 'border-red-500' : 'border-gray-300'
+              } rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500`}
+              placeholder="Enter product description"
+            ></textarea>
+            {errors.description && (
+              <p className="mt-1 text-sm text-red-500">{errors.description}</p>
+            )}
+          </div>
+
           {/* Product Image */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Product Image
+              Product Image <span className="text-red-500">*</span>
             </label>
             <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
               <div className="space-y-4 text-center">

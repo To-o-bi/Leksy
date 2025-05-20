@@ -1,23 +1,30 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import AdminLayout from '../admin/components/layout/AdminLayout';
 
 /**
  * ProtectedRoute component
- * Protects routes by checking if the user is authenticated
- * Redirects to login if not authenticated
+ * Enhanced security wrapper for admin routes
+ * - Checks authentication status
+ * - Shows loading state during authentication check
+ * - Redirects to login with proper state preservation
+ * - Wraps content in AdminLayout once authenticated
  */
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isAdmin, user } = useAuth();
   const location = useLocation();
   
   // Log the authentication state (helpful for debugging)
   console.log('ProtectedRoute check:', { 
     isAuthenticated, 
+    isAdmin,
+    user,
     isLoading, 
-    pathname: location.pathname 
+    pathname: location.pathname,
+    token: localStorage.getItem('auth_token') ? 'exists' : 'missing'
   });
-
+  
   // Show loading state while authentication is being checked
   if (isLoading) {
     return (
@@ -30,17 +37,20 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  // Redirect to login if not authenticated
+  // First check: Redirect to login if not authenticated
   if (!isAuthenticated) {
-    console.log('User not authenticated, redirecting to login');
-    
     // Store the current location in state to redirect back after login
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
+  
+  // Second check: Verify user has admin privileges
+  if (!isAdmin) {
+    // Redirect unauthorized users to the homepage
+    return <Navigate to="/" replace />;
+  }
 
-  // User is authenticated, render the protected route
-  console.log('User authenticated, rendering protected content');
-  return children;
+  // User is authenticated and has admin rights, render admin layout with children
+  return <AdminLayout>{children}</AdminLayout>;
 };
 
 export default ProtectedRoute;

@@ -25,14 +25,18 @@ instance.interceptors.request.use(
       config.url && config.url.includes(endpoint)
     );
     
+    // Check if this is an admin endpoint
+    const isAdminEndpoint = config.url && config.url.includes('/admin/');
+    
     // Add auth token from localStorage if it exists and endpoint requires it
     const token = localStorage.getItem('auth_token');
     
     if (token && !isPublicEndpoint) {
       config.headers['Authorization'] = `Bearer ${token}`;
       console.log('Adding token to request:', config.url);
-    } else if (!token && !isPublicEndpoint) {
-      console.warn('No auth token found for protected request:', config.url);
+    } else if (!token && isAdminEndpoint) {
+      console.warn('No auth token found for admin request:', config.url);
+      // This will trigger a 401 unauthorized response, which will be caught by the response interceptor
     }
     
     // Only override Content-Type if it's not already set and not FormData
@@ -162,13 +166,12 @@ instance.withTokenRenewal = async (apiCall) => {
   } catch (error) {
     if (error.response && error.response.status === 401) {
       // Try to refresh token or re-authenticate
-      // This would depend on your API's token refresh mechanism
       console.log('Token expired - attempting renewal');
       
       // For now, just redirect to login
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      window.location.href = '/login?expired=true';
     }
     throw error;
   }

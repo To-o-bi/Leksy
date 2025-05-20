@@ -1,11 +1,10 @@
 import React, { lazy, Suspense, useEffect } from 'react';
-import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
 import PublicRoutes from './PublicRoutes';
 import ProtectedRoute from './ProtectedRoute';
-import InboxPage from '../admin/pages/InboxPage';
-import AdminLayout from '../admin/components/layout/AdminLayout';
 import { useAuth } from '../contexts/AuthContext';
 
+// Loading fallback for lazy-loaded components
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-screen bg-gray-100">
     <div className="bg-white p-8 rounded-lg shadow-md">
@@ -33,45 +32,36 @@ const ProductStock = lazy(() => import('../admin/pages/products/ProductStock'));
 const AddProductPage = lazy(() => import('../admin/pages/products/AddProductPage'));
 const EditProductPage = lazy(() => import('../admin/pages/products/EditProductPage'));
 const NotificationsPage = lazy(() => import('../admin/pages/Notifications'));
+const InboxPage = lazy(() => import('../admin/pages/InboxPage'));
 const BookingsPage = lazy(() => import('../admin/pages/BookingsPage'));
 const NewBookingPage = lazy(() => import('../admin/pages/NewBookingPage'));
 const EditBookingPage = lazy(() => import('../admin/pages/EditBookingPage'));
 
-// LoginWrapper component to handle redirection after login
+// Improved LoginWrapper with better redirect handling
 const LoginWrapper = () => {
   const { isAuthenticated, isLoading } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   
-  useEffect(() => {
-    // If authenticated, redirect to dashboard or the page they were trying to access
-    if (!isLoading && isAuthenticated) {
-      console.log('User is authenticated on login page, redirecting');
-      const from = location.state?.from?.pathname || "/admin/dashboard";
-      navigate(from, { replace: true });
-    }
-  }, [isAuthenticated, isLoading, navigate, location]);
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return <LoadingFallback />;
+  }
   
-  // Display login page if not authenticated
+  // If user is already authenticated, redirect to dashboard or the intended location
+  if (isAuthenticated) {
+    const from = location.state?.from?.pathname || "/admin/dashboard";
+    return <Navigate to={from} replace />;
+  }
+  
+  // Otherwise show login page
   return <LoginPage />;
 };
 
 const AppRoutes = () => {
-  const location = useLocation();
-  const { isAuthenticated } = useAuth();
-  
-  // Log navigation for debugging
-  useEffect(() => {
-    console.log('Navigation to:', location.pathname, {
-      isAuthenticated,
-      state: location.state
-    });
-  }, [location, isAuthenticated]);
-  
   return (
     <Suspense fallback={<LoadingFallback />}>
       <Routes>
-        {/* Login Route with special wrapper to handle redirection */}
+        {/* Login Route */}
         <Route path="/login" element={<LoginWrapper />} />
         
         {/* Public Routes */}
@@ -86,12 +76,8 @@ const AppRoutes = () => {
           <Route path="/consultation" element={<ConsultationPage />} />
         </Route>
         
-        {/* Protected Admin Routes */}
-        <Route path="/admin" element={
-          <ProtectedRoute>
-            <AdminLayout />
-          </ProtectedRoute>
-        }>
+        {/* Protected Admin Routes - now using ProtectedRoute that includes AdminLayout */}
+        <Route path="/admin" element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="orders" element={<OrdersPage />} />

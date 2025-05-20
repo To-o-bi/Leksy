@@ -56,6 +56,14 @@ function useProvideAuth() {
         if (authService.isAuthenticated()) {
           const userData = authService.getAuthUser();
           console.log('Found existing auth data:', userData);
+          
+          // Verify that token exists
+          const token = localStorage.getItem('auth_token');
+          if (!token) {
+            console.error('User data exists but no token found');
+            throw new Error('Auth token missing');
+          }
+          
           setUser(userData);
         } else {
           console.log('No valid auth data found');
@@ -92,14 +100,12 @@ function useProvideAuth() {
       
       console.log('AuthContext: Login response received:', result);
       
-      // FIXED: Properly handle API response format
-      // Check if result exists and has the expected structure
-      if (!result) {
-        throw new Error('No response from server');
+      // Verify token was saved properly
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.error('Login succeeded but no token was saved');
+        throw new Error('Authentication error: No token saved');
       }
-      
-      // No need to check for result.user - trust the authService implementation
-      // The authService should handle saving user data to localStorage
       
       // Get the user from localStorage after the authService has done its work
       const userData = authService.getAuthUser();
@@ -160,6 +166,8 @@ function useProvideAuth() {
     logout,
     isAuthenticated,
     isAdmin,
+    // Add a method to check if the token is valid
+    verifyToken: debugAuthState
   };
 }
 

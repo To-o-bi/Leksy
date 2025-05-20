@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { Eye, Trash2, Edit, Plus, ChevronLeft, ChevronRight, ChevronDown, ShoppingBag } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, Trash2, Edit, Plus, ChevronLeft, ChevronRight, ChevronDown, AlertCircle, ShoppingBag } from 'lucide-react';
+import productService from '../../../api/services/productService';
 
 const ProductStockPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(7);
+  const [itemsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [sortBy, setSortBy] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
@@ -17,102 +19,9 @@ const ProductStockPage = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Enhanced mock data to match AddProductPage structure
-  const mockProducts = [
-    {
-      id: 1,
-      name: "Cera Ve Cream",
-      category: "Moisturizer",
-      mainPrice: 6900.00,
-      oldPrice: 7500.00,
-      quantity: 63,
-      description: "CeraVe Moisturizing Cream includes 3 essential ceramides that help restore and maintain the skin's natural barrier.",
-      images: ["/api/placeholder/80/80"]
-    },
-    {
-      id: 2,
-      name: "The Ordinary Niacinamide",
-      category: "Serum",
-      mainPrice: 5200.00,
-      oldPrice: 5800.00,
-      quantity: 42,
-      description: "The Ordinary Niacinamide 10% + Zinc 1% is a water-based serum that boosts skin brightness and improves congestion.",
-      images: ["/api/placeholder/80/80"]
-    },
-    {
-      id: 3,
-      name: "Neutrogena Hydro Boost",
-      category: "Moisturizer",
-      mainPrice: 4500.00,
-      oldPrice: null,
-      quantity: 29,
-      description: "Neutrogena Hydro Boost water gel quenches dry skin and keeps it looking hydrated, supple, and smooth.",
-      images: ["/api/placeholder/80/80"]
-    },
-    {
-      id: 4,
-      name: "Paula's Choice BHA Exfoliant",
-      category: "Cleanser",
-      mainPrice: 8900.00,
-      oldPrice: 9500.00,
-      quantity: 17,
-      description: "Paula's Choice Skin Perfecting 2% BHA Liquid Exfoliant gently removes dead skin cells and unclogs pores.",
-      images: ["/api/placeholder/80/80"]
-    },
-    {
-      id: 5,
-      name: "La Roche-Posay Sunscreen",
-      category: "Sunscreens",
-      mainPrice: 7200.00,
-      oldPrice: 7800.00,
-      quantity: 34,
-      description: "La Roche-Posay Anthelios provides broad-spectrum SPF 50+ protection against UVA and UVB rays.",
-      images: ["/api/placeholder/80/80"]
-    },
-    {
-      id: 6,
-      name: "Dove Body Wash",
-      category: "Bathe",
-      mainPrice: 3200.00,
-      oldPrice: 3500.00,
-      quantity: 52,
-      description: "Dove Deep Moisture Body Wash provides instant softness and nourishment for your skin.",
-      images: ["/api/placeholder/80/80"]
-    },
-    {
-      id: 7,
-      name: "Cetaphil Gentle Cleanser",
-      category: "Cleanser",
-      mainPrice: 4800.00,
-      oldPrice: null,
-      quantity: 38,
-      description: "Cetaphil Gentle Skin Cleanser is suitable for all skin types, even sensitive skin.",
-      images: ["/api/placeholder/80/80"]
-    },
-    {
-      id: 8,
-      name: "Bioderma Micellar Water",
-      category: "Cleanser",
-      mainPrice: 5100.00,
-      oldPrice: 5600.00,
-      quantity: 25,
-      description: "Bioderma Sensibio H2O is a gentle cleansing and makeup removing water that respects the fragility of sensitive skin.",
-      images: ["/api/placeholder/80/80"]
-    },
-    {
-      id: 9,
-      name: "Olay Regenerist Serum",
-      category: "Serum",
-      mainPrice: 8200.00,
-      oldPrice: 9000.00,
-      quantity: 19,
-      description: "Olay Regenerist Micro-Sculpting Serum hydrates to improve elasticity and firm skin for a lifted look.",
-      images: ["/api/placeholder/80/80"]
-    }
-  ];
-
-  // Check for added product notification from location state
+  // Check for notifications from location state (e.g., from add/edit page)
   useEffect(() => {
     if (location.state?.notification) {
       setNotification(location.state.notification);
@@ -128,35 +37,50 @@ const ProductStockPage = () => {
     }
   }, [location.state]);
 
+  // Fetch products from API
   useEffect(() => {
-    const fetchProducts = () => {
+    const fetchProducts = async () => {
       setIsLoading(true);
-      setTimeout(() => {
-        setTotalItems(mockProducts.length);
+      try {
+        // Prepare query parameters
+        const queryParams = {
+          page: currentPage,
+          limit: itemsPerPage,
+          sort: sortBy,
+          sortDirection: sortDirection
+        };
         
-        const sortedProducts = [...mockProducts].sort((a, b) => {
-          if (sortBy === 'name') {
-            return sortDirection === 'asc' 
-              ? a.name.localeCompare(b.name) 
-              : b.name.localeCompare(a.name);
-          } else if (sortBy === 'mainPrice') {
-            return sortDirection === 'asc' ? a.mainPrice - b.mainPrice : b.mainPrice - a.mainPrice;
-          } else if (sortBy === 'quantity') {
-            return sortDirection === 'asc' ? a.quantity - b.quantity : b.quantity - a.quantity;
-          }
-          return 0;
+        // Call the API through our service
+        const response = await productService.fetchProducts(queryParams);
+        
+        // API response should include:
+        // - products array
+        // - total count for pagination
+        if (response && response.products) {
+          setProducts(response.products);
+          setTotalItems(response.total || response.products.length);
+        } else {
+          throw new Error('Failed to fetch products');
+        }
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        setNotification({
+          type: 'error',
+          message: 'Failed to load products. Please try again.'
         });
         
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const paginatedProducts = sortedProducts.slice(startIndex, startIndex + itemsPerPage);
-        
-        setProducts(paginatedProducts);
+        // Fallback to empty array if API fails
+        setProducts([]);
+      } finally {
         setIsLoading(false);
-      }, 500);
+      }
     };
 
     fetchProducts();
+  }, [currentPage, itemsPerPage, sortBy, sortDirection]);
 
+  // Handle clicks outside of dropdown
+  useEffect(() => {
     const handleClickOutside = (event) => {
       if (!event.target.closest('.sort-dropdown')) {
         setShowSortDropdown(false);
@@ -167,8 +91,9 @@ const ProductStockPage = () => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [currentPage, itemsPerPage, sortBy, sortDirection]);
+  }, []);
 
+  // Handle sort option selection
   const handleSortOption = (option) => {
     if (option === 'name-asc') {
       setSortBy('name');
@@ -177,10 +102,10 @@ const ProductStockPage = () => {
       setSortBy('name');
       setSortDirection('desc');
     } else if (option === 'price-asc') {
-      setSortBy('mainPrice');
+      setSortBy('price');
       setSortDirection('asc');
     } else if (option === 'price-desc') {
-      setSortBy('mainPrice');
+      setSortBy('price');
       setSortDirection('desc');
     } else if (option === 'quantity-asc') {
       setSortBy('quantity');
@@ -192,8 +117,10 @@ const ProductStockPage = () => {
     setShowSortDropdown(false);
   };
 
+  // Calculate total pages
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
+  // Handle pagination
   const goToNextPage = () => {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
@@ -206,41 +133,74 @@ const ProductStockPage = () => {
     }
   };
 
+  // Format price with Naira symbol
   const formatPrice = (price) => {
-    if (price === null || price === undefined) return '-';
-    return '₦' + price.toLocaleString('en-US', { minimumFractionDigits: 2 });
+    return '₦' + parseFloat(price).toLocaleString('en-US', { minimumFractionDigits: 2 });
   };
 
+  // Handle edit button click - navigate to edit page
+  const handleEditClick = (product) => {
+    navigate(`/admin/products/edit/${product.id}`);
+  };
+
+  // Handle delete button click - show confirmation modal
   const handleDeleteClick = (product) => {
     setActiveProduct(product);
     setShowDeleteModal(true);
   };
 
+  // Handle view button click - show view modal
   const handleViewClick = (product) => {
     setActiveProduct(product);
     setShowViewModal(true);
   };
 
-  const handleDeleteConfirm = () => {
-    // In a real app, you would call an API to delete the product
-    const updatedProducts = products.filter(product => product.id !== activeProduct.id);
-    setProducts(updatedProducts);
-    setTotalItems(prev => prev - 1);
-    setShowDeleteModal(false);
+  // Handle delete confirmation
+  const handleDeleteConfirm = async () => {
+    if (!activeProduct || !activeProduct.id) return;
     
-    // Show success notification
-    setNotification({
-      type: 'success',
-      message: `Product "${activeProduct.name}" has been deleted successfully.`
-    });
+    setIsSubmitting(true);
     
-    // Auto-dismiss notification after 5 seconds
-    setTimeout(() => {
-      setNotification(null);
-    }, 5000);
+    try {
+      // Call the delete API
+      await productService.deleteProduct(activeProduct.id);
+      
+      // Update local state
+      setProducts(products.filter(product => product.id !== activeProduct.id));
+      setTotalItems(prev => prev - 1);
+      
+      // Show success notification
+      setNotification({
+        type: 'success',
+        message: `Product "${activeProduct.name}" has been deleted successfully.`
+      });
+      
+      // Close modal
+      setShowDeleteModal(false);
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      
+      // Show error notification
+      setNotification({
+        type: 'error',
+        message: error.message || 'Failed to delete product. Please try again.'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  // Modal component (for delete and view)
+  // Sort options for the dropdown
+  const sortOptions = [
+    { id: 'name-asc', label: 'Name (A-Z)' },
+    { id: 'name-desc', label: 'Name (Z-A)' },
+    { id: 'price-asc', label: 'Price (Low to High)' },
+    { id: 'price-desc', label: 'Price (High to Low)' },
+    { id: 'quantity-asc', label: 'Stock (Low to High)' },
+    { id: 'quantity-desc', label: 'Stock (High to Low)' }
+  ];
+
+  // Modal component to reduce repetition
   const Modal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
     
@@ -278,7 +238,9 @@ const ProductStockPage = () => {
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
             </svg>
           ) : (
-            <AlertCircle className={`w-5 h-5 ${iconColor}`} />
+            <svg className={`w-5 h-5 ${iconColor}`} fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
           )}
         </div>
         <div className="ml-3">
@@ -293,29 +255,6 @@ const ProductStockPage = () => {
     );
   };
 
-  // Prepare pagination text
-  const getStartItemNumber = () => {
-    if (products.length === 0) return 0;
-    return currentPage === 1 ? 1 : (currentPage - 1) * itemsPerPage + 1;
-  };
-
-  const getEndItemNumber = () => {
-    return Math.min(currentPage * itemsPerPage, totalItems);
-  };
-
-  // Prepare button class names
-  const getPrevButtonClass = () => {
-    return currentPage === 1 
-      ? "p-1 rounded-md text-gray-300 cursor-not-allowed" 
-      : "p-1 rounded-md text-gray-500 hover:bg-gray-100";
-  };
-
-  const getNextButtonClass = () => {
-    return currentPage === totalPages 
-      ? "p-1 rounded-md text-gray-300 cursor-not-allowed" 
-      : "p-1 rounded-md text-gray-500 hover:bg-gray-100";
-  };
-
   return (
     <div className="bg-gray-50 min-h-screen">
       {/* Notification */}
@@ -327,10 +266,12 @@ const ProductStockPage = () => {
         />
       )}
       
+      {/* Main Content */}
       <div className="p-4 md:p-6">
         <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
           <h1 className="text-2xl font-medium text-gray-800">Product Stock</h1>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            {/* Navigate to Add Product Page instead of modal */}
             <button 
               className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-md flex items-center"
               onClick={() => navigate('/admin/products/add')}
@@ -351,42 +292,16 @@ const ProductStockPage = () => {
               {showSortDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10">
                   <div className="py-1">
-                    <button 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                      onClick={() => handleSortOption('name-asc')}
-                    >
-                      Name (A-Z)
-                    </button>
-                    <button 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                      onClick={() => handleSortOption('name-desc')}
-                    >
-                      Name (Z-A)
-                    </button>
-                    <button 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                      onClick={() => handleSortOption('price-asc')}
-                    >
-                      Price (Low to High)
-                    </button>
-                    <button 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                      onClick={() => handleSortOption('price-desc')}
-                    >
-                      Price (High to Low)
-                    </button>
-                    <button 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                      onClick={() => handleSortOption('quantity-asc')}
-                    >
-                      Quantity (Low to High)
-                    </button>
-                    <button 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                      onClick={() => handleSortOption('quantity-desc')}
-                    >
-                      Quantity (High to Low)
-                    </button>
+                    {/* Using the sortOptions array with unique key props */}
+                    {sortOptions.map(option => (
+                      <button 
+                        key={option.id}
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                        onClick={() => handleSortOption(option.id)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
@@ -394,7 +309,7 @@ const ProductStockPage = () => {
           </div>
         </div>
 
-        {/* Product Table */}
+        {/* Product Table - Responsive */}
         <div className="bg-white rounded-md shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -404,7 +319,7 @@ const ProductStockPage = () => {
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Product Name</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Category</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Price</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Quantity</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Stock</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Actions</th>
                 </tr>
               </thead>
@@ -434,11 +349,11 @@ const ProductStockPage = () => {
                   </tr>
                 ) : (
                   products.map((product) => (
-                    <tr key={product.id} className="border-b hover:bg-gray-50">
+                    <tr key={product.id || `product-${Math.random()}`} className="border-b hover:bg-gray-50">
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="w-12 h-12 md:w-16 md:h-16 rounded-md overflow-hidden bg-gray-100">
                           <img 
-                            src={product.images[0] || "/api/placeholder/80/80"} 
+                            src={product.image_url || "/api/placeholder/64/64"} 
                             alt={product.name} 
                             className="w-full h-full object-cover"
                           />
@@ -451,19 +366,31 @@ const ProductStockPage = () => {
                         <div className="text-sm text-gray-600">{product.category}</div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{formatPrice(product.mainPrice)}</div>
-                        {product.oldPrice && (
-                          <div className="text-xs text-gray-500 line-through">{formatPrice(product.oldPrice)}</div>
+                        <div className="text-sm text-gray-900">{formatPrice(product.price)}</div>
+                        {product.slashed_price && (
+                          <div className="text-xs text-gray-500 line-through">
+                            {formatPrice(product.slashed_price)}
+                          </div>
                         )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{product.quantity}</div>
+                        <div className="text-sm text-gray-900">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            product.quantity === 0 
+                              ? 'bg-red-100 text-red-800' 
+                              : product.quantity <= 10 
+                              ? 'bg-yellow-100 text-yellow-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {product.quantity}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
                         <div className="flex space-x-3">
                           <button 
-                            className="text-gray-500 hover:text-blue-500"
-                            onClick={() => navigate(`/admin/products/edit/${product.id}`)}
+                            className="text-gray-500 hover:text-gray-700"
+                            onClick={() => handleEditClick(product)}
                             aria-label="Edit"
                           >
                             <Edit size={18} />
@@ -496,14 +423,15 @@ const ProductStockPage = () => {
             <div className="px-4 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <p className="text-sm text-gray-500">
-                  Showing {getStartItemNumber()}-{getEndItemNumber()} of {totalItems}
+                  Showing {currentPage === 1 ? 1 : (currentPage - 1) * itemsPerPage + 1}-
+                  {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems}
                 </p>
               </div>
               <div className="flex space-x-1">
                 <button
                   onClick={goToPreviousPage}
                   disabled={currentPage === 1}
-                  className={getPrevButtonClass()}
+                  className={`p-1 rounded-md ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-100'}`}
                   aria-label="Previous page"
                 >
                   <ChevronLeft size={20} />
@@ -511,7 +439,7 @@ const ProductStockPage = () => {
                 <button
                   onClick={goToNextPage}
                   disabled={currentPage === totalPages}
-                  className={getNextButtonClass()}
+                  className={`p-1 rounded-md ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-100'}`}
                   aria-label="Next page"
                 >
                   <ChevronRight size={20} />
@@ -537,14 +465,26 @@ const ProductStockPage = () => {
               <button
                 onClick={() => setShowDeleteModal(false)}
                 className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                disabled={isSubmitting}
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteConfirm}
-                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+                className={`px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center ${
+                  isSubmitting ? 'opacity-75 cursor-not-allowed' : ''
+                }`}
+                disabled={isSubmitting}
               >
-                Delete
+                {isSubmitting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Deleting...
+                  </>
+                ) : 'Delete'}
               </button>
             </div>
           </>
@@ -563,7 +503,7 @@ const ProductStockPage = () => {
               <div className="w-full sm:w-1/3">
                 <div className="w-full h-40 rounded-md overflow-hidden bg-gray-100">
                   <img 
-                    src={activeProduct.images[0] || "/api/placeholder/200/200"} 
+                    src={activeProduct.image_url || "/api/placeholder/200/200"} 
                     alt={activeProduct.name} 
                     className="w-full h-full object-contain" 
                   />
@@ -577,9 +517,9 @@ const ProductStockPage = () => {
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-500">Price:</span>
                     <div className="text-right">
-                      <span className="text-sm text-gray-900 font-semibold">{formatPrice(activeProduct.mainPrice)}</span>
-                      {activeProduct.oldPrice && (
-                        <div className="text-xs text-gray-500 line-through">{formatPrice(activeProduct.oldPrice)}</div>
+                      <span className="text-sm text-gray-900 font-semibold">{formatPrice(activeProduct.price)}</span>
+                      {activeProduct.slashed_price && (
+                        <div className="text-xs text-gray-500 line-through">{formatPrice(activeProduct.slashed_price)}</div>
                       )}
                     </div>
                   </div>
@@ -604,7 +544,7 @@ const ProductStockPage = () => {
             
             <div className="mt-6 flex justify-end space-x-3">
               <button
-                onClick={() => navigate(`/admin/products/edit/${activeProduct.id}`)}
+                onClick={() => handleEditClick(activeProduct)}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 flex items-center"
               >
                 <Edit size={16} className="mr-2" />
