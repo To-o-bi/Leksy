@@ -5,7 +5,7 @@ import api from '../../../api/axios';
 
 // Updated AddProductPage with direct API handling
 const AddProductPage = () => {
-  const navigate = useNavigate();
+  const navigate = useNavigate(); 
   const fileInputRef = useRef(null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);

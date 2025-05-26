@@ -8,12 +8,12 @@ export function AuthProvider({ children }) {
   const auth = useProvideAuth();
   
   // Memoize auth value to prevent unnecessary re-renders
-  const memoizedAuth = useMemo(() => auth, [
+  const memoizedAuth = useMemo(() => auth, [    
     auth.user, 
-    auth.isLoading, 
-    auth.error, 
-    auth.isAuthenticated,
-    auth.isAdmin
+    auth.isLoading,   
+    auth.error,  
+    auth.isAuthenticated,   
+    auth.isAdmin      
   ]);
   
   return <AuthContext.Provider value={memoizedAuth}>{children}</AuthContext.Provider>;

@@ -7,7 +7,8 @@ export const categories = [
         image: serum, // Keep this as is since it's imported directly
         path: '/shop/serums', 
         bgColor: 'bg-pink-100', 
-        hoverColor: 'hover:bg-pink-200' 
+        hoverColor: 'hover:bg-pink-200',
+        productCount: 24
     },
     {   
         id: 2,
@@ -15,7 +16,8 @@ export const categories = [
         image: '/assets/images/categories/moisturizer.png', 
         path: '/shop/moisturizers', 
         bgColor: 'bg-amber-50', 
-        hoverColor: 'hover:bg-amber-100' 
+        hoverColor: 'hover:bg-amber-100',
+        productCount: 18
     },
     { 
         id: 3,
@@ -23,7 +25,8 @@ export const categories = [
         image: '/assets/images/categories/body.png', 
         path: '/shop/balms-soaps', 
         bgColor: 'bg-green-50', 
-        hoverColor: 'hover:bg-green-100' 
+        hoverColor: 'hover:bg-green-100',
+        productCount: 32
     },
     {             
         id: 4,
@@ -31,7 +34,8 @@ export const categories = [
         image: '/assets/images/categories/sunscreen.png', 
         path: '/shop/sunscreens', 
         bgColor: 'bg-purple-100', 
-        hoverColor: 'hover:bg-purple-200' 
+        hoverColor: 'hover:bg-purple-200',
+        productCount: 12
     },
     { 
         id: 5,
@@ -39,7 +43,8 @@ export const categories = [
         image: '/assets/images/categories/toner.png', 
         path: '/shop/toners', 
         bgColor: 'bg-blue-100', 
-        hoverColor: 'hover:bg-blue-200' 
+        hoverColor: 'hover:bg-blue-200',
+        productCount: 15
     },
     { 
         id: 6,
@@ -47,7 +52,8 @@ export const categories = [
         image: '/assets/images/categories/cleanser.png', 
         path: '/shop/cleansers', 
         bgColor: 'bg-emerald-100', 
-        hoverColor: 'hover:bg-emerald-200' 
+        hoverColor: 'hover:bg-emerald-200',
+        productCount: 21
     },
 ];
 
