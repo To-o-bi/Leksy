@@ -8,8 +8,8 @@ const LoginPage = () => {
   const location = useLocation();
   const { login, isAuthenticated, isLoading } = useAuth();
   
-  // Form state
-  const [email, setEmail] = useState('');
+  // Form state - using username instead of email since API expects username
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,8 +30,8 @@ const LoginPage = () => {
     e.preventDefault();
     
     // Validate form
-    if (!email) {
-      setError('Email is required');
+    if (!username.trim()) {
+      setError('Username is required');
       return;
     }
     if (!password) {
@@ -43,33 +43,25 @@ const LoginPage = () => {
     setIsSubmitting(true);
     
     try {
-      console.log('Attempting login with:', email);
+      console.log('Attempting login with username:', username);
       
       // Call login function from auth context
-      const result = await login(email, password);
+      // The AuthContext expects email, but we'll pass username since that's what the API needs
+      const result = await login(username.trim(), password);
       
       console.log('Login successful, result:', result);
-      console.log('User should now be authenticated:', { isAuthenticated: Boolean(authService.getAuthUser()) });
       console.log('Redirecting to:', from);
       
-      // Add a small delay to ensure state updates properly
-      setTimeout(() => {
-        console.log('Checking auth state before navigation:', { 
-          isAuthenticated: Boolean(authService.getAuthUser()),
-          token: Boolean(localStorage.getItem('auth_token'))
-        });
-        navigate(from, { replace: true });
-        console.log('Navigation triggered');
-      }, 100);
+      // Navigate to the intended page or dashboard
+      navigate(from, { replace: true });
+      
     } catch (err) {
       console.error('Login failed:', err);
       
       // Handle different error types
-      if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-        setError('Invalid email or password');
-      } else if (err.code === 'auth/too-many-requests') {
-        setError('Too many failed login attempts. Please try again later.');
-      } else if (err.code === 'auth/network-request-failed') {
+      if (err.message.includes('Invalid credentials')) {
+        setError('Invalid username or password');
+      } else if (err.message.includes('Network')) {
         setError('Network error. Please check your connection.');
       } else {
         setError(err.message || 'Login failed. Please try again.');
@@ -89,24 +81,27 @@ const LoginPage = () => {
             </svg>
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
+            Admin Login
           </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Sign in to manage your products
+          </p>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
-              <label htmlFor="email-address" className="sr-only">Email address</label>
+              <label htmlFor="username" className="sr-only">Username</label>
               <input
-                id="email-address"
-                name="email"
-                type="name"
-                autoComplete="email"
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
                 required
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-pink-500 focus:border-pink-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 disabled={isSubmitting}
               />
             </div>
@@ -128,8 +123,8 @@ const LoginPage = () => {
           </div>
           
           {error && (
-            <div className="text-red-500 text-sm text-center" role="alert">
-              {error}
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded relative" role="alert">
+              <span className="block sm:inline">{error}</span>
             </div>
           )}
           
@@ -138,13 +133,13 @@ const LoginPage = () => {
               type="submit"
               disabled={isSubmitting}
               className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
-                isSubmitting ? 'bg-pink-400' : 'bg-pink-600 hover:bg-pink-700'
-              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500`}
+                isSubmitting ? 'bg-pink-400 cursor-not-allowed' : 'bg-pink-600 hover:bg-pink-700'
+              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 transition-colors duration-200`}
             >
               {isSubmitting ? (
                 <>
                   <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                    <svg className="animate-spin h-5 w-5 text-pink-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -152,10 +147,26 @@ const LoginPage = () => {
                   Signing in...
                 </>
               ) : (
-                'Sign in'
+                <>
+                  <span className="absolute left-0 inset-y-0 flex items-center pl-3">
+                    <svg className="h-5 w-5 text-pink-500 group-hover:text-pink-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                  </span>
+                  Sign in
+                </>
               )}
             </button>
           </div>
+          
+          {/* Debug info in development */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-4 p-3 bg-gray-100 rounded text-xs text-gray-600">
+              <p className="font-semibold">Debug Info:</p>
+              <p>API Base URL: {process.env.REACT_APP_API_URL || 'https://leksycosmetics.com/api'}</p>
+              <p>Redirect Path: {from}</p>
+            </div>
+          )}
         </form>
       </div>
     </div>

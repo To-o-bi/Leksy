@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Save, Upload, X, AlertCircle } from 'lucide-react';
-import productService from '../../../api/services/productService';
+import { productService } from '../../../api'; // Corrected import
 
 const EditProductPage = () => {
   const { id } = useParams();
@@ -47,7 +47,7 @@ const EditProductPage = () => {
         
         console.log('Fetching product with ID:', id);
         
-        // Call the real API to fetch product data
+        // Call the API to fetch product data
         const productData = await productService.fetchProduct(id);
         
         if (!productData) {
@@ -57,26 +57,26 @@ const EditProductPage = () => {
         
         console.log('Product data fetched:', productData);
         
-        // Set form data from API response
+        // Set form data from API response - note: API returns available_qty, not quantity
         setFormData({
           name: productData.name || '',
           price: productData.price ? productData.price.toString() : '',
           slashed_price: productData.slashed_price ? productData.slashed_price.toString() : '',
           category: productData.category || '',
-          quantity: productData.quantity ? productData.quantity.toString() : '',
+          quantity: productData.available_qty ? productData.available_qty.toString() : '', // Fixed: use available_qty
           description: productData.description || '',
           images: [] // New images will be added here
         });
         
         // Set existing images from API response
-        setExistingImages(
-          productData.images || 
-          (productData.image_url ? [productData.image_url] : [])
-        );
+        setExistingImages(productData.images || []);
         
       } catch (error) {
         console.error('Error fetching product:', error);
         setSubmitError('Failed to load product data. Please try again.');
+        if (error.message.includes('not found')) {
+          setProductNotFound(true);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -230,25 +230,34 @@ const EditProductPage = () => {
     
     try {
       // Prepare data for submission
-      const productData = {
+      const updateData = {
         name: formData.name,
         price: parseFloat(formData.price),
         description: formData.description,
         quantity: parseInt(formData.quantity, 10),
-        category: formData.category,
-        images: formData.images,
-        existing_images: existingImages
+        category: formData.category
       };
       
       // Add slashed_price if provided
       if (formData.slashed_price) {
-        productData.slashed_price = parseFloat(formData.slashed_price);
+        updateData.slashed_price = parseFloat(formData.slashed_price);
       }
       
-      console.log('Submitting update with data:', productData);
+      // Add new images if any
+      if (formData.images.length > 0) {
+        updateData.images = formData.images;
+      }
+      
+      // Note: The API doesn't support existing_images parameter,
+      // so we only send new images if provided
+      
+      console.log('Submitting update with data:', {
+        ...updateData,
+        images: updateData.images ? `${updateData.images.length} new files` : 'No new images'
+      });
       
       // Make the API call to update the product
-      const response = await productService.editProduct(id, productData);
+      const response = await productService.editProduct(id, updateData);
       
       console.log('Update response:', response);
       setSubmitSuccess(true);
@@ -354,7 +363,7 @@ const EditProductPage = () => {
         </div>
       )}
       
-      <form onSubmit={handleSubmit} className="space-y-6" encType="multipart/form-data">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Product Name */}
           <div>
@@ -501,7 +510,7 @@ const EditProductPage = () => {
           {existingImages.length > 0 && (
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Existing Images
+                Current Images
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {existingImages.map((imageUrl, index) => (
@@ -511,25 +520,32 @@ const EditProductPage = () => {
                         src={imageUrl}
                         alt={`Product image ${index + 1}`}
                         className="h-full w-full object-cover object-center"
+                        onError={(e) => {
+                          e.target.src = '/placeholder-image.jpg'; // Fallback image
+                        }}
                       />
                     </div>
                     <button
                       type="button"
                       onClick={() => handleRemoveExistingImage(index)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-sm hover:bg-red-600"
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-sm hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Remove image"
                     >
                       <X size={16} />
                     </button>
                   </div>
                 ))}
               </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Note: Removing existing images will permanently delete them when you save changes.
+              </p>
             </div>
           )}
           
           {/* Upload New Images */}
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {existingImages.length > 0 ? 'Add More Images' : 'Product Images'} {existingImages.length === 0 && <span className="text-red-500">*</span>}
+              Add New Images {existingImages.length === 0 && <span className="text-red-500">*</span>}
             </label>
             
             <div 
@@ -541,14 +557,13 @@ const EditProductPage = () => {
                 <Upload className="mx-auto h-12 w-12 text-gray-400" />
                 <div className="flex text-sm text-gray-600">
                   <label
-                    htmlFor="images[]"
+                    htmlFor="file-upload"
                     className="relative cursor-pointer bg-white rounded-md font-medium text-pink-600 hover:text-pink-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-pink-500"
                   >
                     <span>Upload images</span>
-                    {/* Important: Use the correct field name expected by the backend */}
                     <input
-                      id="images[]"
-                      name="images[]"
+                      id="file-upload"
+                      name="file-upload"
                       type="file"
                       ref={fileInputRef}
                       multiple
@@ -572,7 +587,7 @@ const EditProductPage = () => {
             {/* New image previews */}
             {imagePreviewUrls.length > 0 && (
               <div className="mt-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">New Images:</p>
+                <p className="text-sm font-medium text-gray-700 mb-2">New Images to Upload:</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                   {imagePreviewUrls.map((url, index) => (
                     <div key={`new-${index}`} className="relative group">
@@ -598,7 +613,7 @@ const EditProductPage = () => {
           </div>
         </div>
         
-        {/* Submit button */}
+        {/* Submit buttons */}
         <div className="flex justify-end mt-8">
           <button
             type="button"
@@ -613,7 +628,7 @@ const EditProductPage = () => {
             disabled={isSubmitting}
             className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
               isSubmitting ? 'bg-pink-400 cursor-not-allowed' : 'bg-pink-600 hover:bg-pink-700'
-            }`}
+            } transition-colors duration-200`}
           >
             {isSubmitting ? (
               <div className="flex items-center">
