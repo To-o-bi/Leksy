@@ -42,35 +42,77 @@ const ProductStockPage = () => {
     const fetchProducts = async () => {
       setIsLoading(true);
       try {
-        // Prepare query parameters
+        // Prepare query parameters that match the API expectations
         const queryParams = {
-          page: currentPage,
-          limit: itemsPerPage,
-          sort: sortBy,
-          sortDirection: sortDirection
+          sort: sortBy, // API only accepts: name|price|category (no direction)
         };
+        
+        console.log('Fetching products with params:', queryParams);
         
         // Call the API through our service
         const response = await productService.fetchProducts(queryParams);
         
-        // API response should include:
-        // - products array
-        // - total count for pagination
-        if (response && response.products) {
-          setProducts(response.products);
-          setTotalItems(response.total || response.products.length);
+        console.log('Products API response:', response);
+        
+        // Handle the response structure from the API
+        if (response && response.code === 200) {
+          let productsList = response.products || [];
+          
+          // Map API response fields to match component expectations
+          productsList = productsList.map(product => ({
+            ...product,
+            id: product.product_id, // Map product_id to id
+            quantity: product.available_qty, // Map available_qty to quantity
+            image_url: product.images && product.images.length > 0 ? product.images[0] : null
+          }));
+          
+          // Sort products locally since API doesn't support direction
+          productsList.sort((a, b) => {
+            let aValue, bValue;
+            
+            switch (sortBy) {
+              case 'name':
+                aValue = (a.name || '').toLowerCase();
+                bValue = (b.name || '').toLowerCase();
+                break;
+              case 'price':
+                aValue = parseFloat(a.price) || 0;
+                bValue = parseFloat(b.price) || 0;
+                break;
+              case 'category':
+                aValue = (a.category || '').toLowerCase();
+                bValue = (b.category || '').toLowerCase();
+                break;
+              default:
+                return 0;
+            }
+            
+            if (sortDirection === 'desc') {
+              return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+            } else {
+              return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+            }
+          });
+          
+          // Handle pagination locally since API doesn't support it
+          const startIndex = (currentPage - 1) * itemsPerPage;
+          const paginatedProducts = productsList.slice(startIndex, startIndex + itemsPerPage);
+          
+          setProducts(paginatedProducts);
+          setTotalItems(productsList.length);
         } else {
-          throw new Error('Failed to fetch products');
+          throw new Error(response?.message || 'Failed to fetch products');
         }
       } catch (error) {
         console.error('Error fetching products:', error);
         setNotification({
           type: 'error',
-          message: 'Failed to load products. Please try again.'
+          message: error.message || 'Failed to load products. Please try again.'
         });
         
         // Fallback to empty array if API fails
         setProducts([]);
+        setTotalItems(0);
       } finally {
         setIsLoading(false);
       }
@@ -108,13 +150,14 @@ const ProductStockPage = () => {
       setSortBy('price');
       setSortDirection('desc');
     } else if (option === 'quantity-asc') {
-      setSortBy('quantity');
+      setSortBy('name'); // API doesn't support quantity sorting, fallback to name
       setSortDirection('asc');
     } else if (option === 'quantity-desc') {
-      setSortBy('quantity');
+      setSortBy('name'); // API doesn't support quantity sorting, fallback to name
       setSortDirection('desc');
     }
     setShowSortDropdown(false);
+    setCurrentPage(1); // Reset to first page when sorting
   };
 
   // Calculate total pages
@@ -135,12 +178,16 @@ const ProductStockPage = () => {
 
   // Format price with Naira symbol
   const formatPrice = (price) => {
-    return '₦' + parseFloat(price).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    if (!price || isNaN(price)) return '₦0.00';
+    return '₦' + parseFloat(price).toLocaleString('en-US', { 
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2 
+    });
   };
 
   // Handle edit button click - navigate to edit page
   const handleEditClick = (product) => {
-    navigate(`/admin/products/edit/${product.id}`);
+    navigate(`/admin/products/edit/${product.product_id || product.id}`);
   };
 
   // Handle delete button click - show confirmation modal
@@ -157,26 +204,45 @@ const ProductStockPage = () => {
 
   // Handle delete confirmation
   const handleDeleteConfirm = async () => {
-    if (!activeProduct || !activeProduct.id) return;
+    if (!activeProduct || !(activeProduct.product_id || activeProduct.id)) return;
     
     setIsSubmitting(true);
     
     try {
+      const productId = activeProduct.product_id || activeProduct.id;
+      console.log('Deleting product with ID:', productId);
+      
       // Call the delete API
-      await productService.deleteProduct(activeProduct.id);
+      const response = await productService.deleteProduct(productId);
       
-      // Update local state
-      setProducts(products.filter(product => product.id !== activeProduct.id));
-      setTotalItems(prev => prev - 1);
+      console.log('Delete response:', response);
       
-      // Show success notification
-      setNotification({
-        type: 'success',
-        message: `Product "${activeProduct.name}" has been deleted successfully.`
-      });
+      if (response && response.code === 200) {
+        // Update local state by removing the deleted product
+        setProducts(prevProducts => 
+          prevProducts.filter(product => 
+            (product.product_id || product.id) !== productId
+          )
+        );
+        setTotalItems(prev => Math.max(0, prev - 1));
+        
+        // Show success notification
+        setNotification({
+          type: 'success',
+          message: response.message || `Product "${activeProduct.name}" has been deleted successfully.`
+        });
+        
+        // If we're on a page with no products left, go to previous page
+        if (products.length === 1 && currentPage > 1) {
+          setCurrentPage(currentPage - 1);
+        }
+      } else {
+        throw new Error(response?.message || 'Failed to delete product');
+      }
       
       // Close modal
       setShowDeleteModal(false);
+      setActiveProduct(null);
     } catch (error) {
       console.error('Error deleting product:', error);
       
@@ -200,12 +266,24 @@ const ProductStockPage = () => {
     { id: 'quantity-desc', label: 'Stock (High to Low)' }
   ];
 
+  // Get current sort option label
+  const getCurrentSortLabel = () => {
+    const currentOption = sortOptions.find(option => {
+      if (sortBy === 'name' && sortDirection === 'asc') return option.id === 'name-asc';
+      if (sortBy === 'name' && sortDirection === 'desc') return option.id === 'name-desc';
+      if (sortBy === 'price' && sortDirection === 'asc') return option.id === 'price-asc';
+      if (sortBy === 'price' && sortDirection === 'desc') return option.id === 'price-desc';
+      return false;
+    });
+    return currentOption ? currentOption.label : 'Sort By';
+  };
+
   // Modal component to reduce repetition
   const Modal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
     
     return (
-      <div className="fixed inset-0 bg-white/20 backdrop-blur-sm flex items-center justify-center z-50" onClick={(e) => {
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50" onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}>
         <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
@@ -246,7 +324,7 @@ const ProductStockPage = () => {
         <div className="ml-3">
           <p className="text-sm font-medium">{message}</p>
         </div>
-        <button onClick={onDismiss} className="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-gray-900 rounded-lg p-1.5">
+        <button onClick={onDismiss} className="ml-auto -mx-1.5 -my-1.5 bg-white/50 text-gray-400 hover:text-gray-900 rounded-lg p-1.5">
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
           </svg>
@@ -271,32 +349,31 @@ const ProductStockPage = () => {
         <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
           <h1 className="text-2xl font-medium text-gray-800">Product Stock</h1>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            {/* Navigate to Add Product Page instead of modal */}
+            {/* Navigate to Add Product Page */}
             <button 
-              className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-md flex items-center"
+              className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-md flex items-center transition-colors"
               onClick={() => navigate('/admin/products/add')}
             >
-              <span className="mr-2">Add New</span>
-              <Plus size={16} />
+              <Plus size={16} className="mr-2" />
+              <span>Add New</span>
             </button>
             
             <div className="relative sort-dropdown w-full sm:w-auto">
               <button 
-                className="flex items-center justify-between bg-white border border-gray-300 rounded-md px-4 py-2 text-gray-700 w-full sm:w-auto"
+                className="flex items-center justify-between bg-white border border-gray-300 rounded-md px-4 py-2 text-gray-700 w-full sm:w-auto min-w-[160px] hover:bg-gray-50 transition-colors"
                 onClick={() => setShowSortDropdown(!showSortDropdown)}
               >
-                <span className="mr-2">Sort By</span>
-                <ChevronDown size={16} />
+                <span className="mr-2">{getCurrentSortLabel()}</span>
+                <ChevronDown size={16} className={`transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} />
               </button>
 
               {showSortDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10">
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
                   <div className="py-1">
-                    {/* Using the sortOptions array with unique key props */}
                     {sortOptions.map(option => (
                       <button 
                         key={option.id}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left transition-colors"
                         onClick={() => handleSortOption(option.id)}
                       >
                         {option.label}
@@ -314,7 +391,7 @@ const ProductStockPage = () => {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-white border-b">
+                <tr className="bg-gray-50 border-b">
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Image</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Product Name</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Category</th>
@@ -326,21 +403,22 @@ const ProductStockPage = () => {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan="6" className="px-4 py-4 text-center">
-                      <div className="flex justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-pink-500"></div>
+                    <td colSpan="6" className="px-4 py-8 text-center">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-pink-500 mb-2"></div>
+                        <p className="text-gray-500 text-sm">Loading products...</p>
                       </div>
                     </td>
                   </tr>
                 ) : products.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-4 py-4 text-center text-gray-500">
+                    <td colSpan="6" className="px-4 py-8 text-center">
                       <div className="flex flex-col items-center justify-center py-6">
                         <ShoppingBag size={48} className="text-gray-300 mb-3" />
-                        <p className="text-gray-500">No products found</p>
+                        <p className="text-gray-500 mb-2">No products found</p>
                         <button 
                           onClick={() => navigate('/admin/products/add')}
-                          className="mt-3 text-pink-500 hover:text-pink-600 text-sm"
+                          className="text-pink-500 hover:text-pink-600 text-sm font-medium transition-colors"
                         >
                           Add your first product
                         </button>
@@ -349,25 +427,34 @@ const ProductStockPage = () => {
                   </tr>
                 ) : (
                   products.map((product) => (
-                    <tr key={product.id || `product-${Math.random()}`} className="border-b hover:bg-gray-50">
+                    <tr key={product.product_id || product.id || `product-${Math.random()}`} className="border-b hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="w-12 h-12 md:w-16 md:h-16 rounded-md overflow-hidden bg-gray-100">
                           <img 
-                            src={product.image_url || "/api/placeholder/64/64"} 
-                            alt={product.name} 
+                            src={product.image_url || (product.images && product.images[0]) || "/api/placeholder/64/64"} 
+                            alt={product.name || 'Product image'} 
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.src = "/api/placeholder/64/64";
+                            }}
                           />
                         </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-medium text-gray-900 line-clamp-2">
+                          {product.name || 'Unnamed Product'}
+                        </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-600">{product.category}</div>
+                        <div className="text-sm text-gray-600">
+                          {product.category || 'Uncategorized'}
+                        </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{formatPrice(product.price)}</div>
-                        {product.slashed_price && (
+                        <div className="text-sm text-gray-900 font-medium">
+                          {formatPrice(product.price)}
+                        </div>
+                        {product.slashed_price && parseFloat(product.slashed_price) > 0 && (
                           <div className="text-xs text-gray-500 line-through">
                             {formatPrice(product.slashed_price)}
                           </div>
@@ -375,39 +462,39 @@ const ProductStockPage = () => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            product.quantity === 0 
+                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            (product.quantity || product.available_qty || 0) === 0 
                               ? 'bg-red-100 text-red-800' 
-                              : product.quantity <= 10 
+                              : (product.quantity || product.available_qty || 0) <= 10 
                               ? 'bg-yellow-100 text-yellow-800' 
                               : 'bg-green-100 text-green-800'
                           }`}>
-                            {product.quantity}
+                            {product.quantity || product.available_qty || 0}
                           </span>
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
                         <div className="flex space-x-3">
                           <button 
-                            className="text-gray-500 hover:text-gray-700"
+                            className="text-gray-500 hover:text-blue-600 transition-colors"
+                            onClick={() => handleViewClick(product)}
+                            aria-label="View product details"
+                          >
+                            <Eye size={18} />
+                          </button>
+                          <button 
+                            className="text-gray-500 hover:text-gray-700 transition-colors"
                             onClick={() => handleEditClick(product)}
-                            aria-label="Edit"
+                            aria-label="Edit product"
                           >
                             <Edit size={18} />
                           </button>
                           <button 
-                            className="text-gray-500 hover:text-red-500"
+                            className="text-gray-500 hover:text-red-500 transition-colors"
                             onClick={() => handleDeleteClick(product)}
-                            aria-label="Delete"
+                            aria-label="Delete product"
                           >
                             <Trash2 size={18} />
-                          </button>
-                          <button 
-                            className="text-gray-500 hover:text-blue-500"
-                            onClick={() => handleViewClick(product)}
-                            aria-label="View"
-                          >
-                            <Eye size={18} />
                           </button>
                         </div>
                       </td>
@@ -419,27 +506,40 @@ const ProductStockPage = () => {
           </div>
 
           {/* Pagination */}
-          {products.length > 0 && (
-            <div className="px-4 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {!isLoading && products.length > 0 && totalPages > 1 && (
+            <div className="px-4 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t">
               <div>
                 <p className="text-sm text-gray-500">
                   Showing {currentPage === 1 ? 1 : (currentPage - 1) * itemsPerPage + 1}-
-                  {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems}
+                  {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} products
                 </p>
               </div>
-              <div className="flex space-x-1">
+              <div className="flex items-center space-x-2">
                 <button
                   onClick={goToPreviousPage}
                   disabled={currentPage === 1}
-                  className={`p-1 rounded-md ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-100'}`}
+                  className={`p-2 rounded-md transition-colors ${
+                    currentPage === 1 
+                      ? 'text-gray-300 cursor-not-allowed' 
+                      : 'text-gray-500 hover:bg-gray-100'
+                  }`}
                   aria-label="Previous page"
                 >
                   <ChevronLeft size={20} />
                 </button>
+                
+                <span className="text-sm text-gray-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                
                 <button
                   onClick={goToNextPage}
                   disabled={currentPage === totalPages}
-                  className={`p-1 rounded-md ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-100'}`}
+                  className={`p-2 rounded-md transition-colors ${
+                    currentPage === totalPages 
+                      ? 'text-gray-300 cursor-not-allowed' 
+                      : 'text-gray-500 hover:bg-gray-100'
+                  }`}
                   aria-label="Next page"
                 >
                   <ChevronRight size={20} />
@@ -453,25 +553,25 @@ const ProductStockPage = () => {
       {/* Delete Confirmation Modal */}
       <Modal
         isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
+        onClose={() => !isSubmitting && setShowDeleteModal(false)}
         title="Confirm Delete"
       >
         {activeProduct && (
           <>
             <p className="text-gray-600 mb-4">
-              Are you sure you want to delete <span className="font-medium">{activeProduct.name}</span>? This action cannot be undone.
+              Are you sure you want to delete <span className="font-medium">"{activeProduct.name}"</span>? This action cannot be undone.
             </p>
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
                 disabled={isSubmitting}
               >
                 Cancel 
               </button>
               <button
                 onClick={handleDeleteConfirm}
-                className={`px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center ${
+                className={`px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center transition-colors ${
                   isSubmitting ? 'opacity-75 cursor-not-allowed' : ''
                 }`}
                 disabled={isSubmitting}
@@ -484,7 +584,9 @@ const ProductStockPage = () => {
                     </svg>
                     Deleting...
                   </>
-                ) : 'Delete'}
+                ) : (
+                  'Delete'
+                )}
               </button>
             </div>
           </>
@@ -503,33 +605,44 @@ const ProductStockPage = () => {
               <div className="w-full sm:w-1/3">
                 <div className="w-full h-40 rounded-md overflow-hidden bg-gray-100">
                   <img 
-                    src={activeProduct.image_url || "/api/placeholder/200/200"} 
-                    alt={activeProduct.name} 
-                    className="w-full h-full object-contain" 
+                    src={activeProduct.image_url || (activeProduct.images && activeProduct.images[0]) || "/api/placeholder/200/200"} 
+                    alt={activeProduct.name || 'Product image'} 
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      e.target.src = "/api/placeholder/200/200";
+                    }}
                   />
                 </div>
               </div>
               <div className="w-full sm:w-2/3">
-                <h3 className="text-lg font-medium text-gray-900 mb-1">{activeProduct.name}</h3>
-                <p className="text-sm text-gray-500 mb-3">{activeProduct.category}</p>
+                <h3 className="text-lg font-medium text-gray-900 mb-1">
+                  {activeProduct.name || 'Unnamed Product'}
+                </h3>
+                <p className="text-sm text-gray-500 mb-3">
+                  {activeProduct.category || 'Uncategorized'}
+                </p>
                 
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-500">Price:</span>
                     <div className="text-right">
-                      <span className="text-sm text-gray-900 font-semibold">{formatPrice(activeProduct.price)}</span>
-                      {activeProduct.slashed_price && (
-                        <div className="text-xs text-gray-500 line-through">{formatPrice(activeProduct.slashed_price)}</div>
+                      <span className="text-sm text-gray-900 font-semibold">
+                        {formatPrice(activeProduct.price)}
+                      </span>
+                      {activeProduct.slashed_price && parseFloat(activeProduct.slashed_price) > 0 && (
+                        <div className="text-xs text-gray-500 line-through">
+                          {formatPrice(activeProduct.slashed_price)}
+                        </div>
                       )}
                     </div>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-500">Stock:</span>
-                    <span className="text-sm text-gray-900">{activeProduct.quantity} units</span>
+                    <span className="text-sm text-gray-900">{activeProduct.quantity || activeProduct.available_qty || 0} units</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-500">Product ID:</span>
-                    <span className="text-sm text-gray-900">#{activeProduct.id}</span>
+                    <span className="text-sm text-gray-900">#{activeProduct.product_id || activeProduct.id}</span>
                   </div>
                 </div>
               </div>
@@ -538,21 +651,26 @@ const ProductStockPage = () => {
             {activeProduct.description && (
               <div className="mb-6">
                 <h4 className="text-sm font-medium text-gray-700 mb-2">Description</h4>
-                <p className="text-sm text-gray-600">{activeProduct.description}</p>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {activeProduct.description}
+                </p>
               </div>
             )}
             
             <div className="mt-6 flex justify-end space-x-3">
               <button
-                onClick={() => handleEditClick(activeProduct)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 flex items-center"
+                onClick={() => {
+                  setShowViewModal(false);
+                  handleEditClick(activeProduct);
+                }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 flex items-center transition-colors"
               >
                 <Edit size={16} className="mr-2" />
                 Edit
               </button>
               <button
                 onClick={() => setShowViewModal(false)}
-                className="px-4 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600"
+                className="px-4 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600 transition-colors"
               >
                 Close
               </button>

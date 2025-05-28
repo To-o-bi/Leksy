@@ -9,7 +9,7 @@ import api from '../axios';
  */
 export const fetchProducts = async (options = {}) => {
   try {
-    const response = await api.postWithParams('/fetch-products', options);
+    const response = await api.post('/fetch-products', options);
     
     if (response.data && response.data.code === 200) {
       return response.data;
@@ -39,8 +39,8 @@ export const fetchProduct = async (productId) => {
     
     console.log('Fetching product with ID:', productId);
     
-    // Send the product_id as query parameter
-    const response = await api.postWithParams('/fetch-product', { 
+    // Send the product_id in the request body, not as a URL parameter
+    const response = await api.post('/fetch-product', { 
       product_id: productId.toString() 
     });
     
@@ -65,7 +65,7 @@ export const fetchProduct = async (productId) => {
 
 /**
  * Add a new product (Admin only)
- * @param {Object} productData - Product data including images
+ * @param {Object} productData - Product data
  * @returns {Promise<Object>} Response with product ID
  */
 export const addProduct = async (productData) => {
@@ -89,27 +89,38 @@ export const addProduct = async (productData) => {
       throw new Error('At least one product image is required!');
     }
     
-    // Prepare parameters for query string
-    const params = {
-      name: productData.name,
-      price: productData.price,
-      description: productData.description,
-      quantity: productData.quantity,
-      category: productData.category
-    };
+    // Create FormData for the request
+    const formData = new FormData();
+    
+    // Add all text fields to FormData
+    formData.append('name', productData.name);
+    formData.append('price', productData.price);
+    formData.append('description', productData.description);
+    formData.append('quantity', productData.quantity);
+    formData.append('category', productData.category);
     
     // Only add slashed_price if it exists and is not empty
     if (productData.slashed_price) {
-      params.slashed_price = productData.slashed_price;
+      formData.append('slashed_price', productData.slashed_price);
     }
     
-    // Prepare files object with images
-    const files = {
-      'images': productData.images
-    };
+    // Important: Add each image with field name "images[]" - the backend expects this specific format
+    productData.images.forEach((image, index) => {
+      if (image instanceof File) {
+        formData.append('images[]', image);
+        console.log(`Appended image ${index} as "images[]" field`);
+      } else {
+        throw new Error('Images must be valid file objects');
+      }
+    });
     
-    // Make the API call with query parameters and files
-    const response = await api.postFormDataWithParams('/admin/add-product', params, files);
+    // Debug FormData contents
+    for (let [key, value] of formData.entries()) {
+      console.log(`FormData contains: ${key} = ${value instanceof File ? value.name : value}`);
+    }
+    
+    // Use the FormData helper method to properly handle file uploads
+    const response = await api.postFormData('/admin/add-product', formData);
     
     if (response.data && response.data.code === 200) {
       return response.data;
@@ -156,44 +167,49 @@ export const editProduct = async (productId, updates) => {
       throw new Error(`${missingFields.join(', ')} are all required!`);
     }
     
-    // Prepare parameters for query string
-    const params = {
-      product_id: productId.toString()
-    };
+    // Create FormData for the request
+    const formData = new FormData();
+    
+    // Add product ID to FormData - convert to string to ensure compatibility
+    formData.append('product_id', productId.toString());
     
     // Add text fields that are present in the updates
-    if (updates.name !== undefined) params.name = updates.name;
-    if (updates.price !== undefined) params.price = updates.price;
-    if (updates.description !== undefined) params.description = updates.description;
-    if (updates.quantity !== undefined) params.quantity = updates.quantity;
-    if (updates.category !== undefined) params.category = updates.category;
-    if (updates.slashed_price !== undefined) params.slashed_price = updates.slashed_price;
+    if (updates.name) formData.append('name', updates.name);
+    if (updates.price) formData.append('price', updates.price);
+    if (updates.description) formData.append('description', updates.description);
+    if (updates.quantity) formData.append('quantity', updates.quantity);
+    if (updates.category) formData.append('category', updates.category);
+    if (updates.slashed_price) formData.append('slashed_price', updates.slashed_price);
     
-    // Prepare files if new images are provided
-    const files = {};
-    if (updates.images && updates.images.length > 0) {
-      files.images = updates.images.filter(img => img instanceof File);
+    // Handle existing images if present
+    if (updates.existing_images && updates.existing_images.length > 0) {
+      updates.existing_images.forEach((image, index) => {
+        formData.append(`existing_images[${index}]`, typeof image === 'string' ? image : image.id || image.url || '');
+      });
     }
     
-    // Make the API call
-    if (Object.keys(files).length > 0) {
-      // If we have files, use the FormData endpoint
-      const response = await api.postFormDataWithParams('/admin/edit-product', params, files);
-      
-      if (response.data && response.data.code === 200) {
-        return response.data;
-      } else {
-        throw new Error(response.data.message || 'Failed to update product');
-      }
+    // Handle new images if present - using the "images[]" field name format
+    if (updates.images && updates.images.length > 0) {
+      updates.images.forEach((image, index) => {
+        if (image instanceof File) {
+          formData.append('images[]', image);
+          console.log(`Appended image ${index} as "images[]" field`);
+        }
+      });
+    }
+    
+    // Debug FormData contents
+    for (let [key, value] of formData.entries()) {
+      console.log(`Update FormData contains: ${key} = ${value instanceof File ? value.name : value}`);
+    }
+    
+    // Use the FormData helper method
+    const response = await api.postFormData('/admin/edit-product', formData);
+    
+    if (response.data && response.data.code === 200) {
+      return response.data;
     } else {
-      // If no files, just use regular POST with params
-      const response = await api.postWithParams('/admin/edit-product', params);
-      
-      if (response.data && response.data.code === 200) {
-        return response.data;
-      } else {
-        throw new Error(response.data.message || 'Failed to update product');
-      }
+      throw new Error(response.data.message || 'Failed to update product');
     }
   } catch (error) {
     console.error('Edit product error:', error);
@@ -221,8 +237,8 @@ export const deleteProduct = async (productId) => {
     
     console.log('Deleting product with ID:', productId);
     
-    // Send product_id as query parameter
-    const response = await api.postWithParams('/admin/delete-product', { 
+    // Send data in the request body
+    const response = await api.post('/admin/delete-product', { 
       product_id: productId.toString() 
     });
     

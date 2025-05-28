@@ -4,11 +4,14 @@ import { useCart } from '../../hooks/useCart';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import Button from '../../components/common/Button';
 import Notification from '../../components/common/Notification';
+import paystackService from '../../api/services/paystackService';
 
 const CheckoutPage = () => {
   const { cart, totalPrice, clearCart } = useCart();
   const navigate = useNavigate();
   const [notification, setNotification] = useState(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isLoadingPaystack, setIsLoadingPaystack] = useState(true);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -22,6 +25,7 @@ const CheckoutPage = () => {
   });
   const [formErrors, setFormErrors] = useState({});
   const shipping = 5000; // Fixed shipping cost in Naira
+  const finalTotal = totalPrice + shipping;
 
   useEffect(() => {
     // Redirect to cart if cart is empty
@@ -29,6 +33,25 @@ const CheckoutPage = () => {
       navigate('/cart');
     }
   }, [cart, navigate]);
+
+  // Load Paystack script on component mount
+  useEffect(() => {
+    const loadPaystack = async () => {
+      try {
+        await paystackService.loadPaystackScript();
+        setIsLoadingPaystack(false);
+      } catch (error) {
+        console.error('Failed to load Paystack:', error);
+        setNotification({
+          type: 'error',
+          message: 'Failed to load payment system. Please refresh the page and try again.'
+        });
+        setIsLoadingPaystack(false);
+      }
+    };
+
+    loadPaystack();
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -64,35 +87,177 @@ const CheckoutPage = () => {
   };
 
   const formatPrice = (price) => {
-    return `₦${parseFloat(price).toLocaleString()}`;
+    return `₦${parseFloat(price).toLocaleString('en-NG', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })}`;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handlePaymentSuccess = async (response) => {
+    console.log('Payment successful:', response);
     
-    if (validateForm()) {
-      // Process the order (in a real app, this would connect to a payment gateway)
-      setNotification({
-        type: 'success',
-        message: 'Order placed successfully! Redirecting to confirmation page...'
-      });
+    try {
+      setIsProcessingPayment(true);
       
-      // Simulate order processing
-      setTimeout(() => {
+      // Verify payment with your backend
+      const verificationResult = await paystackService.verifyPayment(response.reference);
+      
+      if (verificationResult.success) {
+        // Create order with payment details
+        const orderData = {
+          customer: {
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            phone: formData.phone,
+            address: formData.address,
+            country: formData.country,
+            state: formData.state
+          },
+          items: cart.map(item => ({
+            productId: item.id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            variant: item.variant || null,
+            image: item.image
+          })),
+          payment: {
+            reference: response.reference,
+            amount: finalTotal,
+            currency: 'NGN',
+            status: 'paid',
+            paymentMethod: 'paystack',
+            paidAt: new Date().toISOString()
+          },
+          shipping: {
+            cost: shipping,
+            address: formData.address,
+            country: formData.country,
+            state: formData.state
+          },
+          subtotal: totalPrice,
+          total: finalTotal,
+          notes: formData.notes,
+          status: 'pending'
+        };
+
+        // Save order to your backend
+        const orderResult = await paystackService.createOrder(orderData);
+        
+        // Clear cart and show success
         clearCart();
-        navigate('/checkout/confirmation');
-      }, 2000);
-    } else {
+        
+        setNotification({
+          type: 'success',
+          message: `Payment successful! Order #${orderResult.orderId} has been placed. Redirecting...`
+        });
+
+        // Redirect to confirmation page with order details
+        setTimeout(() => {
+          navigate('/checkout/confirmation', {
+            state: {
+              orderData: orderResult,
+              paymentReference: response.reference
+            }
+          });
+        }, 2000);
+
+      } else {
+        throw new Error('Payment verification failed');
+      }
+    } catch (error) {
+      console.error('Post-payment processing error:', error);
       setNotification({
         type: 'error',
-        message: 'Please fill in all required fields'
+        message: error.message || 'Payment was successful but order processing failed. Please contact support.'
       });
-      
-      setTimeout(() => {
-        setNotification(null);
-      }, 3000);
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
+
+  const handlePaymentError = (error) => {
+    console.error('Payment error:', error);
+    setNotification({
+      type: 'error',
+      message: error.message || 'Payment failed. Please try again.'
+    });
+    setIsProcessingPayment(false);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      setNotification({
+        type: 'error',
+        message: 'Please fill in all required fields correctly'
+      });
+      
+      // Auto-dismiss error notification
+      setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+      return;
+    }
+
+    if (isLoadingPaystack) {
+      setNotification({
+        type: 'error',
+        message: 'Payment system is still loading. Please wait a moment and try again.'
+      });
+      return;
+    }
+
+    try {
+      setIsProcessingPayment(true);
+      
+      // Generate unique payment reference
+      const paymentReference = paystackService.generateReference();
+      
+      // Prepare payment data
+      const paymentData = {
+        email: formData.email,
+        amount: finalTotal,
+        reference: paymentReference,
+        currency: 'NGN',
+        metadata: {
+          customer_name: `${formData.firstName} ${formData.lastName}`,
+          customer_phone: formData.phone,
+          order_items: cart.map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price
+          })),
+          shipping_address: formData.address,
+          shipping_cost: shipping
+        },
+        onSuccess: handlePaymentSuccess,
+        onClose: () => {
+          console.log('Payment modal closed');
+          setIsProcessingPayment(false);
+        }
+      };
+
+      // Initialize Paystack payment
+      await paystackService.initializePayment(paymentData);
+      
+    } catch (error) {
+      handlePaymentError(error);
+    }
+  };
+
+  // Auto-dismiss notifications after 5 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -124,7 +289,7 @@ const CheckoutPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                   <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
-                    First name
+                    First name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -132,10 +297,11 @@ const CheckoutPage = () => {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-2 border rounded-md focus:ring-primary focus:border-primary ${
+                    className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${
                       formErrors.firstName ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="Your first name"
+                    disabled={isProcessingPayment}
                   />
                   {formErrors.firstName && (
                     <p className="mt-1 text-sm text-red-500">{formErrors.firstName}</p>
@@ -144,7 +310,7 @@ const CheckoutPage = () => {
                 
                 <div>
                   <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
-                    Last name
+                    Last name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -152,10 +318,11 @@ const CheckoutPage = () => {
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-2 border rounded-md focus:ring-primary focus:border-primary ${
+                    className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${
                       formErrors.lastName ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="Your last name"
+                    disabled={isProcessingPayment}
                   />
                   {formErrors.lastName && (
                     <p className="mt-1 text-sm text-red-500">{formErrors.lastName}</p>
@@ -165,7 +332,7 @@ const CheckoutPage = () => {
               
               <div className="mb-6">
                 <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
-                  Street Address
+                  Street Address <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -173,10 +340,11 @@ const CheckoutPage = () => {
                   name="address"
                   value={formData.address}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-2 border rounded-md focus:ring-primary focus:border-primary ${
+                  className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${
                     formErrors.address ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="Email"
+                  placeholder="Your full address"
+                  disabled={isProcessingPayment}
                 />
                 {formErrors.address && (
                   <p className="mt-1 text-sm text-red-500">{formErrors.address}</p>
@@ -186,7 +354,7 @@ const CheckoutPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                   <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
-                    Country / Region
+                    Country / Region <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <select
@@ -194,11 +362,12 @@ const CheckoutPage = () => {
                       name="country"
                       value={formData.country}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-2 border rounded-md focus:ring-primary focus:border-primary appearance-none ${
+                      className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 appearance-none ${
                         formErrors.country ? 'border-red-500' : 'border-gray-300'
                       }`}
+                      disabled={isProcessingPayment}
                     >
-                      <option value="">Select</option>
+                      <option value="">Select Country</option>
                       <option value="nigeria">Nigeria</option>
                       <option value="ghana">Ghana</option>
                       <option value="kenya">Kenya</option>
@@ -217,7 +386,7 @@ const CheckoutPage = () => {
                 
                 <div>
                   <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
-                    State
+                    State <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <select
@@ -225,15 +394,18 @@ const CheckoutPage = () => {
                       name="state"
                       value={formData.state}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-2 border rounded-md focus:ring-primary focus:border-primary appearance-none ${
+                      className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 appearance-none ${
                         formErrors.state ? 'border-red-500' : 'border-gray-300'
                       }`}
+                      disabled={isProcessingPayment}
                     >
-                      <option value="">Select</option>
+                      <option value="">Select State</option>
                       <option value="lagos">Lagos</option>
                       <option value="abuja">Abuja</option>
                       <option value="rivers">Rivers</option>
                       <option value="kano">Kano</option>
+                      <option value="ogun">Ogun</option>
+                      <option value="kaduna">Kaduna</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                       <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -250,7 +422,7 @@ const CheckoutPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
+                    Email <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="email"
@@ -258,10 +430,11 @@ const CheckoutPage = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-2 border rounded-md focus:ring-primary focus:border-primary ${
+                    className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${
                       formErrors.email ? 'border-red-500' : 'border-gray-300'
                     }`}
-                    placeholder="Email Address"
+                    placeholder="your@email.com"
+                    disabled={isProcessingPayment}
                   />
                   {formErrors.email && (
                     <p className="mt-1 text-sm text-red-500">{formErrors.email}</p>
@@ -270,7 +443,7 @@ const CheckoutPage = () => {
                 
                 <div>
                   <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone
+                    Phone <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="tel"
@@ -278,10 +451,11 @@ const CheckoutPage = () => {
                     name="phone"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-2 border rounded-md focus:ring-primary focus:border-primary ${
+                    className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${
                       formErrors.phone ? 'border-red-500' : 'border-gray-300'
                     }`}
-                    placeholder="Phone number"
+                    placeholder="+234 8012345678"
+                    disabled={isProcessingPayment}
                   />
                   {formErrors.phone && (
                     <p className="mt-1 text-sm text-red-500">{formErrors.phone}</p>
@@ -303,8 +477,9 @@ const CheckoutPage = () => {
                   value={formData.notes}
                   onChange={handleInputChange}
                   rows="4"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-                  placeholder="Notes about your order, e.g. Any other details you might want us to know"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-pink-500 focus:border-pink-500"
+                  placeholder="Notes about your order, e.g. special delivery instructions"
+                  disabled={isProcessingPayment}
                 ></textarea>
               </div>
             </div>
@@ -356,16 +531,22 @@ const CheckoutPage = () => {
               
               <div className="flex justify-between text-lg font-semibold pt-2 border-t border-gray-200">
                 <span>Total:</span>
-                <span className="text-primary">{formatPrice(totalPrice + shipping)}</span>
+                <span className="text-pink-600">{formatPrice(finalTotal)}</span>
               </div>
             </div>
             
             <div className="mb-6">
-              <h3 className="font-medium text-gray-800 mb-3">Bank Transfer Secured by Paystack</h3>
+              <h3 className="font-medium text-gray-800 mb-3">Secure Payment with Paystack</h3>
               <div className="flex gap-2 mb-4">
                 <img src="/assets/images/icons/visa.svg" alt="Visa" className="h-8" />
                 <img src="/assets/images/icons/verve.svg" alt="Verve" className="h-8" />
                 <img src="/assets/images/icons/mastercard.svg" alt="Mastercard" className="h-8" />
+                <div className="flex items-center bg-green-100 px-2 py-1 rounded">
+                  <svg className="w-4 h-4 text-green-600 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-xs text-green-700 font-medium">SSL Secured</span>
+                </div>
               </div>
               
               <p className="text-sm text-gray-600 mb-4">
@@ -382,14 +563,17 @@ const CheckoutPage = () => {
                   name="agreeToTerms"
                   checked={formData.agreeToTerms}
                   onChange={handleInputChange}
-                  className={`mt-1 mr-2 ${formErrors.agreeToTerms ? 'border-red-500' : ''}`}
+                  className={`mt-1 mr-2 h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded ${
+                    formErrors.agreeToTerms ? 'border-red-500' : ''
+                  }`}
+                  disabled={isProcessingPayment}
                 />
                 <label htmlFor="agreeToTerms" className="text-sm text-gray-600">
                   I have read and agree to the website{' '}
                   <Link to="/terms" className="text-pink-500 hover:text-pink-600">
                     terms and conditions
                   </Link>{' '}
-                  *
+                  <span className="text-red-500">*</span>
                 </label>
               </div>
               {formErrors.agreeToTerms && (
@@ -397,12 +581,41 @@ const CheckoutPage = () => {
               )}
               
               <Button
-                type="button"
+                type="submit"
                 onClick={handleSubmit}
-                className="w-full bg-pink-500 hover:bg-pink-600 text-white py-3 rounded-md font-medium"
+                disabled={isProcessingPayment || isLoadingPaystack}
+                className={`w-full py-3 rounded-md font-medium transition-colors ${
+                  isProcessingPayment || isLoadingPaystack
+                    ? 'bg-gray-400 cursor-not-allowed text-gray-200'
+                    : 'bg-pink-500 hover:bg-pink-600 text-white'
+                }`}
               >
-                Place Order
+                {isLoadingPaystack ? (
+                  <div className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading Payment System...
+                  </div>
+                ) : isProcessingPayment ? (
+                  <div className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing Payment...
+                  </div>
+                ) : (
+                  `Pay ${formatPrice(finalTotal)} - Place Order`
+                )}
               </Button>
+              
+              {isLoadingPaystack && (
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  Loading secure payment system...
+                </p>
+              )}
             </div>
             
             <Link 

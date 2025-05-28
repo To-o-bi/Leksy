@@ -1,9 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, AlertCircle } from 'lucide-react';
-import api from '../../../api/axios';
+import productService from '../../../api/services/productService';
 
-// Updated AddProductPage with direct API handling
 const AddProductPage = () => {
   const navigate = useNavigate(); 
   const fileInputRef = useRef(null);
@@ -25,7 +24,7 @@ const AddProductPage = () => {
   const [imagePreviewUrls, setImagePreviewUrls] = useState([]);
   const [errors, setErrors] = useState({});
   
-  // Available product categories
+  // Available product categories - matching API documentation
   const productCategories = [
     'serums',
     'moisturizers',
@@ -150,7 +149,7 @@ const AddProductPage = () => {
     return Object.keys(newErrors).length === 0;
   };
   
-  // Handle form submission - directly using axios instead of productService
+  // Handle form submission using productService
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -163,41 +162,30 @@ const AddProductPage = () => {
     setError(null);
     
     try {
-      // Create a standard HTML form for better compatibility
-      const submissionForm = new FormData();
+      // Prepare data for the productService
+      const productData = {
+        name: formData.name,
+        price: parseFloat(formData.price),
+        description: formData.description,
+        quantity: parseInt(formData.quantity, 10),
+        category: formData.category,
+        images: imageFiles // Pass the actual File objects
+      };
       
-      // Add all text fields
-      submissionForm.append('name', formData.name);
-      submissionForm.append('price', parseFloat(formData.price));
-      submissionForm.append('description', formData.description);
-      submissionForm.append('quantity', parseInt(formData.quantity, 10));
-      submissionForm.append('category', formData.category);
-      
+      // Only add slashed_price if it exists and is not empty
       if (formData.slashed_price) {
-        submissionForm.append('slashed_price', parseFloat(formData.slashed_price));
+        productData.slashed_price = parseFloat(formData.slashed_price);
       }
       
-      // Add images with the exact expected field name format
-      for (let i = 0; i < imageFiles.length; i++) {
-        // Using exactly the field name format the backend expects
-        submissionForm.append('images[]', imageFiles[i]);
-      }
-      
-      // Log the submission form entries for debugging
-      console.log("Form data being submitted:");
-      for (let [key, value] of submissionForm.entries()) {
-        console.log(`${key}: ${value instanceof File ? `File: ${value.name}` : value}`);
-      }
-      
-      // Make direct API call instead of using productService
-      const response = await api.post('/admin/add-product', submissionForm, {
-        headers: {
-          // Remove Content-Type to let the browser set it with the correct boundary
-          'Content-Type': undefined
-        }
+      console.log('Submitting product data:', {
+        ...productData,
+        images: `${productData.images.length} files`
       });
       
-      console.log('Product added successfully:', response.data);
+      // Use the productService to add the product
+      const response = await productService.addProduct(productData);
+      
+      console.log('Product added successfully:', response);
       setSuccess(true);
       
       // Redirect after a brief delay to show success message
@@ -261,7 +249,7 @@ const AddProductPage = () => {
         </div>
       )}
       
-      <form onSubmit={handleSubmit} className="space-y-6" encType="multipart/form-data">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Product Name */}
           <div>
@@ -404,7 +392,7 @@ const AddProductPage = () => {
             )}
           </div>
           
-          {/* Product Images - WITH THE CORRECT NAME ATTRIBUTE */}
+          {/* Product Images */}
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Product Images <span className="text-red-500">*</span>
@@ -432,14 +420,13 @@ const AddProductPage = () => {
                 </svg>
                 <div className="flex text-sm text-gray-600">
                   <label
-                    htmlFor="images[]"
+                    htmlFor="images"
                     className="relative cursor-pointer bg-white rounded-md font-medium text-pink-600 hover:text-pink-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-pink-500"
                   >
                     <span>Upload images</span>
-                    {/* IMPORTANT: Setting name="images[]" as required by backend */}
                     <input
-                      id="images[]"
-                      name="images[]"
+                      id="images"
+                      name="images"
                       type="file"
                       ref={fileInputRef}
                       className="sr-only"

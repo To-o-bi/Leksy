@@ -6,6 +6,7 @@ const instance = axios.create({
   timeout: 30000, // 30 seconds timeout for slow connections
   headers: {
     'Accept': 'application/json',
+    'Content-Type': 'application/json'
   }
 });
 
@@ -35,12 +36,11 @@ instance.interceptors.request.use(
       console.log('Adding token to request:', config.url);
     } else if (!token && isAdminEndpoint) {
       console.warn('No auth token found for admin request:', config.url);
+      // This will trigger a 401 unauthorized response, which will be caught by the response interceptor
     }
     
-    // For FormData, let the browser set the Content-Type with boundary
-    if (config.data instanceof FormData) {
-      delete config.headers['Content-Type'];
-    } else if (!config.headers['Content-Type']) {
+    // Only override Content-Type if it's not already set and not FormData
+    if (!config.headers['Content-Type'] && !(config.data instanceof FormData)) {
       config.headers['Content-Type'] = 'application/json';
     }
     
@@ -49,7 +49,6 @@ instance.interceptors.request.use(
       console.log('API Request:', {
         method: config.method,
         url: config.url,
-        params: config.params,
         data: config.data instanceof FormData ? 'FormData' : config.data,
         headers: {
           ...config.headers,
@@ -80,12 +79,8 @@ instance.interceptors.response.use(
   
     // Extract token from response if available and update it
     if (response.data && response.data.token) {
-      const oldToken = localStorage.getItem('auth_token');
       localStorage.setItem('auth_token', response.data.token);
       console.log('Token updated from response');
-      
-      // Update the default header for future requests
-      instance.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
     }
     
     return response;
@@ -116,11 +111,14 @@ instance.interceptors.response.use(
       // Handle 403 Forbidden - no permission
       if (error.response.status === 403) {
         console.warn('Forbidden request - user lacks permission');
+        // You might want to redirect to a permission denied page
+        // or display a notification
       }
       
       // Handle 500 Server errors
       if (error.response.status >= 500) {
         console.error('Server error detected');
+        // You might want to show a server error notification
       }
     } else if (error.request) {
       console.error('Error Request:', error.request);
@@ -150,41 +148,33 @@ instance.interceptors.response.use(
   }
 );
 
-// Helper method to handle FormData uploads with query parameters
-instance.postFormDataWithParams = async (url, params = {}, files = {}, config = {}) => {
-  // Create FormData for files only
-  const formData = new FormData();
-  
-  // Add files to FormData
-  Object.entries(files).forEach(([key, value]) => {
-    if (Array.isArray(value)) {
-      value.forEach(file => {
-        formData.append(key, file);
-      });
-    } else {
-      formData.append(key, value);
-    }
-  });
-  
-  // Build query string from params
-  const queryString = new URLSearchParams(params).toString();
-  const fullUrl = queryString ? `${url}?${queryString}` : url;
-  
-  return instance.post(fullUrl, formData, {
+// Helper method to handle FormData uploads
+instance.postFormData = async (url, formData, config = {}) => {
+  return instance.post(url, formData, {
     ...config,
     headers: {
       ...config.headers,
-      // Let browser set Content-Type with boundary for multipart/form-data
+      'Content-Type': 'multipart/form-data',
     },
   });
 };
 
-// Helper method for regular POST with query parameters
-instance.postWithParams = async (url, params = {}, config = {}) => {
-  const queryString = new URLSearchParams(params).toString();
-  const fullUrl = queryString ? `${url}?${queryString}` : url;
-  
-  return instance.post(fullUrl, null, config);
+// Helper method for API calls that need to renew token
+instance.withTokenRenewal = async (apiCall) => {
+  try {
+    return await apiCall();
+  } catch (error) {
+    if (error.response && error.response.status === 401) {
+      // Try to refresh token or re-authenticate
+      console.log('Token expired - attempting renewal');
+      
+      // For now, just redirect to login
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+      window.location.href = '/login?expired=true';
+    }
+    throw error;
+  }
 };
 
 export default instance;

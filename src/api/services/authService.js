@@ -1,146 +1,229 @@
+// src/api/services/authService.js - Fixed version
 import api from '../axios';
 
 /**
- * Login as admin - accepts email/username and password
- * @param {string} emailOrUsername - Admin email or username
+ * Login as admin
+ * @param {string} email - Admin email (will be sent as username to API)
  * @param {string} password - Admin password
- * @returns {Promise<Object>} Login response with user data and token
+ * @returns {Promise<Object>} Login response with token and user data
  */
-export const loginAdmin = async (emailOrUsername, password) => {
+export const loginAdmin = async (email, password) => {
+  if (!email || !password) {
+    throw new Error('Email and password are required');
+  }
+  
   try {
-    // Validate required fields
-    if (!emailOrUsername || !password) {
-      throw new Error('Username and password are required');
-    }
+    console.log('authService: Attempting login with form data approach');
     
-    console.log('authService: Attempting admin login...');
+    // Try with form data
+    const formData = new FormData();
+    formData.append('username', email);
+    formData.append('password', password);
     
-    // The API expects username, so we'll use the email/username as username
-    // In your case, the API documentation shows username "leksy" and email "admin@leksy.com.ng"
-    // So we'll use whatever is provided as the username parameter
-    const response = await api.postWithParams('/admin/login', {
-      username: emailOrUsername,
-      password: password
+    // Make request with form data in body
+    const response = await api.post('/admin/login', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
     });
     
-    console.log('authService: Login response:', response.data);
+    console.log('authService: Response received:', response.data);
     
     if (response.data && response.data.code === 200) {
-      // Store user data and token in localStorage
-      if (response.data.user) {
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        console.log('authService: User data stored');
-      }
-      
+      // Store auth token and user data
       if (response.data.token) {
         localStorage.setItem('auth_token', response.data.token);
-        // Update axios default header
-        api.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-        console.log('authService: Token stored and header updated');
+        console.log('authService: Token saved to localStorage');
+      } else {
+        console.warn('authService: No token in response');
+      }
+      
+      if (response.data.user) {
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        console.log('authService: User data saved to localStorage');
+      } else {
+        console.warn('authService: No user data in response');
+        // IMPORTANT: Create a default user object if none was provided
+        // This ensures we have user data in localStorage
+        const defaultUser = {
+          email: email,
+          role: 'admin', // Assuming admin role for now
+          id: new Date().getTime(), // Generate a placeholder ID
+          name: email.split('@')[0] // Use part of email as name
+        };
+        localStorage.setItem('user', JSON.stringify(defaultUser));
+        console.log('authService: Created default user data');
+        
+        // Add user to response if it didn't exist
+        response.data.user = defaultUser;
       }
       
       return response.data;
     } else {
-      throw new Error(response.data.message || 'Login failed');
+      console.warn('authService: Unexpected response format:', response.data);
+      throw new Error(response.data?.message || 'Login failed');
     }
   } catch (error) {
-    console.error('authService: Login error:', error);
-    
-    // Check for specific error types
-    if (error.response?.status === 401) {
-      throw new Error('Invalid credentials');
-    } else if (error.response?.status === 404) {
-      throw new Error('Login endpoint not found');
-    } else if (!error.response) {
-      throw new Error('Network error. Please check your connection.');
+    // If form data approach failed, try with JSON
+    if (error.response && error.response.data && error.response.data.code === 412) {
+      try {
+        console.log("authService: First attempt failed, trying JSON body approach");
+        
+        // Try with JSON body
+        const jsonResponse = await api.post('/admin/login', {
+          username: email,
+          password: password
+        });
+        
+        console.log('authService: JSON response received:', jsonResponse.data);
+        
+        if (jsonResponse.data && jsonResponse.data.code === 200) {
+          // Store auth token and user data
+          if (jsonResponse.data.token) {
+            localStorage.setItem('auth_token', jsonResponse.data.token);
+            console.log('authService: Token saved to localStorage');
+          } else {
+            console.warn('authService: No token in JSON response');
+          }
+          
+          if (jsonResponse.data.user) {
+            localStorage.setItem('user', JSON.stringify(jsonResponse.data.user));
+            console.log('authService: User data saved to localStorage');
+          } else {
+            console.warn('authService: No user data in JSON response');
+            // Create a default user object if none was provided
+            const defaultUser = {
+              email: email,
+              role: 'admin',
+              id: new Date().getTime(),
+              name: email.split('@')[0]
+            };
+            localStorage.setItem('user', JSON.stringify(defaultUser));
+            console.log('authService: Created default user data');
+            
+            // Add user to response if it didn't exist
+            jsonResponse.data.user = defaultUser;
+          }
+          
+          return jsonResponse.data;
+        } else {
+          console.warn('authService: Unexpected JSON response format:', jsonResponse.data);
+          throw new Error(jsonResponse.data?.message || 'Login failed');
+        }
+      } catch (jsonError) {
+        console.error('authService: JSON login attempt error:', jsonError);
+        
+        // If JSON approach failed, try one more with x-www-form-urlencoded
+        try {
+          console.log("authService: Second attempt failed, trying form urlencoded approach");
+          
+          // Create URLSearchParams
+          const params = new URLSearchParams();
+          params.append('username', email);
+          params.append('password', password);
+          
+          const urlEncodedResponse = await api.post('/admin/login', params, {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
+          });
+          
+          console.log('authService: URLEncoded response received:', urlEncodedResponse.data);
+          
+          if (urlEncodedResponse.data && urlEncodedResponse.data.code === 200) {
+            // Store auth token and user data
+            if (urlEncodedResponse.data.token) {
+              localStorage.setItem('auth_token', urlEncodedResponse.data.token);
+              console.log('authService: Token saved to localStorage');
+            } else {
+              console.warn('authService: No token in URLEncoded response');
+            }
+            
+            if (urlEncodedResponse.data.user) {
+              localStorage.setItem('user', JSON.stringify(urlEncodedResponse.data.user));
+              console.log('authService: User data saved to localStorage');
+            } else {
+              console.warn('authService: No user data in URLEncoded response');
+              // Create a default user object if none was provided
+              const defaultUser = {
+                email: email,
+                role: 'admin',
+                id: new Date().getTime(),
+                name: email.split('@')[0]
+              };
+              localStorage.setItem('user', JSON.stringify(defaultUser));
+              console.log('authService: Created default user data');
+              
+              // Add user to response if it didn't exist
+              urlEncodedResponse.data.user = defaultUser;
+            }
+            
+            return urlEncodedResponse.data;
+          } else {
+            console.warn('authService: Unexpected URLEncoded response format:', urlEncodedResponse.data);
+            throw new Error(urlEncodedResponse.data?.message || 'Login failed');
+          }
+        } catch (urlEncodedError) {
+          console.error('authService: URLEncoded login attempt error:', urlEncodedError);
+          throw urlEncodedError;
+        }
+      }
     }
     
-    throw new Error(
-      error.response?.data?.message || 
-      error.message ||
-      'Unable to login. Please check your credentials and try again.'
-    );
+    console.error('authService: Login error:', error);
+    // Provide more user-friendly error messages
+    if (error.response) {
+      const errorMsg = error.response.data?.message || 'Invalid credentials';
+      throw new Error(errorMsg);
+    } else if (error.request) {
+      throw new Error('Network error. Please check your connection and try again.');
+    } else {
+      throw error;
+    }
   }
 };
 
-/**
- * Login as admin - alternative method that accepts credentials object
- * @param {Object} credentials - Login credentials
- * @param {string} credentials.username - Admin username
- * @param {string} credentials.password - Admin password
- * @returns {Promise<Object>} Login response with user data and token
- */
-export const login = async (credentials) => {
-  return loginAdmin(credentials.username, credentials.password);
-};
-
-/**
- * Logout the current user
- */
+// The rest remains the same
 export const logout = () => {
-  console.log('authService: Logging out...');
-  
-  // Clear stored data
   localStorage.removeItem('auth_token');
   localStorage.removeItem('user');
-  
-  // Remove authorization header
-  delete api.defaults.headers.common['Authorization'];
-  
-  console.log('authService: Logout complete');
-  
-  // Don't automatically redirect - let the component handle it
+  console.log('authService: Logged out - cleared localStorage');
 };
 
-/**
- * Get the current logged in user (alias for getAuthUser)
- * @returns {Object|null} User object or null if not logged in
- */
-export const getCurrentUser = () => {
-  const userStr = localStorage.getItem('user');
-  if (userStr) {
+export const isAuthenticated = () => {
+  const hasToken = !!localStorage.getItem('auth_token');
+  console.log('authService: isAuthenticated check -', hasToken);
+  return hasToken;
+};
+
+export const getAuthUser = () => {
+  const userData = localStorage.getItem('user');
+  if (userData) {
     try {
-      return JSON.parse(userStr);
+      return JSON.parse(userData);
     } catch (error) {
       console.error('Error parsing user data:', error);
+      localStorage.removeItem('user');
       return null;
     }
   }
   return null;
 };
 
-/**
- * Get the current logged in user (expected by AuthContext)
- * @returns {Object|null} User object or null if not logged in
- */
-export const getAuthUser = () => {
-  return getCurrentUser();
-};
-
-/**
- * Check if user is authenticated
- * @returns {boolean} True if user has a valid token
- */
-export const isAuthenticated = () => {
-  const token = localStorage.getItem('auth_token');
-  const user = localStorage.getItem('user');
-  return !!(token && user);
-};
-
-/**
- * Get the current auth token
- * @returns {string|null} Auth token or null if not available
- */
-export const getAuthToken = () => {
+export const getToken = () => {
   return localStorage.getItem('auth_token');
 };
 
+export const isAdmin = () => {
+  const user = getAuthUser();
+  return user && (user.role === 'admin' || user.role === 'superadmin');
+};
+
 export default {
-  login,
   loginAdmin,
   logout,
-  getCurrentUser,
-  getAuthUser,
   isAuthenticated,
-  getAuthToken
+  getAuthUser,
+  getToken,
+  isAdmin
 };
