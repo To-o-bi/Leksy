@@ -210,6 +210,7 @@ const ContactPage = () => {
                     {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                   </div>
                   
+                  
                   <div className="flex-grow">
                     <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">Message</label>
                     <textarea
