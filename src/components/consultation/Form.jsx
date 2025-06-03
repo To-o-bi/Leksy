@@ -25,13 +25,13 @@ const Form = () => {
     const consultationFormats = [
       { 
         id: 'video', 
-        name: 'Video Call (Zoom or Google Meet)', 
+        name: 'Live Beauty Session (via Zoom/Google Meet)', 
         price: 35000,
         displayPrice: '₦35,000'
       },
       { 
         id: 'whatsapp', 
-        name: 'WhatsApp Consultation', 
+        name: 'Leksy WhatsApp Session', 
         price: 15000,
         displayPrice: '₦15,000'
       }
@@ -293,7 +293,7 @@ const Form = () => {
                         What is your skin type?
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-                        {['Dry', 'Oily', 'Combination', 'Normal', 'Sensitive'].map((type) => (
+                        {['Dry', 'Oily', 'Combination', 'Normal'].map((type) => (
                           <label key={type} className="flex items-center p-3 sm:p-4 border rounded-md cursor-pointer hover:bg-pink-50 transition-colors">
                             <input
                               type="radio"
@@ -334,26 +334,16 @@ const Form = () => {
                       )}
                     </div>
                     
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                        Do you currently use any skincare products?
-                      </label>
-                      <textarea
-                        {...register('currentProducts')}
-                        rows="3"
-                        placeholder="Please list the products you currently use in your routine"
-                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:ring-pink-500 focus:border-pink-500 text-sm sm:text-base resize-none"
-                      ></textarea>
-                    </div>
+                   
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                        Any additional details about your skin concerns?
+                        Do you have a sensitive skin?
                       </label>
                       <textarea
                         {...register('additionalInfo')}
                         rows="3"
-                        placeholder="Please share any other information that might help our specialist"
+                        placeholder="Please let us know about your skin sensitivity "
                         className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:ring-pink-500 focus:border-pink-500 text-sm sm:text-base resize-none"
                       ></textarea>
                     </div>
