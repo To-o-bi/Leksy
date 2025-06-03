@@ -1,15 +1,15 @@
+// src/pages/LoginPage.js - Fixed to match backend API
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
-// Login Page Component
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isAuthenticated, isLoading } = useAuth();
   
-  // Form state
-  const [email, setEmail] = useState('');
+  // Form state - changed from email to username to match backend API
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,8 +30,8 @@ const LoginPage = () => {
     e.preventDefault();
     
     // Validate form
-    if (!email) {
-      setError('Email is required');
+    if (!username) {
+      setError('Username is required');
       return;
     }
     if (!password) {
@@ -43,41 +43,49 @@ const LoginPage = () => {
     setIsSubmitting(true);
     
     try {
-      console.log('Attempting login with:', email);
+      console.log('Attempting login with:', username);
       
       // Call login function from auth context
-      const result = await login(email, password);
+      const result = await login(username, password);
       
       console.log('Login successful, result:', result);
-      console.log('User should now be authenticated:', { isAuthenticated: Boolean(authService.getAuthUser()) });
-      console.log('Redirecting to:', from);
       
-      // Add a small delay to ensure state updates properly
+      // Small delay to ensure state updates properly
       setTimeout(() => {
-        console.log('Checking auth state before navigation:', { 
-          isAuthenticated: Boolean(authService.getAuthUser()),
-          token: Boolean(localStorage.getItem('auth_token'))
-        });
+        console.log('Redirecting to:', from);
         navigate(from, { replace: true });
-        console.log('Navigation triggered');
       }, 100);
     } catch (err) {
       console.error('Login failed:', err);
       
-      // Handle different error types
-      if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-        setError('Invalid email or password');
-      } else if (err.code === 'auth/too-many-requests') {
-        setError('Too many failed login attempts. Please try again later.');
-      } else if (err.code === 'auth/network-request-failed') {
-        setError('Network error. Please check your connection.');
+      // Handle different error types based on backend responses
+      const errorMessage = err.message;
+      
+      if (errorMessage.includes('Invalid credentials')) {
+        setError('Invalid username or password');
+      } else if (errorMessage.includes('Username and password are required')) {
+        setError('Please provide both username and password');
+      } else if (errorMessage.includes('Network error')) {
+        setError('Network error. Please check your connection and try again.');
       } else {
-        setError(err.message || 'Login failed. Please try again.');
+        setError(errorMessage || 'Login failed. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
     }
   };
+  
+  // Show loading if auth is still initializing
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
+          <p className="mt-2 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
@@ -89,24 +97,27 @@ const LoginPage = () => {
             </svg>
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
+            Admin Login
           </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Sign in to manage Leksy Cosmetics
+          </p>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
-              <label htmlFor="email-address" className="sr-only">Email address</label>
+              <label htmlFor="username" className="sr-only">Username</label>
               <input
-                id="email-address"
-                name="email"
-                type="name"
-                autoComplete="email"
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
                 required
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-pink-500 focus:border-pink-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 disabled={isSubmitting}
               />
             </div>
@@ -128,7 +139,7 @@ const LoginPage = () => {
           </div>
           
           {error && (
-            <div className="text-red-500 text-sm text-center" role="alert">
+            <div className="text-red-500 text-sm text-center bg-red-50 border border-red-200 rounded-md p-3" role="alert">
               {error}
             </div>
           )}
@@ -138,8 +149,8 @@ const LoginPage = () => {
               type="submit"
               disabled={isSubmitting}
               className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
-                isSubmitting ? 'bg-pink-400' : 'bg-pink-600 hover:bg-pink-700'
-              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500`}
+                isSubmitting ? 'bg-pink-400 cursor-not-allowed' : 'bg-pink-600 hover:bg-pink-700'
+              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 transition duration-150 ease-in-out`}
             >
               {isSubmitting ? (
                 <>
@@ -157,6 +168,15 @@ const LoginPage = () => {
             </button>
           </div>
         </form>
+        
+        {/* Development helper */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-xs text-blue-600">
+              <strong>Dev Note:</strong> Enter your admin username and password as configured in your backend.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

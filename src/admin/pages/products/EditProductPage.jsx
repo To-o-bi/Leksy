@@ -47,36 +47,38 @@ const EditProductPage = () => {
         
         console.log('Fetching product with ID:', id);
         
-        // Call the real API to fetch product data
-        const productData = await productService.fetchProduct(id);
+        // Call the API to fetch product data
+        const response = await productService.fetchProduct(id);
         
-        if (!productData) {
+        if (!response || !response.product) {
           setProductNotFound(true);
           throw new Error('Product not found');
         }
         
+        const productData = response.product;
         console.log('Product data fetched:', productData);
         
-        // Set form data from API response
+        // Set form data from API response (matching your backend format)
         setFormData({
           name: productData.name || '',
           price: productData.price ? productData.price.toString() : '',
           slashed_price: productData.slashed_price ? productData.slashed_price.toString() : '',
           category: productData.category || '',
-          quantity: productData.quantity ? productData.quantity.toString() : '',
+          quantity: productData.available_qty ? productData.available_qty.toString() : '',
           description: productData.description || '',
           images: [] // New images will be added here
         });
         
         // Set existing images from API response
-        setExistingImages(
-          productData.images || 
-          (productData.image_url ? [productData.image_url] : [])
-        );
+        setExistingImages(productData.images || []);
         
       } catch (error) {
         console.error('Error fetching product:', error);
-        setSubmitError('Failed to load product data. Please try again.');
+        if (error.message.includes('Product not found') || error.status === 404) {
+          setProductNotFound(true);
+        } else {
+          setSubmitError('Failed to load product data. Please try again.');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -180,7 +182,7 @@ const EditProductPage = () => {
     setExistingImages(updatedExistingImages);
   };
   
-  // Validate the form
+  // Simplified validation
   const validateForm = () => {
     const newErrors = {};
     
@@ -191,17 +193,17 @@ const EditProductPage = () => {
     if (!formData.quantity.trim()) newErrors.quantity = 'Quantity is required';
     if (!formData.category) newErrors.category = 'Category is required';
     
-    // Numeric validation
-    if (formData.price && !/^\d+(\.\d{1,2})?$/.test(formData.price)) {
-      newErrors.price = 'Price must be a valid number';
+    // Simple numeric validation
+    if (formData.price && (isNaN(formData.price) || parseFloat(formData.price) <= 0)) {
+      newErrors.price = 'Please enter a valid price';
     }
     
-    if (formData.slashed_price && !/^\d+(\.\d{1,2})?$/.test(formData.slashed_price)) {
-      newErrors.slashed_price = 'Original price must be a valid number';
+    if (formData.slashed_price && (isNaN(formData.slashed_price) || parseFloat(formData.slashed_price) <= 0)) {
+      newErrors.slashed_price = 'Please enter a valid original price';
     }
     
-    if (formData.quantity && !/^\d+$/.test(formData.quantity)) {
-      newErrors.quantity = 'Quantity must be a whole number';
+    if (formData.quantity && (isNaN(formData.quantity) || parseInt(formData.quantity) < 0)) {
+      newErrors.quantity = 'Please enter a valid quantity';
     }
     
     // At least one image required (either existing or new)
@@ -223,32 +225,41 @@ const EditProductPage = () => {
     
     // Validate form
     if (!validateForm()) {
+      setSubmitError('Please fill in all required fields correctly.');
       return;
     }
     
     setIsSubmitting(true);
     
     try {
-      // Prepare data for submission
-      const productData = {
-        name: formData.name,
-        price: parseFloat(formData.price),
-        description: formData.description,
-        quantity: parseInt(formData.quantity, 10),
-        category: formData.category,
-        images: formData.images,
-        existing_images: existingImages
-      };
+      // Prepare data for submission (only include fields that have changed)
+      const productData = {};
+      
+      // Add changed fields
+      if (formData.name.trim()) productData.name = formData.name.trim();
+      if (formData.price) productData.price = parseFloat(formData.price);
+      if (formData.description.trim()) productData.description = formData.description.trim();
+      if (formData.quantity) productData.quantity = parseInt(formData.quantity, 10);
+      if (formData.category) productData.category = formData.category;
       
       // Add slashed_price if provided
       if (formData.slashed_price) {
         productData.slashed_price = parseFloat(formData.slashed_price);
       }
       
-      console.log('Submitting update with data:', productData);
+      // Add new images if any
+      if (formData.images.length > 0) {
+        productData.images = formData.images;
+      }
       
-      // Make the API call to update the product
-      const response = await productService.editProduct(id, productData);
+      console.log('Submitting update with data:', {
+        ...productData,
+        images: productData.images ? `${productData.images.length} new files` : 'none',
+        existing_images: `${existingImages.length} existing`
+      });
+      
+      // Make the API call to update the product (correct method name)
+      const response = await productService.updateProduct(id, productData);
       
       console.log('Update response:', response);
       setSubmitSuccess(true);
@@ -267,6 +278,7 @@ const EditProductPage = () => {
     } catch (error) {
       console.error('Error updating product:', error);
       setSubmitError(error.message || 'An error occurred while updating the product.');
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -354,7 +366,7 @@ const EditProductPage = () => {
         </div>
       )}
       
-      <form onSubmit={handleSubmit} className="space-y-6" encType="multipart/form-data">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Product Name */}
           <div>
@@ -511,6 +523,9 @@ const EditProductPage = () => {
                         src={imageUrl}
                         alt={`Product image ${index + 1}`}
                         className="h-full w-full object-cover object-center"
+                        onError={(e) => {
+                          e.target.src = '/placeholder-image.png'; // Fallback image
+                        }}
                       />
                     </div>
                     <button
@@ -541,14 +556,13 @@ const EditProductPage = () => {
                 <Upload className="mx-auto h-12 w-12 text-gray-400" />
                 <div className="flex text-sm text-gray-600">
                   <label
-                    htmlFor="images[]"
+                    htmlFor="images"
                     className="relative cursor-pointer bg-white rounded-md font-medium text-pink-600 hover:text-pink-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-pink-500"
                   >
                     <span>Upload images</span>
-                    {/* Important: Use the correct field name expected by the backend */}
                     <input
-                      id="images[]"
-                      name="images[]"
+                      id="images"
+                      name="images"
                       type="file"
                       ref={fileInputRef}
                       multiple

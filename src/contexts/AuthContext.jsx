@@ -1,3 +1,4 @@
+// src/contexts/AuthContext.js - Fixed to match backend API
 import { useState, useEffect, useContext, createContext, useMemo, useCallback } from 'react';
 import authService from '../api/services/authService';
 
@@ -49,30 +50,24 @@ function useProvideAuth() {
       setIsLoading(true);
       
       try {
-        // Debug current localStorage state
         debugAuthState();
         
-        // Check if we have a valid token and user data
+        // Check if we have valid authentication data
         if (authService.isAuthenticated()) {
           const userData = authService.getAuthUser();
           console.log('Found existing auth data:', userData);
           
-          // Verify that token exists
-          const token = localStorage.getItem('auth_token');
-          if (!token) {
-            console.error('User data exists but no token found');
-            throw new Error('Auth token missing');
-          }
-          
           setUser(userData);
         } else {
           console.log('No valid auth data found');
+          setUser(null);
         }
       } catch (err) {
         console.error('Error initializing auth:', err);
         setError('Failed to initialize authentication');
         // Clear potentially corrupted auth data
         authService.logout();
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -81,70 +76,111 @@ function useProvideAuth() {
     initializeAuth();
   }, [debugAuthState]);
   
-  // Login function
-  const login = useCallback(async (email, password) => {
+  // Login function - updated to work with backend API
+  const login = useCallback(async (usernameOrEmail, password) => {
     setIsLoading(true);
     setError(null);
     
     try {
-      // Make sure both email and password are provided
-      if (!email || !password) {
-        throw new Error('Email and password are required');
+      if (!usernameOrEmail || !password) {
+        throw new Error('Username and password are required');
       }
       
       console.log('AuthContext: Attempting login...');
       debugAuthState();
       
-      // Use the authService to authenticate with the API
-      const result = await authService.loginAdmin(email, password);
+      // Use the authService to authenticate with the backend API
+      // Backend expects 'username' parameter, so we'll use usernameOrEmail as username
+      const result = await authService.loginAdmin(usernameOrEmail, password);
       
       console.log('AuthContext: Login response received:', result);
       
-      // Verify token was saved properly
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        console.error('Login succeeded but no token was saved');
-        throw new Error('Authentication error: No token saved');
+      // Verify authentication was successful
+      if (!authService.isAuthenticated()) {
+        throw new Error('Authentication failed: No valid session created');
       }
       
-      // Get the user from localStorage after the authService has done its work
+      // Get the user data that was saved to localStorage
       const userData = authService.getAuthUser();
+      if (!userData) {
+        throw new Error('Authentication failed: No user data available');
+      }
       
-      // Set the user state from data in localStorage
+      // Set the user state
       setUser(userData);
       
-      // Debug localStorage state after login
       debugAuthState();
-      
-      console.log('AuthContext: User state updated from localStorage');
+      console.log('AuthContext: User state updated successfully');
       
       return result;
     } catch (err) {
       console.error('AuthContext: Login error:', err);
       setError(err.message || 'Login failed');
+      setUser(null);
+      // Clear any partial auth data
+      authService.logout();
       throw err;
     } finally {
       setIsLoading(false);
     }
   }, [debugAuthState]);
   
-  // Logout function
-  const logout = useCallback(() => {
+  // Logout function - updated to call backend logout
+  const logout = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     
     try {
       console.log('AuthContext: Logging out...');
+      
+      // Try to call backend logout API first
+      try {
+        await authService.logoutAdmin();
+        console.log('AuthContext: Backend logout successful');
+      } catch (err) {
+        console.warn('AuthContext: Backend logout failed, continuing with local logout:', err);
+        // Continue with local logout even if backend call fails
+      }
+      
+      // Always clear local state regardless of backend response
       authService.logout();
       setUser(null);
+      setError(null);
+      
       console.log('AuthContext: User logged out successfully');
       debugAuthState();
     } catch (err) {
       console.error('Logout error:', err);
       setError(err.message || 'Logout failed');
+      // Force local logout even if there's an error
+      authService.logout();
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
   }, [debugAuthState]);
+  
+  // Check token validity - useful for debugging
+  const verifyAuth = useCallback(() => {
+    const isValid = authService.isAuthenticated();
+    const userData = authService.getAuthUser();
+    
+    console.log('Auth verification:', {
+      isValid,
+      hasUser: !!userData,
+      user: userData
+    });
+    
+    if (!isValid && user) {
+      console.log('Auth state invalid, clearing user');
+      setUser(null);
+    } else if (isValid && !user && userData) {
+      console.log('Auth valid but no user state, restoring user');
+      setUser(userData);
+    }
+    
+    return isValid;
+  }, [user]);
   
   // For debugging: log user state changes
   useEffect(() => {
@@ -166,8 +202,9 @@ function useProvideAuth() {
     logout,
     isAuthenticated,
     isAdmin,
-    // Add a method to check if the token is valid
-    verifyToken: debugAuthState
+    verifyAuth,
+    // Add method to manually refresh auth state
+    refreshAuth: debugAuthState
   };
 }
 
