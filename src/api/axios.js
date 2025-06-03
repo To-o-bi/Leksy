@@ -1,12 +1,12 @@
+// src/api/axios.js - Fixed to match backend API
 import axios from 'axios';
 
-// Create a direct instance pointing to the real API
+// Create axios instance pointing to your backend API
 const instance = axios.create({
   baseURL: import.meta.env.REACT_APP_API_URL || 'https://leksycosmetics.com/api',
-  timeout: 30000, // 30 seconds timeout for slow connections
+  timeout: 30000, // 30 seconds timeout
   headers: {
     'Accept': 'application/json',
-    'Content-Type': 'application/json'
   }
 });
 
@@ -14,7 +14,16 @@ const instance = axios.create({
 const PUBLIC_ENDPOINTS = [
   '/fetch-products',
   '/fetch-product',
-  '/contact'
+  '/contact',
+  '/initiate-checkout'
+];
+
+// List of admin endpoints that require authentication
+const ADMIN_ENDPOINTS = [
+  '/admin/add-product',
+  '/admin/update-product', 
+  '/admin/delete-product',
+  '/admin/logout'
 ];
 
 // Request interceptor
@@ -25,30 +34,37 @@ instance.interceptors.request.use(
       config.url && config.url.includes(endpoint)
     );
     
-    // Check if this is an admin endpoint
-    const isAdminEndpoint = config.url && config.url.includes('/admin/');
+    // Check if this is an admin endpoint (excluding login)
+    const isAdminEndpoint = ADMIN_ENDPOINTS.some(endpoint =>
+      config.url && config.url.includes(endpoint)
+    );
     
-    // Add auth token from localStorage if it exists and endpoint requires it
+    // Add auth token for admin endpoints (except login)
     const token = localStorage.getItem('auth_token');
+    const isLoginEndpoint = config.url && config.url.includes('/admin/login');
     
-    if (token && !isPublicEndpoint) {
+    if (token && isAdminEndpoint && !isLoginEndpoint) {
       config.headers['Authorization'] = `Bearer ${token}`;
-      console.log('Adding token to request:', config.url);
-    } else if (!token && isAdminEndpoint) {
+      console.log('Adding token to admin request:', config.url);
+    } else if (!token && isAdminEndpoint && !isLoginEndpoint) {
       console.warn('No auth token found for admin request:', config.url);
-      // This will trigger a 401 unauthorized response, which will be caught by the response interceptor
     }
     
-    // Only override Content-Type if it's not already set and not FormData
-    if (!config.headers['Content-Type'] && !(config.data instanceof FormData)) {
+    // Handle different content types
+    if (config.data instanceof FormData) {
+      // For FormData, let browser set the Content-Type with boundary
+      delete config.headers['Content-Type'];
+    } else if (!config.headers['Content-Type']) {
       config.headers['Content-Type'] = 'application/json';
     }
     
     // Log request details in development
     if (import.meta.env.NODE_ENV !== 'production') {
       console.log('API Request:', {
-        method: config.method,
+        method: config.method?.toUpperCase(),
         url: config.url,
+        baseURL: config.baseURL,
+        fullURL: config.baseURL + config.url,
         data: config.data instanceof FormData ? 'FormData' : config.data,
         headers: {
           ...config.headers,
@@ -77,71 +93,81 @@ instance.interceptors.response.use(
       });
     }
   
-    // Extract token from response if available and update it
+    // Handle token renewal from backend
+    // Your backend may return a new token in responses to extend session
     if (response.data && response.data.token) {
-      localStorage.setItem('auth_token', response.data.token);
-      console.log('Token updated from response');
+      const currentToken = localStorage.getItem('auth_token');
+      if (currentToken !== response.data.token) {
+        localStorage.setItem('auth_token', response.data.token);
+        console.log('Token updated from response');
+      }
     }
     
     return response;
   },
   (error) => {
     // Log errors with detailed information
-    console.error('API Error:', error.message);
+    console.error('API Error:', {
+      message: error.message,
+      status: error.response?.status,
+      url: error.config?.url,
+      data: error.response?.data
+    });
     
     if (error.response) {
-      console.error('Error Response:', {
-        status: error.response.status,
-        data: error.response.data,
-        headers: error.response.headers
-      });
+      const { status, data } = error.response;
       
-      // Handle 401 Unauthorized - redirect to login
-      if (error.response.status === 401) {
-        console.warn('Unauthorized request - clearing auth data');
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user');
-        
-        // Only redirect if we're not already on the login page
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
-        }
+      // Handle specific error codes from your backend
+      switch (status) {
+        case 401:
+          console.warn('Unauthorized request - clearing auth data');
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user');
+          
+          // Only redirect if we're not already on the login page
+          if (!window.location.pathname.includes('/login')) {
+            window.location.href = '/login?expired=true';
+          }
+          break;
+          
+        case 403:
+          console.warn('Forbidden request - user lacks permission');
+          break;
+          
+        case 404:
+          console.warn('Endpoint not found:', error.config?.url);
+          break;
+          
+        case 412:
+          // Precondition Failed - usually missing required parameters
+          console.warn('Precondition failed - missing required parameters');
+          break;
+          
+        case 500:
+        case 502:
+        case 503:
+        case 504:
+          console.error('Server error detected');
+          break;
       }
       
-      // Handle 403 Forbidden - no permission
-      if (error.response.status === 403) {
-        console.warn('Forbidden request - user lacks permission');
-        // You might want to redirect to a permission denied page
-        // or display a notification
-      }
+      // Create a standardized error object
+      const apiError = new Error(data?.message || `HTTP ${status} Error`);
+      apiError.status = status;
+      apiError.code = data?.code;
+      apiError.data = data;
       
-      // Handle 500 Server errors
-      if (error.response.status >= 500) {
-        console.error('Server error detected');
-        // You might want to show a server error notification
-      }
+      return Promise.reject(apiError);
     } else if (error.request) {
-      console.error('Error Request:', error.request);
-    }
-    
-    // Handle common errors
-    if (error.code === 'ECONNABORTED') {
-      error.message = 'Request timed out. Please check your connection and try again.';
-    } else if (!error.response && error.message.includes('Network Error')) {
-      error.message = 'Network error. Please check your connection and try again.';
-    }
-    
-    // Add a user-friendly message property if not already present
-    if (!error.userMessage) {
-      if (error.response && error.response.data && error.response.data.message) {
-        error.userMessage = error.response.data.message;
-      } else if (error.code === 'ECONNABORTED') {
-        error.userMessage = 'Request timed out. Please try again later.';
-      } else if (!error.response) {
-        error.userMessage = 'Network error. Please check your connection.';
-      } else {
-        error.userMessage = 'An unexpected error occurred. Please try again.';
-      }
+      // Network error
+      const networkError = new Error('Network error. Please check your connection and try again.');
+      networkError.isNetworkError = true;
+      return Promise.reject(networkError);
+    } else if (error.code === 'ECONNABORTED') {
+      // Timeout error
+      const timeoutError = new Error('Request timed out. Please try again.');
+      timeoutError.isTimeout = true;
+      return Promise.reject(timeoutError);
     }
     
     return Promise.reject(error);
@@ -154,27 +180,24 @@ instance.postFormData = async (url, formData, config = {}) => {
     ...config,
     headers: {
       ...config.headers,
-      'Content-Type': 'multipart/form-data',
+      // Let browser set Content-Type for FormData
     },
   });
 };
 
-// Helper method for API calls that need to renew token
-instance.withTokenRenewal = async (apiCall) => {
-  try {
-    return await apiCall();
-  } catch (error) {
-    if (error.response && error.response.status === 401) {
-      // Try to refresh token or re-authenticate
-      console.log('Token expired - attempting renewal');
-      
-      // For now, just redirect to login
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user');
-      window.location.href = '/login?expired=true';
-    }
-    throw error;
-  }
+// Helper method for file uploads with progress
+instance.uploadFile = async (url, formData, onUploadProgress) => {
+  return instance.post(url, formData, {
+    headers: {
+      // Let browser set Content-Type for FormData
+    },
+    onUploadProgress: onUploadProgress
+  });
+};
+
+// Helper method to check if user is authenticated
+instance.isAuthenticated = () => {
+  return !!localStorage.getItem('auth_token') && !!localStorage.getItem('user');
 };
 
 export default instance;

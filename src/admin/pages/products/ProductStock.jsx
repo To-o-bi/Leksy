@@ -7,11 +7,11 @@ const ProductStockPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]); // Store all products
+  const [displayedProducts, setDisplayedProducts] = useState([]); // Products shown on current page
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  const [totalItems, setTotalItems] = useState(0);
   const [sortBy, setSortBy] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -42,64 +42,20 @@ const ProductStockPage = () => {
     const fetchProducts = async () => {
       setIsLoading(true);
       try {
-        // Prepare query parameters that match the API expectations
-        const queryParams = {
-          sort: sortBy, // API only accepts: name|price|category (no direction)
-        };
+        console.log('Fetching all products from API...');
         
-        console.log('Fetching products with params:', queryParams);
-        
-        // Call the API through our service
-        const response = await productService.fetchProducts(queryParams);
+        // Call the API through our service (no pagination params since API doesn't support it)
+        const response = await productService.fetchProducts();
         
         console.log('Products API response:', response);
         
         // Handle the response structure from the API
         if (response && response.code === 200) {
-          let productsList = response.products || [];
+          const productsList = response.products || [];
           
-          // Map API response fields to match component expectations
-          productsList = productsList.map(product => ({
-            ...product,
-            id: product.product_id, // Map product_id to id
-            quantity: product.available_qty, // Map available_qty to quantity
-            image_url: product.images && product.images.length > 0 ? product.images[0] : null
-          }));
+          console.log('Products list:', productsList);
+          setAllProducts(productsList);
           
-          // Sort products locally since API doesn't support direction
-          productsList.sort((a, b) => {
-            let aValue, bValue;
-            
-            switch (sortBy) {
-              case 'name':
-                aValue = (a.name || '').toLowerCase();
-                bValue = (b.name || '').toLowerCase();
-                break;
-              case 'price':
-                aValue = parseFloat(a.price) || 0;
-                bValue = parseFloat(b.price) || 0;
-                break;
-              case 'category':
-                aValue = (a.category || '').toLowerCase();
-                bValue = (b.category || '').toLowerCase();
-                break;
-              default:
-                return 0;
-            }
-            
-            if (sortDirection === 'desc') {
-              return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
-            } else {
-              return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
-            }
-          });
-          
-          // Handle pagination locally since API doesn't support it
-          const startIndex = (currentPage - 1) * itemsPerPage;
-          const paginatedProducts = productsList.slice(startIndex, startIndex + itemsPerPage);
-          
-          setProducts(paginatedProducts);
-          setTotalItems(productsList.length);
         } else {
           throw new Error(response?.message || 'Failed to fetch products');
         }
@@ -111,15 +67,63 @@ const ProductStockPage = () => {
         });
         
         // Fallback to empty array if API fails
-        setProducts([]);
-        setTotalItems(0);
+        setAllProducts([]);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchProducts();
-  }, [currentPage, itemsPerPage, sortBy, sortDirection]);
+  }, []); // Only fetch once on mount
+
+  // Handle sorting and pagination locally
+  useEffect(() => {
+    if (allProducts.length === 0) {
+      setDisplayedProducts([]);
+      return;
+    }
+
+    // Sort products
+    let sortedProducts = [...allProducts];
+    
+    sortedProducts.sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (sortBy) {
+        case 'name':
+          aValue = (a.name || '').toLowerCase();
+          bValue = (b.name || '').toLowerCase();
+          break;
+        case 'price':
+          aValue = parseFloat(a.price) || 0;
+          bValue = parseFloat(b.price) || 0;
+          break;
+        case 'category':
+          aValue = (a.category || '').toLowerCase();
+          bValue = (b.category || '').toLowerCase();
+          break;
+        case 'quantity':
+          aValue = parseInt(a.available_qty) || 0;
+          bValue = parseInt(b.available_qty) || 0;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (sortDirection === 'desc') {
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+      } else {
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      }
+    });
+    
+    // Handle pagination
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedProducts = sortedProducts.slice(startIndex, endIndex);
+    
+    setDisplayedProducts(paginatedProducts);
+  }, [allProducts, sortBy, sortDirection, currentPage, itemsPerPage]);
 
   // Handle clicks outside of dropdown
   useEffect(() => {
@@ -137,31 +141,15 @@ const ProductStockPage = () => {
 
   // Handle sort option selection
   const handleSortOption = (option) => {
-    if (option === 'name-asc') {
-      setSortBy('name');
-      setSortDirection('asc');
-    } else if (option === 'name-desc') {
-      setSortBy('name');
-      setSortDirection('desc');
-    } else if (option === 'price-asc') {
-      setSortBy('price');
-      setSortDirection('asc');
-    } else if (option === 'price-desc') {
-      setSortBy('price');
-      setSortDirection('desc');
-    } else if (option === 'quantity-asc') {
-      setSortBy('name'); // API doesn't support quantity sorting, fallback to name
-      setSortDirection('asc');
-    } else if (option === 'quantity-desc') {
-      setSortBy('name'); // API doesn't support quantity sorting, fallback to name
-      setSortDirection('desc');
-    }
+    const [field, direction] = option.split('-');
+    setSortBy(field);
+    setSortDirection(direction);
     setShowSortDropdown(false);
     setCurrentPage(1); // Reset to first page when sorting
   };
 
   // Calculate total pages
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const totalPages = Math.ceil(allProducts.length / itemsPerPage);
 
   // Handle pagination
   const goToNextPage = () => {
@@ -187,7 +175,7 @@ const ProductStockPage = () => {
 
   // Handle edit button click - navigate to edit page
   const handleEditClick = (product) => {
-    navigate(`/admin/products/edit/${product.product_id || product.id}`);
+    navigate(`/admin/products/edit/${product.product_id}`);
   };
 
   // Handle delete button click - show confirmation modal
@@ -204,27 +192,23 @@ const ProductStockPage = () => {
 
   // Handle delete confirmation
   const handleDeleteConfirm = async () => {
-    if (!activeProduct || !(activeProduct.product_id || activeProduct.id)) return;
+    if (!activeProduct || !activeProduct.product_id) return;
     
     setIsSubmitting(true);
     
     try {
-      const productId = activeProduct.product_id || activeProduct.id;
-      console.log('Deleting product with ID:', productId);
+      console.log('Deleting product with ID:', activeProduct.product_id);
       
       // Call the delete API
-      const response = await productService.deleteProduct(productId);
+      const response = await productService.deleteProduct(activeProduct.product_id);
       
       console.log('Delete response:', response);
       
       if (response && response.code === 200) {
         // Update local state by removing the deleted product
-        setProducts(prevProducts => 
-          prevProducts.filter(product => 
-            (product.product_id || product.id) !== productId
-          )
+        setAllProducts(prevProducts => 
+          prevProducts.filter(product => product.product_id !== activeProduct.product_id)
         );
-        setTotalItems(prev => Math.max(0, prev - 1));
         
         // Show success notification
         setNotification({
@@ -233,7 +217,7 @@ const ProductStockPage = () => {
         });
         
         // If we're on a page with no products left, go to previous page
-        if (products.length === 1 && currentPage > 1) {
+        if (displayedProducts.length === 1 && currentPage > 1) {
           setCurrentPage(currentPage - 1);
         }
       } else {
@@ -263,19 +247,34 @@ const ProductStockPage = () => {
     { id: 'price-asc', label: 'Price (Low to High)' },
     { id: 'price-desc', label: 'Price (High to Low)' },
     { id: 'quantity-asc', label: 'Stock (Low to High)' },
-    { id: 'quantity-desc', label: 'Stock (High to Low)' }
+    { id: 'quantity-desc', label: 'Stock (High to Low)' },
+    { id: 'category-asc', label: 'Category (A-Z)' },
+    { id: 'category-desc', label: 'Category (Z-A)' }
   ];
 
   // Get current sort option label
   const getCurrentSortLabel = () => {
     const currentOption = sortOptions.find(option => {
-      if (sortBy === 'name' && sortDirection === 'asc') return option.id === 'name-asc';
-      if (sortBy === 'name' && sortDirection === 'desc') return option.id === 'name-desc';
-      if (sortBy === 'price' && sortDirection === 'asc') return option.id === 'price-asc';
-      if (sortBy === 'price' && sortDirection === 'desc') return option.id === 'price-desc';
-      return false;
+      const [field, direction] = option.id.split('-');
+      return field === sortBy && direction === sortDirection;
     });
     return currentOption ? currentOption.label : 'Sort By';
+  };
+
+  // Get product image URL
+  const getProductImageUrl = (product) => {
+    if (product.images && product.images.length > 0) {
+      return product.images[0];
+    }
+    return "/api/placeholder/64/64";
+  };
+
+  // Get stock status color
+  const getStockStatusColor = (quantity) => {
+    const stock = parseInt(quantity) || 0;
+    if (stock === 0) return 'bg-red-100 text-red-800';
+    if (stock <= 10) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-green-100 text-green-800';
   };
 
   // Modal component to reduce repetition
@@ -410,7 +409,7 @@ const ProductStockPage = () => {
                       </div>
                     </td>
                   </tr>
-                ) : products.length === 0 ? (
+                ) : allProducts.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="px-4 py-8 text-center">
                       <div className="flex flex-col items-center justify-center py-6">
@@ -426,12 +425,12 @@ const ProductStockPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  products.map((product) => (
-                    <tr key={product.product_id || product.id || `product-${Math.random()}`} className="border-b hover:bg-gray-50 transition-colors">
+                  displayedProducts.map((product) => (
+                    <tr key={product.product_id} className="border-b hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="w-12 h-12 md:w-16 md:h-16 rounded-md overflow-hidden bg-gray-100">
                           <img 
-                            src={product.image_url || (product.images && product.images[0]) || "/api/placeholder/64/64"} 
+                            src={getProductImageUrl(product)} 
                             alt={product.name || 'Product image'} 
                             className="w-full h-full object-cover"
                             onError={(e) => {
@@ -446,7 +445,7 @@ const ProductStockPage = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-gray-600 capitalize">
                           {product.category || 'Uncategorized'}
                         </div>
                       </td>
@@ -462,14 +461,8 @@ const ProductStockPage = () => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            (product.quantity || product.available_qty || 0) === 0 
-                              ? 'bg-red-100 text-red-800' 
-                              : (product.quantity || product.available_qty || 0) <= 10 
-                              ? 'bg-yellow-100 text-yellow-800' 
-                              : 'bg-green-100 text-green-800'
-                          }`}>
-                            {product.quantity || product.available_qty || 0}
+                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStockStatusColor(product.available_qty)}`}>
+                            {product.available_qty || 0}
                           </span>
                         </div>
                       </td>
@@ -506,12 +499,12 @@ const ProductStockPage = () => {
           </div>
 
           {/* Pagination */}
-          {!isLoading && products.length > 0 && totalPages > 1 && (
+          {!isLoading && allProducts.length > 0 && totalPages > 1 && (
             <div className="px-4 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t">
               <div>
                 <p className="text-sm text-gray-500">
                   Showing {currentPage === 1 ? 1 : (currentPage - 1) * itemsPerPage + 1}-
-                  {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} products
+                  {Math.min(currentPage * itemsPerPage, allProducts.length)} of {allProducts.length} products
                 </p>
               </div>
               <div className="flex items-center space-x-2">
@@ -605,7 +598,7 @@ const ProductStockPage = () => {
               <div className="w-full sm:w-1/3">
                 <div className="w-full h-40 rounded-md overflow-hidden bg-gray-100">
                   <img 
-                    src={activeProduct.image_url || (activeProduct.images && activeProduct.images[0]) || "/api/placeholder/200/200"} 
+                    src={getProductImageUrl(activeProduct)} 
                     alt={activeProduct.name || 'Product image'} 
                     className="w-full h-full object-contain"
                     onError={(e) => {
@@ -618,7 +611,7 @@ const ProductStockPage = () => {
                 <h3 className="text-lg font-medium text-gray-900 mb-1">
                   {activeProduct.name || 'Unnamed Product'}
                 </h3>
-                <p className="text-sm text-gray-500 mb-3">
+                <p className="text-sm text-gray-500 mb-3 capitalize">
                   {activeProduct.category || 'Uncategorized'}
                 </p>
                 
@@ -638,11 +631,11 @@ const ProductStockPage = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-500">Stock:</span>
-                    <span className="text-sm text-gray-900">{activeProduct.quantity || activeProduct.available_qty || 0} units</span>
+                    <span className="text-sm text-gray-900">{activeProduct.available_qty || 0} units</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-500">Product ID:</span>
-                    <span className="text-sm text-gray-900">#{activeProduct.product_id || activeProduct.id}</span>
+                    <span className="text-sm text-gray-900">#{activeProduct.product_id}</span>
                   </div>
                 </div>
               </div>

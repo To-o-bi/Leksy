@@ -1,268 +1,260 @@
+// src/api/services/productService.js - Complete corrected version
 import api from '../axios';
 
 /**
- * Fetch all products with optional filtering
- * @param {Object} options - Query options
- * @param {string} options.category - Optional product category filter
- * @param {string} options.sort - Optional sorting parameter
- * @returns {Promise<Object>} Products response
+ * Fetch a single product by ID
+ * @param {string} productId - Product ID
+ * @returns {Promise<Object>} Product data
  */
-export const fetchProducts = async (options = {}) => {
+export const fetchProduct = async (productId) => {
+  if (!productId) {
+    throw new Error('Product ID is required');
+  }
+
   try {
-    const response = await api.post('/fetch-products', options);
+    const response = await api.get(`/fetch-product?product_id=${productId}`);
     
     if (response.data && response.data.code === 200) {
       return response.data;
     } else {
-      throw new Error(response.data.message || 'Failed to fetch products');
+      throw new Error(response.data?.message || 'Failed to fetch product');
     }
   } catch (error) {
-    console.error('Fetch products error:', error);
-    throw new Error(
-      error.response?.data?.message || 
-      'Unable to load products. Please try again later.'
-    );
+    console.error('Error fetching product:', error);
+    throw error;
   }
 };
 
 /**
- * Fetch a single product by ID
- * @param {string|number} productId - Product ID to fetch
- * @returns {Promise<Object>} Product data
+ * Fetch multiple products with optional filters
+ * @param {Object} options - Query options
+ * @param {string[]} options.categories - Array of categories to filter by
+ * @param {string[]} options.productIds - Array of specific product IDs to fetch
+ * @param {string} options.sort - Sort by field (name, price, category)
+ * @returns {Promise<Object>} Products data
  */
-export const fetchProduct = async (productId) => {
+export const fetchProducts = async (options = {}) => {
   try {
-    // Validate the product ID
-    if (!productId) {
-      throw new Error('Please set a product_id!');
+    const queryParams = new URLSearchParams();
+    
+    // Add category filter if provided
+    if (options.categories && options.categories.length > 0) {
+      queryParams.append('filter', options.categories.join(','));
     }
     
-    console.log('Fetching product with ID:', productId);
+    // Add specific product IDs if provided
+    if (options.productIds && options.productIds.length > 0) {
+      queryParams.append('products_ids_array', options.productIds.join(','));
+    }
     
-    // Send the product_id in the request body, not as a URL parameter
-    const response = await api.post('/fetch-product', { 
-      product_id: productId.toString() 
-    });
+    // Add sorting if provided
+    if (options.sort) {
+      queryParams.append('sort', options.sort);
+    }
     
-    console.log('Product fetch response:', response.data);
+    const queryString = queryParams.toString();
+    const url = `/fetch-products${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await api.get(url);
     
     if (response.data && response.data.code === 200) {
-      if (!response.data.product) {
-        throw new Error('Product not found');
-      }
-      return response.data.product;
+      return response.data;
     } else {
-      throw new Error(response.data.message || 'Failed to fetch product');
+      throw new Error(response.data?.message || 'Failed to fetch products');
     }
   } catch (error) {
-    console.error('Fetch product error:', error);
-    throw new Error(
-      error.response?.data?.message || 
-      'Unable to load product details. Please try again later.'
-    );
+    console.error('Error fetching products:', error);
+    throw error;
   }
 };
 
 /**
  * Add a new product (Admin only)
- * @param {Object} productData - Product data
- * @returns {Promise<Object>} Response with product ID
+ * @param {Object} productData - Product information
+ * @param {string} productData.name - Product name
+ * @param {number} productData.price - Product price
+ * @param {number} productData.slashed_price - Original price (optional)
+ * @param {string} productData.description - Product description
+ * @param {number} productData.quantity - Available quantity
+ * @param {string} productData.category - Product category
+ * @param {File[]} productData.images - Product images (max 2MB each)
+ * @returns {Promise<Object>} Add product response
  */
 export const addProduct = async (productData) => {
+  const { name, price, slashed_price, description, quantity, category, images } = productData;
+  
+  if (!name || !price || !description || !quantity || !category) {
+    throw new Error('All required fields must be provided');
+  }
+
   try {
-    console.log('AddProduct service received:', productData);
-    
-    // Validate required fields
-    const requiredFields = ['name', 'price', 'description', 'quantity', 'category'];
-    const missingFields = requiredFields.filter(field => 
-      productData[field] === undefined || 
-      productData[field] === null || 
-      productData[field] === ''
-    );
-    
-    if (missingFields.length > 0) {
-      throw new Error(`${missingFields.join(', ')} are all required!`);
-    }
-    
-    // Explicitly check for the images array
-    if (!productData.images || !Array.isArray(productData.images) || productData.images.length === 0) {
-      throw new Error('At least one product image is required!');
-    }
-    
-    // Create FormData for the request
     const formData = new FormData();
+    formData.append('name', name);
+    formData.append('price', price.toString());
+    if (slashed_price) formData.append('slashed_price', slashed_price.toString());
+    formData.append('description', description);
+    formData.append('quantity', quantity.toString());
+    formData.append('category', category);
     
-    // Add all text fields to FormData
-    formData.append('name', productData.name);
-    formData.append('price', productData.price);
-    formData.append('description', productData.description);
-    formData.append('quantity', productData.quantity);
-    formData.append('category', productData.category);
-    
-    // Only add slashed_price if it exists and is not empty
-    if (productData.slashed_price) {
-      formData.append('slashed_price', productData.slashed_price);
-    }
-    
-    // Important: Add each image with field name "images[]" - the backend expects this specific format
-    productData.images.forEach((image, index) => {
-      if (image instanceof File) {
+    // Add images if provided (backend expects images[] field name)
+    if (images && images.length > 0) {
+      images.forEach((image) => {
         formData.append('images[]', image);
-        console.log(`Appended image ${index} as "images[]" field`);
-      } else {
-        throw new Error('Images must be valid file objects');
-      }
-    });
-    
-    // Debug FormData contents
-    for (let [key, value] of formData.entries()) {
-      console.log(`FormData contains: ${key} = ${value instanceof File ? value.name : value}`);
+      });
     }
     
-    // Use the FormData helper method to properly handle file uploads
-    const response = await api.postFormData('/admin/add-product', formData);
+    const response = await api.post('/admin/add-product', formData);
     
     if (response.data && response.data.code === 200) {
       return response.data;
     } else {
-      throw new Error(response.data.message || 'Failed to add product');
+      throw new Error(response.data?.message || 'Failed to add product');
     }
   } catch (error) {
-    console.error('Add product error:', error);
-    
-    // Specific handling for authentication errors
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized! Please login/re-login.');
-    }
-    
-    throw error; // Re-throw the original error to preserve the message
+    console.error('Error adding product:', error);
+    throw error;
   }
 };
 
 /**
- * Edit an existing product (Admin only)
- * @param {string|number} productId - Product ID to edit
- * @param {Object} updates - Product data updates
- * @returns {Promise<Object>} Response with product ID
+ * Update an existing product (Admin only)
+ * @param {string} productId - Product ID to update
+ * @param {Object} productData - Updated product information (all fields optional)
+ * @returns {Promise<Object>} Update product response
  */
-export const editProduct = async (productId, updates) => {
+export const updateProduct = async (productId, productData) => {
+  if (!productId) {
+    throw new Error('Product ID is required');
+  }
+
   try {
-    // Validate product ID
-    if (!productId) {
-      throw new Error('Product ID is required for updating');
-    }
-    
-    console.log('Editing product with ID:', productId);
-    
-    // Validate required fields if they are provided in the updates
-    const requiredFields = ['name', 'price', 'description', 'quantity', 'category'];
-    const providedFields = Object.keys(updates);
-    
-    const missingFields = requiredFields.filter(field => 
-      providedFields.includes(field) && 
-      (updates[field] === undefined || updates[field] === null || updates[field] === '')
-    );
-    
-    if (missingFields.length > 0) {
-      throw new Error(`${missingFields.join(', ')} are all required!`);
-    }
-    
-    // Create FormData for the request
     const formData = new FormData();
+    formData.append('product_id', productId);
     
-    // Add product ID to FormData - convert to string to ensure compatibility
-    formData.append('product_id', productId.toString());
-    
-    // Add text fields that are present in the updates
-    if (updates.name) formData.append('name', updates.name);
-    if (updates.price) formData.append('price', updates.price);
-    if (updates.description) formData.append('description', updates.description);
-    if (updates.quantity) formData.append('quantity', updates.quantity);
-    if (updates.category) formData.append('category', updates.category);
-    if (updates.slashed_price) formData.append('slashed_price', updates.slashed_price);
-    
-    // Handle existing images if present
-    if (updates.existing_images && updates.existing_images.length > 0) {
-      updates.existing_images.forEach((image, index) => {
-        formData.append(`existing_images[${index}]`, typeof image === 'string' ? image : image.id || image.url || '');
-      });
-    }
-    
-    // Handle new images if present - using the "images[]" field name format
-    if (updates.images && updates.images.length > 0) {
-      updates.images.forEach((image, index) => {
-        if (image instanceof File) {
-          formData.append('images[]', image);
-          console.log(`Appended image ${index} as "images[]" field`);
+    // Add only provided fields
+    Object.keys(productData).forEach(key => {
+      if (productData[key] !== undefined && productData[key] !== null) {
+        if (key === 'images' && Array.isArray(productData[key])) {
+          // Handle multiple images with correct field name
+          productData[key].forEach((image) => {
+            formData.append('images[]', image);
+          });
+        } else {
+          formData.append(key, productData[key].toString());
         }
-      });
-    }
+      }
+    });
     
-    // Debug FormData contents
-    for (let [key, value] of formData.entries()) {
-      console.log(`Update FormData contains: ${key} = ${value instanceof File ? value.name : value}`);
-    }
-    
-    // Use the FormData helper method
-    const response = await api.postFormData('/admin/edit-product', formData);
+    const response = await api.post('/admin/update-product', formData);
     
     if (response.data && response.data.code === 200) {
       return response.data;
     } else {
-      throw new Error(response.data.message || 'Failed to update product');
+      throw new Error(response.data?.message || 'Failed to update product');
     }
   } catch (error) {
-    console.error('Edit product error:', error);
-    
-    // Specific handling for authentication errors
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized! Please login/re-login.');
-    }
-    
-    throw error; // Re-throw the original error to preserve the message
+    console.error('Error updating product:', error);
+    throw error;
   }
 };
 
 /**
  * Delete a product (Admin only)
- * @param {string|number} productId - Product ID to delete
- * @returns {Promise<Object>} Response with success message
+ * @param {string} productId - Product ID to delete
+ * @returns {Promise<Object>} Delete product response
  */
 export const deleteProduct = async (productId) => {
+  if (!productId) {
+    throw new Error('Product ID is required');
+  }
+
   try {
-    // Validate product ID
-    if (!productId) {
-      throw new Error('Product ID is required for deletion');
-    }
+    const formData = new FormData();
+    formData.append('product_id', productId);
     
-    console.log('Deleting product with ID:', productId);
-    
-    // Send data in the request body
-    const response = await api.post('/admin/delete-product', { 
-      product_id: productId.toString() 
-    });
+    const response = await api.post('/admin/delete-product', formData);
     
     if (response.data && response.data.code === 200) {
       return response.data;
     } else {
-      throw new Error(response.data.message || 'Failed to delete product');
+      throw new Error(response.data?.message || 'Failed to delete product');
     }
   } catch (error) {
-    console.error('Delete product error:', error);
+    console.error('Error deleting product:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get all available product categories
+ * This is a helper function to maintain consistency with your backend categories
+ */
+export const getProductCategories = () => {
+  return [
+    'serums',
+    'moisturizers', 
+    'bathe and body',
+    'sunscreens',
+    'toners',
+    'face cleansers'
+  ];
+};
+
+/**
+ * Initiate checkout process
+ * @param {Object} checkoutData - Checkout information
+ * @param {string} checkoutData.phone - Customer phone number
+ * @param {string} checkoutData.delivery_method - 'pickup' or 'address'
+ * @param {string} checkoutData.state - Customer state (if delivery_method is 'address')
+ * @param {string} checkoutData.city - Customer city (if delivery_method is 'address')
+ * @param {string} checkoutData.street_address - Customer address (if delivery_method is 'address')
+ * @param {Array} checkoutData.cart - Array of cart items with product_id and quantity
+ * @returns {Promise<Object>} Checkout initiation response
+ */
+export const initiateCheckout = async (checkoutData) => {
+  const { phone, delivery_method, state, city, street_address, cart } = checkoutData;
+  
+  if (!phone || !delivery_method || !cart || cart.length === 0) {
+    throw new Error('Phone, delivery method, and cart are required');
+  }
+  
+  if (delivery_method === 'address' && (!state || !city || !street_address)) {
+    throw new Error('State, city, and street address are required for address delivery');
+  }
+
+  try {
+    const queryParams = new URLSearchParams();
+    queryParams.append('phone', phone);
+    queryParams.append('delivery_method', delivery_method);
     
-    // Specific handling for authentication errors
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized! Please login/re-login.');
+    if (delivery_method === 'address') {
+      queryParams.append('state', state);
+      queryParams.append('city', city);
+      queryParams.append('street_address', street_address);
     }
     
-    throw error; // Re-throw the original error to preserve the message
+    // Encode cart as JSON string
+    queryParams.append('cart', JSON.stringify(cart));
+    
+    const response = await api.get(`/initiate-checkout?${queryParams.toString()}`);
+    
+    if (response.data && response.data.code === 200) {
+      return response.data;
+    } else {
+      throw new Error(response.data?.message || 'Failed to initiate checkout');
+    }
+  } catch (error) {
+    console.error('Error initiating checkout:', error);
+    throw error;
   }
 };
 
 export default {
-  fetchProducts,
   fetchProduct,
+  fetchProducts,
   addProduct,
-  editProduct,
-  deleteProduct
+  updateProduct,
+  deleteProduct,
+  getProductCategories,
+  initiateCheckout
 };
