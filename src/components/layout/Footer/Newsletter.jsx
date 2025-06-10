@@ -12,36 +12,43 @@ const Newsletter = () => {
   };
 
   return (
-    <div className="bg-gray-100 rounded-lg py-6 md:py-8 px-4 md:px-8 lg:px-14">
-      <div className="flex flex-col sm:items-center md:items-start md:flex-row md:justify-between gap-4">
-        {/* Logo - Centered on mobile, aligned left on md+ */}
-        <Link to="/" className="inline-block self-center md:self-start mb-4 md:mb-0">
-          <img src={logo} alt="Leksy Cosmetics" className="h-10 sm:h-12 md:h-14" />
+    <div className="bg-gray-100 rounded-lg py-4 sm:py-6 md:py-8 lg:py-10 px-3 sm:px-4 md:px-8 lg:px-14 xl:px-16">
+      <div className="flex flex-col items-center sm:items-center md:items-start md:flex-row md:justify-between gap-3 sm:gap-4 lg:gap-6">
+        {/* Logo - Centered on mobile/tablet, aligned left on desktop */}
+        <Link to="/" className="inline-block self-center md:self-start mb-3 sm:mb-4 md:mb-0 shrink-0">
+          <img 
+            src={logo} 
+            alt="Leksy Cosmetics" 
+            className="h-8 xs:h-9 sm:h-10 md:h-12 lg:h-14 xl:h-16 transition-all duration-200" 
+          />
         </Link>
 
-        {/* Text Content - Full width on mobile */}
-        <div className="mb-4 text-center md:text-left md:mb-0 md:mr-6 md:flex-1 lg:max-w-md">
-          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">
+        {/* Text Content - Responsive sizing and alignment */}
+        <div className="mb-3 sm:mb-4 md:mb-0 text-center md:text-left md:mr-4 lg:mr-6 xl:mr-8 md:flex-1 lg:max-w-sm xl:max-w-md">
+          <h3 className="text-lg xs:text-xl sm:text-2xl md:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900 mb-1 sm:mb-2 leading-tight">
             Subscribe to our Newsletter
           </h3>
-          <p className="text-gray-500 text-xs sm:text-sm">
+          <p className="text-gray-500 text-xs sm:text-sm md:text-xs lg:text-sm xl:text-base leading-relaxed max-w-xs sm:max-w-sm md:max-w-none mx-auto md:mx-0">
             Stay updated with the latest products, exclusive offers and beauty tips from our store
           </p>
         </div>
 
-        {/* Form - Full width on mobile and tablet, proper width on desktop */}
-        <form onSubmit={handleSubmit} className="w-full md:w-auto lg:min-w-[320px] flex flex-col sm:flex-row">
+        {/* Form - Fully responsive with optimized breakpoints */}
+        <form 
+          onSubmit={handleSubmit} 
+          className="w-full sm:w-full md:w-auto lg:min-w-[300px] xl:min-w-[360px] flex flex-col sm:flex-row gap-2 sm:gap-0 shrink-0"
+        >
           <input
             type="email"
             placeholder="Your email address"
-            className="w-full py-2 sm:py-3 px-4 rounded-lg sm:rounded-none sm:rounded-l-lg focus:outline-none focus:ring-1 focus:ring-pink-500 border border-gray-200 bg-white"
+            className="w-full flex-1 py-2.5 sm:py-3 md:py-2.5 lg:py-3 xl:py-3.5 px-3 sm:px-4 text-sm sm:text-base md:text-sm lg:text-base rounded-lg sm:rounded-none sm:rounded-l-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent border border-gray-200 bg-white placeholder-gray-400 transition-all duration-200"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
           />
           <button
             type="submit"
-            className="w-full sm:w-auto mt-2 sm:mt-0 bg-pink-500 text-white py-2 sm:py-3 px-6 rounded-lg sm:rounded-none sm:rounded-r-lg font-medium hover:bg-pink-600 transition-colors"
+            className="w-full sm:w-auto sm:px-4 md:px-5 lg:px-6 xl:px-8 py-2.5 sm:py-3 md:py-2.5 lg:py-3 xl:py-3.5 bg-pink-500 text-white rounded-lg sm:rounded-none sm:rounded-r-lg font-medium text-sm sm:text-base md:text-sm lg:text-base hover:bg-pink-600 active:bg-pink-700 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
           >
             Subscribe
           </button>
