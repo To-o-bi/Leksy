@@ -125,8 +125,8 @@ function useProvideAuth() {
     }
   }, [debugAuthState]);
   
-  // Logout function - updated to call backend logout
-  const logout = useCallback(async () => {
+  // Logout function - updated to call backend logout and redirect to login
+  const logout = useCallback(async (navigate) => {
     setIsLoading(true);
     setError(null);
     
@@ -149,12 +149,23 @@ function useProvideAuth() {
       
       console.log('AuthContext: User logged out successfully');
       debugAuthState();
+      
+      // Redirect to login page if navigate function is provided
+      if (navigate) {
+        console.log('AuthContext: Redirecting to login page');
+        navigate('/login', { replace: true });
+      }
     } catch (err) {
       console.error('Logout error:', err);
       setError(err.message || 'Logout failed');
       // Force local logout even if there's an error
       authService.logout();
       setUser(null);
+      
+      // Still redirect to login even on error
+      if (navigate) {
+        navigate('/login', { replace: true });
+      }
     } finally {
       setIsLoading(false);
     }

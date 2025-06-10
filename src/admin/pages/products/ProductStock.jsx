@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Eye, Trash2, Edit, Plus, ChevronLeft, ChevronRight, ChevronDown, ShoppingBag } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import productService from '../../../api/services/productService';
+import { useAuthErrorHandler } from '../../../hooks/useAuthErrorHandler';
 
 const ProductStockPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { handleAuthError, wrapApiCall } = useAuthErrorHandler();
   
   const [allProducts, setAllProducts] = useState([]); // Store all products
   const [displayedProducts, setDisplayedProducts] = useState([]); // Products shown on current page
@@ -44,8 +46,16 @@ const ProductStockPage = () => {
       try {
         console.log('Fetching all products from API...');
         
-        // Call the API through our service (no pagination params since API doesn't support it)
-        const response = await productService.fetchProducts();
+        // Call the API through our service with auth error handling
+        const response = await wrapApiCall(
+          () => productService.fetchProducts(),
+          { showAuthMessage: true }
+        );
+        
+        // If response is null, it means auth error was handled
+        if (response === null) {
+          return;
+        }
         
         console.log('Products API response:', response);
         
@@ -61,10 +71,17 @@ const ProductStockPage = () => {
         }
       } catch (error) {
         console.error('Error fetching products:', error);
-        setNotification({
-          type: 'error',
-          message: error.message || 'Failed to load products. Please try again.'
-        });
+        
+        // Check if this was an auth error that was already handled
+        const wasAuthError = await handleAuthError(error);
+        
+        if (!wasAuthError) {
+          // Show error notification only if it wasn't an auth error
+          setNotification({
+            type: 'error',
+            message: error.message || 'Failed to load products. Please try again.'
+          });
+        }
         
         // Fallback to empty array if API fails
         setAllProducts([]);
@@ -74,7 +91,7 @@ const ProductStockPage = () => {
     };
 
     fetchProducts();
-  }, []); // Only fetch once on mount
+  }, [wrapApiCall, handleAuthError]); // Only fetch once on mount
 
   // Handle sorting and pagination locally
   useEffect(() => {
@@ -199,8 +216,16 @@ const ProductStockPage = () => {
     try {
       console.log('Deleting product with ID:', activeProduct.product_id);
       
-      // Call the delete API
-      const response = await productService.deleteProduct(activeProduct.product_id);
+      // Call the delete API with auth error handling
+      const response = await wrapApiCall(
+        () => productService.deleteProduct(activeProduct.product_id),
+        { showAuthMessage: true }
+      );
+      
+      // If response is null, it means auth error was handled
+      if (response === null) {
+        return;
+      }
       
       console.log('Delete response:', response);
       
@@ -220,21 +245,27 @@ const ProductStockPage = () => {
         if (displayedProducts.length === 1 && currentPage > 1) {
           setCurrentPage(currentPage - 1);
         }
+        
+        // Close modal
+        setShowDeleteModal(false);
+        setActiveProduct(null);
       } else {
         throw new Error(response?.message || 'Failed to delete product');
       }
       
-      // Close modal
-      setShowDeleteModal(false);
-      setActiveProduct(null);
     } catch (error) {
       console.error('Error deleting product:', error);
       
-      // Show error notification
-      setNotification({
-        type: 'error',
-        message: error.message || 'Failed to delete product. Please try again.'
-      });
+      // Check if this was an auth error that was already handled
+      const wasAuthError = await handleAuthError(error);
+      
+      if (!wasAuthError) {
+        // Show error notification only if it wasn't an auth error
+        setNotification({
+          type: 'error',
+          message: error.message || 'Failed to delete product. Please try again.'
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
