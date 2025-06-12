@@ -1,6 +1,6 @@
 // src/api/index.js - Updated to match backend API exactly
-import authService from './services/authService';
-import productService from './services/productService';
+import authService from './authService';
+import productService from './productService';
 
 // Export services for easy import throughout the app
 export {

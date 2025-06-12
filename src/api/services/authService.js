@@ -1,5 +1,5 @@
 // src/api/services/authService.js - Fixed to match backend API
-import api from '../axios';
+import api from './axios';
 
 /**
  * Login as admin

@@ -1,5 +1,5 @@
   // services/paystackService.js
-  import api from '../axios';
+  import api from './axios';
 
   /**
   * Paystack Service for handling payments

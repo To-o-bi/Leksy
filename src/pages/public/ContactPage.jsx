@@ -1,3 +1,4 @@
+// src/pages/ContactPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useForm } from '../../hooks/useForm';
 import { sendContactMessage } from '../../api/services/contactService';
@@ -69,22 +70,24 @@ const ContactPage = () => {
     setSubmitError('');
     
     try {
-      // Prepare data for API
+      // Prepare data for API - matching the backend API format
+      const cleanPhone = values.phone.replace(/\D/g, ''); // Remove all non-digits
       const contactData = {
         name: values.name.trim(),
         email: values.email.trim().toLowerCase(),
-        phone: `${values.countryCode}${values.phone.replace(/\D/g, '')}`, // Clean phone number
+        phone: `${values.countryCode}${cleanPhone}`, // Clean phone number and add country code
         subject: values.subject.trim(),
-        message: values.message.trim(),
-        submitted_at: new Date().toISOString(),
-        source: 'contact_page'
+        message: values.message.trim()
       };
+
+      console.log('Submitting contact data:', contactData);
 
       const response = await sendContactMessage(contactData);
       
       if (response.success) {
         setSubmitSuccess(true);
         reset();
+        
         // Optional: Track successful submission
         if (window.gtag) {
           window.gtag('event', 'contact_form_submit', {
@@ -92,6 +95,9 @@ const ContactPage = () => {
             event_label: 'contact_page'
           });
         }
+        
+        // Scroll to top to show success message
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         throw new Error(response.message || 'Failed to send message');
       }
@@ -101,11 +107,11 @@ const ContactPage = () => {
       // Handle different types of errors
       if (error.name === 'NetworkError' || error.message.includes('fetch')) {
         setSubmitError('Network error. Please check your connection and try again.');
-      } else if (error.status === 429) {
+      } else if (error.message.includes('429')) {
         setSubmitError('Too many requests. Please wait a moment before trying again.');
-      } else if (error.status === 422) {
+      } else if (error.message.includes('422')) {
         setSubmitError('Please check your information and try again.');
-      } else if (error.status >= 500) {
+      } else if (error.message.includes('500')) {
         setSubmitError('Server error. Please try again later.');
       } else {
         setSubmitError(error.message || 'Failed to send message. Please try again later.');
@@ -139,7 +145,7 @@ const ContactPage = () => {
           <div className="lg:col-span-7 flex flex-col h-full">
             <ContactHeader />
             
-            <div className="flex-grow">
+            <div className="bg-white shadow-lg rounded-lg p-8 flex-grow">
               {submitSuccess ? (
                 <ContactSuccessMessage 
                   onSendAnother={() => setSubmitSuccess(false)} 
@@ -157,7 +163,7 @@ const ContactPage = () => {
             </div>
           </div>
           
-          {/* Right Column - Sliding Cards and Contact Info */}
+          {/* Right Column - Image Carousel and Contact Info */}
           <div className="lg:col-span-5 flex flex-col h-full">
             <ImageCarousel />
             <ContactInfo />

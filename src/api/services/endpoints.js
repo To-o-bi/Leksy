@@ -1,5 +1,5 @@
-import authService from './services/authService';
-import productService from './services/productService';
+import authService from './authService';
+import productService from './productService';
 
 // Combine all service exports for easy import
 export {

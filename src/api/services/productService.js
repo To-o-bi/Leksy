@@ -1,5 +1,5 @@
 // src/api/services/productService.js - Complete corrected version
-import api from '../axios';
+import api from './axios';
 
 /**
  * Fetch a single product by ID
