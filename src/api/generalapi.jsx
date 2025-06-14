@@ -1,365 +1,314 @@
+// src/api/config.js
+export const API_CONFIG = {
+  BASE_URL: import.meta.env.VITE_API_URL || 'https://leksycosmetics.com/api',
+  TIMEOUT: 30000,
+  MAX_RETRIES: 3,
+  RETRY_DELAY: 1000,
+};
+
+export const ENDPOINTS = {
+  ADMIN_LOGIN: '/admin/login',
+  ADMIN_LOGOUT: '/admin/logout',
+  ADD_PRODUCT: '/admin/add-product',
+  UPDATE_PRODUCT: '/admin/update-product',
+  DELETE_PRODUCT: '/admin/delete-product',
+  FETCH_PRODUCT: '/fetch-product',
+  FETCH_PRODUCTS: '/fetch-products',
+  INITIATE_CHECKOUT: '/initiate-checkout',
+  FETCH_ORDERS: '/admin/fetch-orders',
+  CHANGE_DELIVERY_STATUS: '/admin/change-delivery-status',
+  SUBMIT_CONTACT: '/submit-contact',
+  FETCH_CONTACT_SUBMISSIONS: '/admin/fetch-contact-submissions',
+};
+
+export const CATEGORIES = ['serums', 'moisturizers', 'bathe and body', 'sunscreens', 'toners', 'face cleansers'];
+
+// src/api/axios.js
+import axios from 'axios';
+import { API_CONFIG, ENDPOINTS } from './config.js';
+
+class ApiClient {
+  constructor() {
+    this.client = axios.create({
+      baseURL: API_CONFIG.BASE_URL,
+      timeout: API_CONFIG.TIMEOUT,
+      headers: { 'Accept': 'application/json' }
+    });
+    
+    this.requestQueue = new Map();
+    this.setupInterceptors();
+  }
+
+  setupInterceptors() {
+    // Request interceptor
+    this.client.interceptors.request.use(
+      (config) => {
+        const token = this.getToken();
+        const isAdminRoute = config.url?.includes('/admin/') && !config.url?.includes('/admin/login');
+        
+        if (isAdminRoute && token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        
+        return config;
+      },
+      (error) => Promise.reject(this.formatError(error))
+    );
+
+    // Response interceptor with retry logic
+    this.client.interceptors.response.use(
+      (response) => {
+        if (response.data?.token) {
+          this.setToken(response.data.token);
+        }
+        return response;
+      },
+      async (error) => {
+        const { config, response } = error;
+        
+        if (response?.status === 401) {
+          this.clearAuth();
+          window.location.href = '/login';
+          return Promise.reject(this.formatError(error));
+        }
+
+        // Retry logic for network errors
+        if (this.shouldRetry(error) && config && !config._retry) {
+          config._retryCount = (config._retryCount || 0) + 1;
+          
+          if (config._retryCount <= API_CONFIG.MAX_RETRIES) {
+            config._retry = true;
+            await this.delay(API_CONFIG.RETRY_DELAY * config._retryCount);
+            return this.client(config);
+          }
+        }
+
+        return Promise.reject(this.formatError(error));
+      }
+    );
+  }
+
+  shouldRetry(error) {
+    return !error.response || 
+           error.code === 'ECONNABORTED' || 
+           (error.response.status >= 500 && error.response.status <= 599);
+  }
+
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  formatError(error) {
+    if (error.response?.data?.message) return new Error(error.response.data.message);
+    if (error.code === 'ECONNABORTED') return new Error('Request timeout');
+    if (!error.response) return new Error('Network error');
+    return new Error('An error occurred');
+  }
+
+  // Request deduplication
+  async request(config) {
+    const key = this.getRequestKey(config);
+    
+    if (this.requestQueue.has(key)) {
+      return this.requestQueue.get(key);
+    }
+
+    const promise = this.client(config).finally(() => {
+      this.requestQueue.delete(key);
+    });
+
+    this.requestQueue.set(key, promise);
+    return promise;
+  }
+
+  getRequestKey(config) {
+    return `${config.method}-${config.url}-${JSON.stringify(config.params || {})}`;
+  }
+
+  // Secure token handling with cookies
+  getToken() {
+    const match = document.cookie.match(/auth=([^;]+)/);
+    return match ? atob(match[1]) : null;
+  }
+
+  setToken(token) {
+    const encoded = btoa(token);
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toUTCString(); // 24 hours
+    document.cookie = `auth=${encoded}; path=/; expires=${expires}; SameSite=Strict; Secure`;
+  }
+
+  clearAuth() {
+    document.cookie = 'auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    localStorage.removeItem('user');
+  }
+
+  // Core methods
+  async get(url, params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const fullUrl = queryString ? `${url}?${queryString}` : url;
+    return this.request({ method: 'get', url: fullUrl });
+  }
+
+  async post(url, data, config = {}) {
+    return this.request({ method: 'post', url, data, ...config });
+  }
+
+  async postFormData(url, formData) {
+    return this.request({ 
+      method: 'post', 
+      url, 
+      data: formData,
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  }
+}
+
+const api = new ApiClient();
+export default api;
+
+// src/api/validation.js
+export const validators = {
+  email: (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email?.trim()),
+  
+  phone: (phone) => {
+    const clean = phone?.replace(/\D/g, '') || '';
+    return clean.length >= 10 && clean.length <= 15;
+  },
+  
+  required: (value) => Boolean(value?.toString().trim()),
+  
+  minLength: (value, min) => value?.toString().trim().length >= min,
+  
+  maxLength: (value, max) => value?.toString().trim().length <= max,
+  
+  price: (price) => !isNaN(price) && parseFloat(price) > 0,
+  
+  image: (file) => {
+    if (!file) return { valid: true };
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxSize = 2 * 1024 * 1024; // 2MB
+    
+    return {
+      valid: validTypes.includes(file.type) && file.size <= maxSize,
+      error: !validTypes.includes(file.type) ? 'Invalid file type' : 
+             file.size > maxSize ? 'File too large (max 2MB)' : null
+    };
+  }
+};
+
+export const validateForm = (data, rules) => {
+  const errors = {};
+  
+  Object.entries(rules).forEach(([field, fieldRules]) => {
+    const value = data[field];
+    
+    for (const [rule, param] of Object.entries(fieldRules)) {
+      if (rule === 'required' && param && !validators.required(value)) {
+        errors[field] = `${field} is required`;
+        break;
+      }
+      if (rule === 'email' && param && value && !validators.email(value)) {
+        errors[field] = 'Invalid email format';
+        break;
+      }
+      if (rule === 'phone' && param && value && !validators.phone(value)) {
+        errors[field] = 'Invalid phone number';
+        break;
+      }
+      if (rule === 'minLength' && value && !validators.minLength(value, param)) {
+        errors[field] = `Minimum ${param} characters required`;
+        break;
+      }
+    }
+  });
+  
+  return { isValid: Object.keys(errors).length === 0, errors };
+};
+
+// src/api/validation.js
+export const validators = {
+  email: (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email?.trim()),
+  
+  phone: (phone) => {
+    const clean = phone?.replace(/\D/g, '') || '';
+    return clean.length >= 10 && clean.length <= 15;
+  },
+  
+  required: (value) => Boolean(value?.toString().trim()),
+  
+  minLength: (value, min) => value?.toString().trim().length >= min,
+  
+  maxLength: (value, max) => value?.toString().trim().length <= max,
+  
+  price: (price) => !isNaN(price) && parseFloat(price) > 0,
+  
+  image: (file) => {
+    if (!file) return { valid: true };
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxSize = 2 * 1024 * 1024; // 2MB
+    
+    return {
+      valid: validTypes.includes(file.type) && file.size <= maxSize,
+      error: !validTypes.includes(file.type) ? 'Invalid file type' : 
+             file.size > maxSize ? 'File too large (max 2MB)' : null
+    };
+  }
+};
+
+export const validateForm = (data, rules) => {
+  const errors = {};
+  
+  Object.entries(rules).forEach(([field, fieldRules]) => {
+    const value = data[field];
+    
+    for (const [rule, param] of Object.entries(fieldRules)) {
+      if (rule === 'required' && param && !validators.required(value)) {
+        errors[field] = `${field} is required`;
+        break;
+      }
+      if (rule === 'email' && param && value && !validators.email(value)) {
+        errors[field] = 'Invalid email format';
+        break;
+      }
+      if (rule === 'phone' && param && value && !validators.phone(value)) {
+        errors[field] = 'Invalid phone number';
+        break;
+      }
+      if (rule === 'minLength' && value && !validators.minLength(value, param)) {
+        errors[field] = `Minimum ${param} characters required`;
+        break;
+      }
+    }
+  });
+  
+  return { isValid: Object.keys(errors).length === 0, errors };
+};
+
+// src/api/services.js
 import api from './axios.js';
 import { ENDPOINTS, CATEGORIES } from './config.js';
+import { validateForm, validators } from './validation.js';
 
 export const authService = {
   async login(username, password) {
-    if (!username || !password) {
-      throw new Error('Username and password are required');
+    const response = await api.get(ENDPOINTS.ADMIN_LOGIN, { username, password });
+    if (response.data.code === 200) {
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      return response.data;
     }
-    
-    try {
-      console.log('authService: Attempting login with backend API format');
-      
-      // According to your API docs, backend expects form data with username/password
-      const formData = new FormData();
-      formData.append('username', username);
-      formData.append('password', password);
-      
-      // Make request to the correct endpoint as per your API docs
-      const response = await api.post('/admin/login', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      
-      console.log('authService: Response received:', response.data);
-      
-      // Check for successful response according to your backend format
-      if (response.data && response.data.code === 200) {
-        // Store auth token 
-        if (response.data.token) {
-          api.setToken(response.data.token);
-          console.log('authService: Token saved');
-        } else {
-          throw new Error('No token received from server');
-        }
-        
-        // Store user data (your backend returns "user" object)
-        if (response.data.user) {
-          localStorage.setItem('user', JSON.stringify(response.data.user));
-          console.log('authService: User data saved');
-        } else {
-          throw new Error('No user data received from server');
-        }
-        
-        return response.data;
-      } else if (response.data && response.data.code === 401) {
-        throw new Error('Invalid credentials');
-      } else if (response.data && response.data.code === 412) {
-        throw new Error('Username and password are required');
-      } else {
-        throw new Error(response.data?.message || 'Login failed');
-      }
-    } catch (error) {
-      console.error('authService: Login error:', error);
-      
-      // Handle different error types based on your backend responses
-      if (error.response && error.response.data) {
-        const { code, message } = error.response.data;
-        
-        switch(code) {
-          case 400:
-            throw new Error('Username and password are required');
-          case 401:
-            throw new Error('Invalid credentials');
-          case 412:
-            throw new Error('Please provide both username and password');
-          default:
-            throw new Error(message || 'Login failed');
-        }
-      } else if (error.request) {
-        throw new Error('Network error. Please check your connection and try again.');
-      } else {
-        throw error;
-      }
-    }
+    throw new Error(response.data.message || 'Login failed');
   },
 
   async logout() {
     try {
-      console.log('authService: Attempting logout');
-      const response = await api.post(ENDPOINTS.ADMIN_LOGOUT);
-      console.log('authService: Logout response:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('authService: Logout error:', error);
-      throw error;
+      await api.post(ENDPOINTS.ADMIN_LOGOUT);
     } finally {
-      // Always clear local storage
       api.clearAuth();
-      localStorage.removeItem('user');
-      console.log('authService: Cleared localStorage');
     }
-  },
-
-  clearAuth() {
-    api.clearAuth();
-    localStorage.removeItem('user');
-    console.log('authService: Logged out - cleared localStorage');
   },
 
   isAuthenticated() {
-    const hasToken = !!api.getToken();
-    const hasUser = !!localStorage.getItem('user');
-    console.log('authService: isAuthenticated check -', { hasToken, hasUser });
-    return hasToken && hasUser;
-  },
-
-  getAuthUser() {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        return JSON.parse(userData);
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-        localStorage.removeItem('user');
-        return null;
-      }
-    }
-    return null;
-  },
-
-  isAdmin() {
-    const user = this.getAuthUser();
-    return user && (user.role === 'admin' || user.role === 'superadmin');
-  }
-};
-
-export const productService = {
-  async fetchProducts(filters = {}) {
-    try {
-      const params = {};
-      if (filters.categories?.length) params.filter = filters.categories.join(',');
-      if (filters.productIds?.length) params.products_ids_array = filters.productIds.join(',');
-      if (filters.sort) params.sort = filters.sort;
-      if (filters.limit) params.limit = filters.limit;
-      
-      const response = await api.get(ENDPOINTS.FETCH_PRODUCTS, params);
-      return response.data;
-    } catch (error) {
-      console.error('productService: fetchProducts error:', error);
-      throw error;
-    }
-  },
-
-  async fetchProduct(productId) {
-    try {
-      const response = await api.get(ENDPOINTS.FETCH_PRODUCT, { product_id: productId });
-      return response.data;
-    } catch (error) {
-      console.error('productService: fetchProduct error:', error);
-      throw error;
-    }
-  },
-
-  async addProduct(productData) {
-    try {
-      // Basic validation
-      if (!productData.name?.trim()) throw new Error('Product name is required');
-      if (!productData.price || parseFloat(productData.price) <= 0) throw new Error('Valid price is required');
-      if (!productData.description?.trim()) throw new Error('Description is required');
-      if (!productData.quantity || parseInt(productData.quantity) < 0) throw new Error('Valid quantity is required');
-      if (!productData.category) throw new Error('Category is required');
-      if (!CATEGORIES.includes(productData.category)) throw new Error('Invalid category');
-
-      console.log('productService: Adding product');
-
-      // Build form data for POST request
-      const formData = new FormData();
-      formData.append('name', productData.name);
-      formData.append('price', productData.price);
-      formData.append('description', productData.description);
-      formData.append('quantity', productData.quantity);
-      formData.append('category', productData.category);
-
-      if (productData.slashed_price) {
-        formData.append('slashed_price', productData.slashed_price);
-      }
-
-      // Add images
-      if (productData.images && Array.isArray(productData.images)) {
-        productData.images.forEach(image => {
-          if (!image.type?.startsWith('image/')) {
-            throw new Error('Only image files are allowed');
-          }
-          if (image.size > 2 * 1024 * 1024) {
-            throw new Error('Image size must be less than 2MB');
-          }
-          formData.append('images', image);
-        });
-      }
-
-      const response = await api.postFormData(ENDPOINTS.ADD_PRODUCT, formData);
-      console.log('productService: Product added successfully');
-      return response.data;
-    } catch (error) {
-      console.error('productService: addProduct error:', error);
-      throw error;
-    }
-  },
-
-  async updateProduct(productId, productData) {
-    try {
-      console.log('productService: Updating product:', productId);
-
-      const formData = new FormData();
-      formData.append('product_id', productId);
-      
-      // Add changed fields
-      Object.entries(productData).forEach(([key, value]) => {
-        if (key !== 'images' && value !== undefined) {
-          formData.append(key, value.toString());
-        }
-      });
-
-      // Add new images if any
-      if (productData.images && Array.isArray(productData.images)) {
-        productData.images.forEach(image => formData.append('images', image));
-      }
-
-      const response = await api.postFormData(ENDPOINTS.UPDATE_PRODUCT, formData);
-      console.log('productService: Product updated successfully');
-      return response.data;
-    } catch (error) {
-      console.error('productService: updateProduct error:', error);
-      throw error;
-    }
-  },
-
-  async deleteProduct(productId) {
-    try {
-      console.log('productService: Deleting product:', productId);
-      const formData = new FormData();
-      formData.append('product_id', productId);
-      
-      const response = await api.postFormData(ENDPOINTS.DELETE_PRODUCT, formData);
-      console.log('productService: Product deleted successfully');
-      return response.data;
-    } catch (error) {
-      console.error('productService: deleteProduct error:', error);
-      throw error;
-    }
-  }
-};
-
-export const contactService = {
-  async submit(contactData) {
-    try {
-      // Basic validation
-      if (!contactData.name?.trim()) throw new Error('Name is required');
-      if (!contactData.email?.trim()) throw new Error('Email is required');
-      if (!contactData.phone?.trim()) throw new Error('Phone is required');
-      if (!contactData.subject?.trim()) throw new Error('Subject is required');
-      if (!contactData.message?.trim()) throw new Error('Message is required');
-
-      // Email validation
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactData.email)) {
-        throw new Error('Invalid email format');
-      }
-
-      console.log('contactService: Submitting contact form');
-
-      // Build form data for POST request
-      const formData = new FormData();
-      formData.append('name', contactData.name.trim());
-      formData.append('email', contactData.email.trim());
-      formData.append('phone', contactData.phone.trim());
-      formData.append('subject', contactData.subject.trim());
-      formData.append('message', contactData.message.trim());
-
-      const response = await api.postFormData(ENDPOINTS.SUBMIT_CONTACT, formData);
-      console.log('contactService: Contact form submitted successfully');
-      return response.data;
-    } catch (error) {
-      console.error('contactService: submit error:', error);
-      throw error;
-    }
-  },
-
-  async fetchSubmissions(filters = {}) {
-    try {
-      const response = await api.get(ENDPOINTS.FETCH_CONTACT_SUBMISSIONS, filters);
-      return response.data;
-    } catch (error) {
-      console.error('contactService: fetchSubmissions error:', error);
-      throw error;
-    }
-  }
-};
-
-export const orderService = {
-  async initiateCheckout(checkoutData) {
-    try {
-      // Basic validation
-      if (!checkoutData.phone?.trim()) throw new Error('Phone is required');
-      if (!checkoutData.delivery_method) throw new Error('Delivery method is required');
-      if (!['pickup', 'address'].includes(checkoutData.delivery_method)) {
-        throw new Error('Invalid delivery method');
-      }
-
-      if (checkoutData.delivery_method === 'address') {
-        if (!checkoutData.state?.trim()) throw new Error('State is required');
-        if (!checkoutData.city?.trim()) throw new Error('City is required');
-        if (!checkoutData.street_address?.trim()) throw new Error('Street address is required');
-      }
-
-      if (!checkoutData.cart || !Array.isArray(checkoutData.cart) || checkoutData.cart.length === 0) {
-        throw new Error('Cart cannot be empty');
-      }
-
-      console.log('orderService: Initiating checkout');
-
-      const params = {
-        phone: checkoutData.phone,
-        delivery_method: checkoutData.delivery_method,
-        cart: JSON.stringify(checkoutData.cart)
-      };
-
-      if (checkoutData.delivery_method === 'address') {
-        params.state = checkoutData.state;
-        params.city = checkoutData.city;
-        params.street_address = checkoutData.street_address;
-      }
-
-      const response = await api.get(ENDPOINTS.INITIATE_CHECKOUT, params);
-      console.log('orderService: Checkout initiated successfully');
-      return response.data;
-    } catch (error) {
-      console.error('orderService: initiateCheckout error:', error);
-      throw error;
-    }
-  },
-
-  async fetchOrders(filters = {}) {
-    try {
-      const response = await api.get(ENDPOINTS.FETCH_ORDERS, filters);
-      return response.data;
-    } catch (error) {
-      console.error('orderService: fetchOrders error:', error);
-      throw error;
-    }
-  },
-
-  async changeDeliveryStatus(orderId, newStatus) {
-    try {
-      const validStatuses = ['unpaid', 'order-received', 'packaged', 'in-transit', 'delivered'];
-      if (!validStatuses.includes(newStatus)) {
-        throw new Error('Invalid delivery status');
-      }
-
-      console.log('orderService: Changing delivery status:', { orderId, newStatus });
-
-      const response = await api.get(ENDPOINTS.CHANGE_DELIVERY_STATUS, {
-        order_id: orderId,
-        new_delivery_status: newStatus
-      });
-      
-      console.log('orderService: Delivery status changed successfully');
-      return response.data;
-    } catch (error) {
-      console.error('orderService: changeDeliveryStatus error:', error);
-      throw error;
-    }
+    return Boolean(api.getToken() && localStorage.getItem('user'));
   }
 };
 
@@ -381,95 +330,85 @@ export const productService = {
   },
 
   async addProduct(productData) {
-    // Basic validation
-    if (!productData.name?.trim()) throw new Error('Product name is required');
-    if (!productData.price || parseFloat(productData.price) <= 0) throw new Error('Valid price is required');
-    if (!productData.description?.trim()) throw new Error('Description is required');
-    if (!productData.quantity || parseInt(productData.quantity) < 0) throw new Error('Valid quantity is required');
-    if (!productData.category) throw new Error('Category is required');
-    if (!CATEGORIES.includes(productData.category)) throw new Error('Invalid category');
-
-    // Build query string for POST request as per API docs
-    const params = new URLSearchParams({
-      name: productData.name,
-      price: productData.price,
-      description: productData.description,
-      quantity: productData.quantity,
-      category: productData.category
+    const validation = validateForm(productData, {
+      name: { required: true, minLength: 2 },
+      price: { required: true },
+      description: { required: true, minLength: 10 },
+      quantity: { required: true },
+      category: { required: true }
     });
 
-    if (productData.slashed_price) {
-      params.append('slashed_price', productData.slashed_price);
+    if (!validation.isValid) {
+      throw new Error(`Validation failed: ${Object.values(validation.errors).join(', ')}`);
     }
 
-    // Add images to FormData
+    if (!CATEGORIES.includes(productData.category)) {
+      throw new Error('Invalid category');
+    }
+
     const formData = new FormData();
-    if (productData.images && Array.isArray(productData.images)) {
-      productData.images.forEach(image => {
-        // Basic image validation
-        if (!image.type?.startsWith('image/')) {
-          throw new Error('Only image files are allowed');
-        }
-        if (image.size > 2 * 1024 * 1024) {
-          throw new Error('Image size must be less than 2MB');
-        }
-        formData.append('images', image);
-      });
-    }
+    Object.entries(productData).forEach(([key, value]) => {
+      if (key === 'images' && Array.isArray(value)) {
+        value.forEach(image => {
+          const imageValidation = validators.image(image);
+          if (!imageValidation.valid) {
+            throw new Error(imageValidation.error);
+          }
+          formData.append('images', image);
+        });
+      } else if (value !== undefined) {
+        formData.append(key, value.toString());
+      }
+    });
 
-    const response = await api.postFormData(`${ENDPOINTS.ADD_PRODUCT}?${params.toString()}`, formData);
+    const response = await api.postFormData(ENDPOINTS.ADD_PRODUCT, formData);
     return response.data;
   },
 
   async updateProduct(productId, productData) {
-    const params = new URLSearchParams({ product_id: productId });
+    const formData = new FormData();
+    formData.append('product_id', productId);
     
-    // Add only changed fields to params
     Object.entries(productData).forEach(([key, value]) => {
-      if (key !== 'images' && value !== undefined) {
-        params.append(key, value.toString());
+      if (key === 'images' && Array.isArray(value)) {
+        value.forEach(image => formData.append('images', image));
+      } else if (value !== undefined) {
+        formData.append(key, value.toString());
       }
     });
 
-    const formData = new FormData();
-    if (productData.images && Array.isArray(productData.images)) {
-      productData.images.forEach(image => formData.append('images', image));
-    }
-
-    const response = await api.postFormData(`${ENDPOINTS.UPDATE_PRODUCT}?${params.toString()}`, formData);
+    const response = await api.postFormData(ENDPOINTS.UPDATE_PRODUCT, formData);
     return response.data;
   },
 
   async deleteProduct(productId) {
-    const response = await api.post(`${ENDPOINTS.DELETE_PRODUCT}?product_id=${productId}`);
+    const response = await api.post(ENDPOINTS.DELETE_PRODUCT, null, {
+      params: { product_id: productId }
+    });
     return response.data;
   }
 };
 
 export const contactService = {
   async submit(contactData) {
-    // Basic validation
-    if (!contactData.name?.trim()) throw new Error('Name is required');
-    if (!contactData.email?.trim()) throw new Error('Email is required');
-    if (!contactData.phone?.trim()) throw new Error('Phone is required');
-    if (!contactData.subject?.trim()) throw new Error('Subject is required');
-    if (!contactData.message?.trim()) throw new Error('Message is required');
-
-    // Email validation
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactData.email)) {
-      throw new Error('Invalid email format');
-    }
-
-    // Build query string for POST request as per API docs
-    const params = new URLSearchParams({
-      name: contactData.name.trim(),
-      email: contactData.email.trim(),
-      phone: contactData.phone.trim(),
-      subject: contactData.subject.trim(),
-      message: contactData.message.trim()
+    const validation = validateForm(contactData, {
+      name: { required: true, minLength: 2 },
+      email: { required: true, email: true },
+      phone: { required: true, phone: true },
+      subject: { required: true, minLength: 5 },
+      message: { required: true, minLength: 10 }
     });
 
-    const response = await api.post(`${ENDPOINTS.SUBMIT_CONTACT}?${params.toString()}`);
+    if (!validation.isValid) {
+      throw new Error(`Validation failed: ${Object.values(validation.errors).join(', ')}`);
+    }
+
+    const formData = new FormData();
+    Object.entries(contactData).forEach(([key, value]) => {
+      formData.append(key, value.toString().trim());
+    });
+
+    const response = await api.postFormData(ENDPOINTS.SUBMIT_CONTACT, formData);
     return response.data;
   },
 
@@ -481,33 +420,30 @@ export const contactService = {
 
 export const orderService = {
   async initiateCheckout(checkoutData) {
-    // Basic validation
-    if (!checkoutData.phone?.trim()) throw new Error('Phone is required');
-    if (!checkoutData.delivery_method) throw new Error('Delivery method is required');
-    if (!['pickup', 'address'].includes(checkoutData.delivery_method)) {
-      throw new Error('Invalid delivery method');
+    const validation = validateForm(checkoutData, {
+      phone: { required: true, phone: true },
+      delivery_method: { required: true }
+    });
+
+    if (!validation.isValid) {
+      throw new Error(`Validation failed: ${Object.values(validation.errors).join(', ')}`);
     }
 
     if (checkoutData.delivery_method === 'address') {
-      if (!checkoutData.state?.trim()) throw new Error('State is required');
-      if (!checkoutData.city?.trim()) throw new Error('City is required');
-      if (!checkoutData.street_address?.trim()) throw new Error('Street address is required');
+      const addressValidation = validateForm(checkoutData, {
+        state: { required: true },
+        city: { required: true },
+        street_address: { required: true }
+      });
+
+      if (!addressValidation.isValid) {
+        throw new Error(`Address required: ${Object.values(addressValidation.errors).join(', ')}`);
+      }
     }
 
-    if (!checkoutData.cart || !Array.isArray(checkoutData.cart) || checkoutData.cart.length === 0) {
-      throw new Error('Cart cannot be empty');
-    }
-
-    const params = {
-      phone: checkoutData.phone,
-      delivery_method: checkoutData.delivery_method,
-      cart: JSON.stringify(checkoutData.cart)
-    };
-
-    if (checkoutData.delivery_method === 'address') {
-      params.state = checkoutData.state;
-      params.city = checkoutData.city;
-      params.street_address = checkoutData.street_address;
+    const params = { ...checkoutData };
+    if (checkoutData.cart) {
+      params.cart = JSON.stringify(checkoutData.cart);
     }
 
     const response = await api.get(ENDPOINTS.INITIATE_CHECKOUT, params);
@@ -532,3 +468,59 @@ export const orderService = {
     return response.data;
   }
 };
+
+// src/api/utils.js
+export const formatPrice = (price, currency = '₦') => {
+  const num = typeof price === 'number' ? price : parseFloat(price) || 0;
+  return `${currency}${num.toLocaleString()}`;
+};
+
+export const formatDate = (dateString) => {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now - date;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return `${days} days ago`;
+    
+    return date.toLocaleDateString('en-NG', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch {
+    return 'Unknown date';
+  }
+};
+
+export const getInitials = (name) => {
+  return name?.split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .substring(0, 2) || 'U';
+};
+
+export const sanitizeHtml = (str) => {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+};
+
+export const debounce = (func, wait = 300) => {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+};
+
+// src/api/index.js
+export { authService, productService, contactService, orderService } from './services.js';
+export { formatPrice, formatDate, getInitials, sanitizeHtml, debounce } from './utils.js';
+export { validators, validateForm } from './validation.js';
+export { ENDPOINTS, CATEGORIES, API_CONFIG } from './config.js';
+export { default as api } from './axios.js';
