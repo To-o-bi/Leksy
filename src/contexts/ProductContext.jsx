@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import productService from '../api/services/productService';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { productService, CATEGORIES } from '../api';
 
 const ProductContext = createContext();
 
@@ -15,101 +15,388 @@ export const ProductProvider = ({ children }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [categories, setCategories] = useState([]);
+  const [lastFetch, setLastFetch] = useState(null);
+  const [cache, setCache] = useState(new Map());
 
-  // Fetch all products on component mount
-  useEffect(() => {
-    fetchAllProducts();
+  // Static categories from API config
+  const categories = useMemo(() => CATEGORIES, []);
+
+  // Clear error
+  const clearError = useCallback(() => {
+    setError(null);
   }, []);
 
-  // Extract unique categories after products are loaded
-  useEffect(() => {
-    if (products.length > 0) {
-      const uniqueCategories = [...new Set(products.map(product => product.category))];
-      setCategories(uniqueCategories);
-    }
-  }, [products]);
+  // Check if data needs refresh (5 minutes cache)
+  const needsRefresh = useCallback(() => {
+    if (!lastFetch) return true;
+    const fiveMinutes = 5 * 60 * 1000;
+    return Date.now() - lastFetch > fiveMinutes;
+  }, [lastFetch]);
 
   /**
    * Fetch all products from the API
    * @param {Object} options - Optional query parameters
+   * @param {boolean} forceRefresh - Force refresh even if cache is valid
    * @returns {Promise<Array>} Products array
    */
-  const fetchAllProducts = async (options = {}) => {
+  const fetchAllProducts = useCallback(async (options = {}, forceRefresh = false) => {
+    // Don't fetch if we have recent data and not forcing refresh
+    if (!forceRefresh && products.length > 0 && !needsRefresh()) {
+      console.log('Using cached products');
+      return products;
+    }
+
     setLoading(true);
     setError(null);
-    console.log('Fetching all products from API');
+    console.log('Fetching products from API with options:', options);
     
     try {
-      // Change this line from getAllProducts to fetchProducts
       const response = await productService.fetchProducts(options);
+      console.log('Products fetch response:', response);
       
-      if (response && response.products) {
-        setProducts(response.products);
-        return response.products;
+      if (response && response.code === 200 && response.products) {
+        const fetchedProducts = response.products;
+        setProducts(fetchedProducts);
+        setLastFetch(Date.now());
+        console.log(`Loaded ${fetchedProducts.length} products`);
+        return fetchedProducts;
       } else {
-        throw new Error('Invalid response format');
+        throw new Error(response?.message || 'Invalid response format');
       }
     } catch (err) {
       console.error('Failed to fetch products:', err);
-      setError(err.message || 'Failed to load products');
-      return [];
+      const errorMessage = err.message || 'Failed to load products';
+      setError(errorMessage);
+      
+      // Return empty array on error, but keep existing products if available
+      if (products.length === 0) {
+        return [];
+      }
+      return products;
     } finally {
       setLoading(false);
     }
-  };
+  }, [products, needsRefresh]);
 
   /**
-   * Get a product by ID
+   * Get a product by ID with caching
    * @param {string} productId - Product ID to find
-   * @returns {Object|null} Product object or null if not found
+   * @param {boolean} useCache - Whether to use cached data
+   * @returns {Promise<Object|null>} Product object or null if not found
    */
-  const getProductById = async (productId) => {
-    // First check if product already exists in state
+  const getProductById = useCallback(async (productId, useCache = true) => {
+    if (!productId) {
+      console.error('getProductById: No product ID provided');
+      return null;
+    }
+
+    // Check cache first if enabled
+    if (useCache && cache.has(productId)) {
+      const cached = cache.get(productId);
+      const cacheAge = Date.now() - cached.timestamp;
+      const fiveMinutes = 5 * 60 * 1000;
+      
+      if (cacheAge < fiveMinutes) {
+        console.log(`Using cached product: ${productId}`);
+        return cached.product;
+      }
+    }
+
+    // Check if product exists in current products list
     const cachedProduct = products.find(p => p.product_id === productId);
-    
-    if (cachedProduct) {
+    if (cachedProduct && useCache) {
+      console.log(`Found product in products list: ${productId}`);
       return cachedProduct;
     }
     
-    // If not in state, fetch from API
+    // Fetch from API
     setLoading(true);
+    setError(null);
+    
     try {
-      const product = await productService.fetchProduct(productId);
-      return product;
+      console.log(`Fetching product from API: ${productId}`);
+      const response = await productService.fetchProduct(productId);
+      console.log('Product fetch response:', response);
+      
+      if (response && response.code === 200 && response.product) {
+        const product = response.product;
+        
+        // Cache the product
+        setCache(prev => new Map(prev).set(productId, {
+          product,
+          timestamp: Date.now()
+        }));
+        
+        console.log(`Product fetched successfully: ${product.name}`);
+        return product;
+      } else {
+        throw new Error(response?.message || 'Product not found');
+      }
     } catch (err) {
       console.error(`Failed to fetch product ${productId}:`, err);
-      setError(err.message || 'Failed to load product details');
+      const errorMessage = err.message || 'Failed to load product details';
+      setError(errorMessage);
       return null;
     } finally {
       setLoading(false);
     }
-  };
+  }, [products, cache]);
 
   /**
    * Filter products by category
    * @param {string} category - Category to filter by
    * @returns {Array} Filtered products
    */
-  const filterByCategory = (category) => {
+  const filterByCategory = useCallback((category) => {
     if (!category || category === 'all') {
       return products;
     }
     return products.filter(product => product.category === category);
-  };
+  }, [products]);
 
-  const value = {
+  /**
+   * Search products by query
+   * @param {string} query - Search query
+   * @returns {Array} Filtered products
+   */
+  const searchProducts = useCallback((query) => {
+    if (!query || !query.trim()) {
+      return products;
+    }
+    
+    const searchTerm = query.toLowerCase().trim();
+    return products.filter(product => 
+      product.name?.toLowerCase().includes(searchTerm) ||
+      product.description?.toLowerCase().includes(searchTerm) ||
+      product.category?.toLowerCase().includes(searchTerm)
+    );
+  }, [products]);
+
+  /**
+   * Get products by multiple categories
+   * @param {Array} categoryList - Array of categories
+   * @returns {Array} Filtered products
+   */
+  const filterByCategories = useCallback((categoryList) => {
+    if (!categoryList || categoryList.length === 0) {
+      return products;
+    }
+    return products.filter(product => categoryList.includes(product.category));
+  }, [products]);
+
+  /**
+   * Sort products by specified field
+   * @param {string} sortBy - Field to sort by (name, price, category)
+   * @param {string} order - Sort order (asc, desc)
+   * @returns {Array} Sorted products
+   */
+  const sortProducts = useCallback((sortBy = 'name', order = 'asc') => {
+    const sorted = [...products].sort((a, b) => {
+      let aValue = a[sortBy];
+      let bValue = b[sortBy];
+      
+      // Handle price sorting
+      if (sortBy === 'price') {
+        aValue = parseFloat(aValue) || 0;
+        bValue = parseFloat(bValue) || 0;
+      }
+      
+      // Handle string sorting
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+      
+      if (order === 'desc') {
+        return bValue > aValue ? 1 : -1;
+      }
+      return aValue > bValue ? 1 : -1;
+    });
+    
+    return sorted;
+  }, [products]);
+
+  /**
+   * Get products with filters and sorting
+   * @param {Object} options - Filter and sort options
+   * @returns {Array} Filtered and sorted products
+   */
+  const getFilteredProducts = useCallback((options = {}) => {
+    let result = products;
+    
+    // Apply category filter
+    if (options.category && options.category !== 'all') {
+      result = filterByCategory(options.category);
+    }
+    
+    // Apply search
+    if (options.search) {
+      result = result.filter(product => 
+        product.name?.toLowerCase().includes(options.search.toLowerCase()) ||
+        product.description?.toLowerCase().includes(options.search.toLowerCase())
+      );
+    }
+    
+    // Apply sorting
+    if (options.sortBy) {
+      result = [...result].sort((a, b) => {
+        let aValue = a[options.sortBy];
+        let bValue = b[options.sortBy];
+        
+        if (options.sortBy === 'price') {
+          aValue = parseFloat(aValue) || 0;
+          bValue = parseFloat(bValue) || 0;
+        }
+        
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          aValue = aValue.toLowerCase();
+          bValue = bValue.toLowerCase();
+        }
+        
+        const order = options.sortOrder === 'desc' ? -1 : 1;
+        return aValue > bValue ? order : -order;
+      });
+    }
+    
+    return result;
+  }, [products, filterByCategory]);
+
+  /**
+   * Refresh products data
+   */
+  const refreshProducts = useCallback(() => {
+    return fetchAllProducts({}, true);
+  }, [fetchAllProducts]);
+
+  /**
+   * Add product to local state (for optimistic updates)
+   * @param {Object} product - Product to add
+   */
+  const addProductToState = useCallback((product) => {
+    setProducts(prev => [product, ...prev]);
+  }, []);
+
+  /**
+   * Update product in local state
+   * @param {string} productId - Product ID to update
+   * @param {Object} updates - Product updates
+   */
+  const updateProductInState = useCallback((productId, updates) => {
+    setProducts(prev => 
+      prev.map(product => 
+        product.product_id === productId 
+          ? { ...product, ...updates }
+          : product
+      )
+    );
+    
+    // Update cache as well
+    if (cache.has(productId)) {
+      const cached = cache.get(productId);
+      setCache(prev => new Map(prev).set(productId, {
+        product: { ...cached.product, ...updates },
+        timestamp: cached.timestamp
+      }));
+    }
+  }, [cache]);
+
+  /**
+   * Remove product from local state
+   * @param {string} productId - Product ID to remove
+   */
+  const removeProductFromState = useCallback((productId) => {
+    setProducts(prev => prev.filter(product => product.product_id !== productId));
+    
+    // Remove from cache
+    setCache(prev => {
+      const newCache = new Map(prev);
+      newCache.delete(productId);
+      return newCache;
+    });
+  }, []);
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchAllProducts();
+  }, [fetchAllProducts]);
+
+  // Clear old cache entries periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const oneHour = 60 * 60 * 1000;
+      
+      setCache(prev => {
+        const newCache = new Map();
+        for (const [key, value] of prev) {
+          if (now - value.timestamp < oneHour) {
+            newCache.set(key, value);
+          }
+        }
+        return newCache;
+      });
+    }, 10 * 60 * 1000); // Clean every 10 minutes
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Memoize the context value to prevent unnecessary re-renders
+  const contextValue = useMemo(() => ({
+    // State
+    products,
+    loading,
+    error,
+    categories,
+    
+    // Basic operations
+    fetchAllProducts,
+    getProductById,
+    refreshProducts,
+    clearError,
+    
+    // Filtering and searching
+    filterByCategory,
+    filterByCategories,
+    searchProducts,
+    sortProducts,
+    getFilteredProducts,
+    
+    // State management
+    addProductToState,
+    updateProductInState,
+    removeProductFromState,
+    
+    // Computed properties
+    productCount: products.length,
+    hasProducts: products.length > 0,
+    isEmpty: products.length === 0,
+    lastUpdated: lastFetch,
+    
+    // Cache info
+    cacheSize: cache.size
+  }), [
     products,
     loading,
     error,
     categories,
     fetchAllProducts,
     getProductById,
-    filterByCategory
-  };
+    refreshProducts,
+    clearError,
+    filterByCategory,
+    filterByCategories,
+    searchProducts,
+    sortProducts,
+    getFilteredProducts,
+    addProductToState,
+    updateProductInState,
+    removeProductFromState,
+    lastFetch,
+    cache.size
+  ]);
 
   return (
-    <ProductContext.Provider value={value}>
+    <ProductContext.Provider value={contextValue}>
       {children}
     </ProductContext.Provider>
   );

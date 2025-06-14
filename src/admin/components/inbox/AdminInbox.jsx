@@ -1,355 +1,317 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Send, RefreshCw, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, Search, RefreshCw, Send, Users, Eye } from 'lucide-react';
+import { contactService } from '../../../api';
 
 const AdminInbox = () => {
+  const [messages, setMessages] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [replyText, setReplyText] = useState('');
-  const [messages, setMessages] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isSendingReply, setIsSendingReply] = useState(false);
+  const [notification, setNotification] = useState(null);
 
-  // Base URL from your API documentation
-  const BASE_URL = 'https://leksycosmetics.com';
+  useEffect(() => {
+    loadMessages();
+  }, []);
 
-  // Get auth token from localStorage (matching your auth service)
-  const getAuthToken = () => {
-    return localStorage.getItem('auth_token');
-  };
-
-  // Fetch contact submissions from backend
-  const fetchContactSubmissions = useCallback(async () => {
+  const loadMessages = async () => {
     try {
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
+      setLoading(true);
+      setError(null);
+      
+      console.log('Fetching contact submissions...');
+      
+      // Pass limit parameter as documented in API
+      const result = await contactService.fetchSubmissions({ limit: 100 });
+      
+      console.log('API Response:', result);
+      
+      // Handle potential double-wrapped response
+      const responseData = result.data || result;
+      
+      // Check if response structure matches expected format
+      if (responseData && responseData.code === 200) {
+        // The API returns 'submissions' field (plural) as an array
+        const submissionsData = responseData.submissions || [];
+        
+        console.log('Submissions data:', submissionsData);
+        
+        if (submissionsData && submissionsData.length > 0) {
+          const formattedMessages = submissionsData.map((submission, index) => ({
+            id: submission.id || submission.submission_id || `msg_${index}`,
+            name: submission.name || 'Unknown',
+            email: submission.email || '',
+            phone: submission.phone || '',
+            subject: submission.subject || 'No subject',
+            message: submission.message || '',
+            created_at: submission.created_at || new Date().toISOString(),
+            read: false,
+            replied: false,
+            date: formatDate(submission.created_at),
+            time: formatTime(submission.created_at)
+          }));
 
-      const response = await fetch(`${BASE_URL}/api/admin/fetch-contact-submissions`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-
-      if (data.code === 200) {
-        // Transform the backend data to match our component structure
-        const transformedMessages = data.submission.map((submission, index) => ({
-          id: submission.submission_id || index + 1, // Use submission_id if available
-          sender: {
-            name: submission.name,
-            email: submission.email,
-            phone: submission.phone,
-            avatar: '/assets/images/avatars/avatar-1.jpg' // Default avatar
-          },
-          subject: submission.subject,
-          preview: submission.message.length > 100 
-            ? `${submission.message.substring(0, 100)}...` 
-            : submission.message,
-          content: submission.message,
-          time: submission.created_at ? formatTime(submission.created_at) : 'Unknown time',
-          date: submission.created_at ? formatDate(submission.created_at) : 'Today',
-          read: submission.read_status || false, // Assuming you might add read status later
-          email: submission.email,
-          phone: submission.phone
-        }));
-
-        setMessages(transformedMessages);
-        setError(null);
+          console.log('Formatted messages:', formattedMessages);
+          setMessages(formattedMessages);
+        } else {
+          console.log('No submissions found in response');
+          setMessages([]);
+        }
       } else {
-        throw new Error(data.message || 'Failed to fetch messages');
+        const errorMsg = responseData?.message || result?.message || 'Failed to load messages - Invalid response format';
+        console.error('API Error:', errorMsg, responseData || result);
+        throw new Error(errorMsg);
       }
     } catch (err) {
-      console.error('Error fetching contact submissions:', err);
-      setError(err.message);
-    }
-  }, [BASE_URL]);
-
-  // Format time for display
-  const formatTime = (dateString) => {
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+      const errorMessage = err.message || 'Failed to load contact submissions';
+      setError(errorMessage);
+      console.error('Error loading messages:', err);
       
-      if (diffInMinutes < 1) return 'Just now';
-      if (diffInMinutes < 60) return `${diffInMinutes} mins ago`;
-      if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`;
-      return date.toLocaleDateString();
-    } catch {
-      return 'Unknown time';
+      // Show detailed error for debugging
+      setNotification({
+        type: 'error',
+        message: `Error: ${errorMessage}`
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Format date for grouping
   const formatDate = (dateString) => {
+    if (!dateString) return 'Unknown';
     try {
       const date = new Date(dateString);
       const today = new Date();
+      
+      if (isNaN(date.getTime())) return 'Invalid Date';
+      
+      if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+      }
+      
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-
-      if (date.toDateString() === today.toDateString()) return 'Today';
-      if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+      if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+      }
+      
       return date.toLocaleDateString();
-    } catch {
-      return 'Today';
+    } catch (e) {
+      return 'Unknown';
     }
   };
 
-  // Load messages on component mount
-  useEffect(() => {
-    const loadMessages = async () => {
-      setIsLoading(true);
-      await fetchContactSubmissions();
-      setIsLoading(false);
-    };
-
-    loadMessages();
-  }, [fetchContactSubmissions]);
-
-  // Refresh messages
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await fetchContactSubmissions();
-    setIsRefreshing(false);
+  const formatTime = (dateString) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      
+      return date.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+    } catch (e) {
+      return '';
+    }
   };
 
-  // Handle message selection
   const handleSelectMessage = (message) => {
     if (!message.read) {
-      setMessages(prevMessages => 
-        prevMessages.map(msg => 
-          msg.id === message.id ? { ...msg, read: true } : msg
-        )
+      const updatedMessages = messages.map(msg => 
+        msg.id === message.id ? { ...msg, read: true } : msg
       );
+      setMessages(updatedMessages);
     }
     setSelectedMessage(message);
+    setReplyText('');
   };
 
-  // Handle sending reply (you'll need to implement an email sending endpoint)
   const handleSendReply = async () => {
-    if (!replyText.trim() || !selectedMessage || isSendingReply) return;
+    if (!replyText.trim() || !selectedMessage) return;
     
-    setIsSendingReply(true);
     try {
-      // Note: You'll need to implement an email reply endpoint in your backend
-      // For now, this will just log the reply
-      console.log(`Sending reply to ${selectedMessage.sender.name} (${selectedMessage.sender.email}):`, replyText);
+      // Simulate sending reply (you'll need to implement actual email sending)
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // You could implement this by:
-      // 1. Adding an email sending endpoint to your backend
-      // 2. Using a service like SendGrid, Mailgun, or native PHP mail
-      // 3. Calling something like: POST /api/admin/send-reply
-      
-      // Placeholder for actual API call:
-      /*
-      const token = getAuthToken();
-      const response = await fetch(`${BASE_URL}/api/admin/send-reply`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to_email: selectedMessage.sender.email,
-          to_name: selectedMessage.sender.name,
-          subject: `Re: ${selectedMessage.subject}`,
-          message: replyText,
-          original_submission_id: selectedMessage.id
-        })
+      setNotification({
+        type: 'success',
+        message: `Reply sent to ${selectedMessage.name}!`
       });
-      */
       
-      // Clear the reply input
       setReplyText('');
       
-      // Show success message (you could add a toast notification here)
-      alert('Reply sent successfully!');
+      // Mark as replied
+      const updatedMessages = messages.map(msg => 
+        msg.id === selectedMessage.id ? { ...msg, replied: true } : msg
+      );
+      setMessages(updatedMessages);
+      setSelectedMessage(prev => ({ ...prev, replied: true }));
       
-    } catch (err) {
-      console.error('Error sending reply:', err);
-      alert('Failed to send reply. Please try again.');
-    } finally {
-      setIsSendingReply(false);
+    } catch (error) {
+      setNotification({
+        type: 'error',
+        message: 'Failed to send reply'
+      });
     }
   };
 
-  // Memoized filtered messages
-  const filteredMessages = useMemo(() => {
-    return messages.filter(message => 
-      message.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      message.sender.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      message.preview.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      message.sender.email.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [messages, searchQuery]);
+  // Clear notification after 5 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
-  // Memoized grouped messages
-  const groupedMessages = useMemo(() => {
-    return filteredMessages.reduce((groups, message) => {
-      const date = message.date;
-      if (!groups[date]) {
-        groups[date] = [];
-      }
-      groups[date].push(message);
-      return groups;
-    }, {});
-  }, [filteredMessages]);
-
-  // Placeholder for avatar when image fails to load
-  const getInitials = (name) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase();
-  };
-
-  // Placeholder avatar component
-  const AvatarFallback = ({ name }) => (
-    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-pink-100 text-pink-600 font-medium">
-      {getInitials(name)}
-    </div>
+  // Filter messages based on search
+  const filteredMessages = messages.filter(msg => 
+    msg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    msg.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    msg.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    msg.message.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (isLoading) {
+  const stats = {
+    total: messages.length,
+    unread: messages.filter(m => !m.read).length
+  };
+
+  if (loading) {
     return (
       <div className="bg-gray-50 p-6 rounded-lg h-full flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin text-pink-500 mx-auto mb-4" />
-          <p className="text-gray-600">Loading messages...</p>
+        <div className="flex items-center space-x-2">
+          <RefreshCw className="animate-spin h-5 w-5 text-blue-500" />
+          <span>Loading contact messages...</span>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-gray-50 p-6 rounded-lg h-full flex flex-col items-center justify-center">
+        <div className="text-red-500 mb-4 text-4xl">⚠️</div>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">Failed to Load Messages</h3>
+        <p className="text-gray-600 mb-4 text-center max-w-md">{error}</p>
+        <button 
+          onClick={loadMessages}
+          className="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 flex items-center gap-2"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Try Again
+        </button>
       </div>
     );
   }
 
   return (
     <div className="bg-gray-50 p-6 rounded-lg h-full">
-      {/* Error Alert */}
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-          <AlertCircle className="h-5 w-5 text-red-500" />
-          <span className="text-red-700">{error}</span>
-          <button 
-            onClick={handleRefresh}
-            className="ml-auto text-red-600 hover:text-red-800 underline"
-          >
-            Retry
-          </button>
+      
+      {/* Notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 transition-all duration-300 ${
+          notification.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <span className="font-medium">{notification.message}</span>
+            <button 
+              onClick={() => setNotification(null)} 
+              className="ml-4 text-gray-500 hover:text-gray-700 text-xl"
+            >
+              ×
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Inbox Header */}
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-semibold text-gray-800">Inbox</h1>
-          <span className="text-sm text-gray-500">
-            {messages.length} message{messages.length !== 1 ? 's' : ''}
-          </span>
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-800 flex items-center gap-2">
+            <Mail className="h-6 w-6 text-blue-500" />
+            Contact Inbox
+          </h1>
+          <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+            <span className="flex items-center gap-1">
+              <Users className="h-4 w-4" />
+              Total: {stats.total}
+            </span>
+            <span className="flex items-center gap-1">
+              <Eye className="h-4 w-4" />
+              Unread: {stats.unread}
+            </span>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button 
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-md flex items-center gap-2 transition-colors duration-200 border border-gray-200"
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
-          </button>
-          <button className="bg-pink-500 hover:bg-pink-600 text-white font-medium py-2 px-4 rounded-md flex items-center gap-2 transition-colors duration-200">
-            <span>Compose message</span>
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-            </svg>
-          </button>
-        </div>
+        <button 
+          onClick={loadMessages}
+          disabled={loading}
+          className="bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 px-4 py-2 rounded-md flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
-      {/* Main content area */}
-      <div className="flex flex-col md:flex-row h-[calc(100vh-220px)] gap-4">
+      {/* Main Content */}
+      <div className="flex gap-4 h-[calc(100vh-220px)]">
+        
         {/* Message List */}
-        <div className="w-full md:w-1/2 lg:w-5/12 bg-white rounded-lg shadow-sm overflow-hidden flex flex-col">
-          {/* Search Bar */}
-          <div className="p-4 border-b border-gray-100">
+        <div className="w-1/2 bg-white rounded-lg shadow-sm overflow-hidden flex flex-col">
+          {/* Search */}
+          <div className="p-4 border-b">
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
-              </div>
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                className="pl-10 pr-4 py-2 w-full rounded-full border border-gray-200 focus:ring-pink-500 focus:border-pink-500 text-sm"
-                placeholder="Search messages, names, or emails..."
+                className="pl-10 pr-4 py-2 w-full rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Search messages..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label="Search messages"
               />
             </div>
           </div>
 
-          {/* Messages List with inner scroll */}
+          {/* Messages */}
           <div className="overflow-y-auto flex-1">
-            {Object.keys(groupedMessages).length > 0 ? (
-              Object.keys(groupedMessages).map(date => (
-                <div key={date}>
-                  <h3 className="text-gray-500 text-xs font-medium px-4 py-2">{date}</h3>
+            {filteredMessages.length > 0 ? (
+              filteredMessages.map(message => (
+                <div 
+                  key={message.id}
+                  className={`p-4 cursor-pointer border-b hover:bg-gray-50 transition-colors ${
+                    selectedMessage?.id === message.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                  } ${!message.read ? 'bg-blue-25' : ''}`}
+                  onClick={() => handleSelectMessage(message)}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className={`text-sm ${!message.read ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                      {message.name}
+                    </h4>
+                    <span className="text-xs text-gray-500">{message.time}</span>
+                  </div>
+                  <h3 className={`text-sm mb-1 ${!message.read ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
+                    {message.subject}
+                  </h3>
+                  <p className="text-xs text-gray-600 truncate mb-1">{message.message}</p>
+                  <p className="text-xs text-gray-500">{message.email}</p>
                   
-                  {groupedMessages[date].map(message => (
-                    <div 
-                      key={message.id}
-                      className={`px-4 py-3 cursor-pointer border-l-2 flex items-center transition-colors ${
-                        selectedMessage?.id === message.id 
-                          ? 'bg-gray-50 border-l-pink-500' 
-                          : message.read 
-                            ? 'border-l-transparent hover:bg-gray-50' 
-                            : 'border-l-pink-500 hover:bg-gray-50'
-                      }`}
-                      onClick={() => handleSelectMessage(message)}
-                    >
-                      {/* Avatar */}
-                      <div className="mr-3">
-                        <AvatarFallback name={message.sender.name} />
-                      </div>
-                      
-                      {/* Message content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-center mb-1">
-                          <h4 className="font-medium text-sm text-gray-900 truncate">{message.sender.name}</h4>
-                          <span className="text-xs text-gray-500">{message.time}</span>
-                        </div>
-                        <h3 className={`text-sm truncate ${!message.read ? 'font-semibold' : ''}`}>
-                          {message.subject}
-                        </h3>
-                        <p className="text-xs text-gray-600 truncate">{message.preview}</p>
-                      </div>
-                      
-                      {/* Unread indicator */}
-                      {!message.read && (
-                        <div className="ml-2 w-2 h-2 bg-pink-500 rounded-full"></div>
-                      )}
-                    </div>
-                  ))}
+                  <div className="flex items-center gap-2 mt-2">
+                    {!message.read && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
+                    {message.replied && <span className="text-xs text-green-600 font-medium">✓ Replied</span>}
+                    <span className="text-xs text-gray-400">{message.date}</span>
+                  </div>
                 </div>
               ))
             ) : (
-              <div className="flex flex-col items-center justify-center p-6 text-gray-500">
-                <p className="text-sm">
-                  {searchQuery ? 'No messages match your search' : 'No messages found'}
-                </p>
-                {!searchQuery && (
-                  <button 
-                    onClick={handleRefresh}
-                    className="mt-2 text-pink-500 hover:text-pink-600 text-sm underline"
-                  >
-                    Refresh messages
-                  </button>
+              <div className="flex flex-col items-center justify-center p-8 text-gray-500">
+                <Mail className="h-12 w-12 mb-4 text-gray-400" />
+                <p className="text-lg font-medium">No messages found</p>
+                {searchQuery && (
+                  <p className="text-sm mt-2">Try adjusting your search terms</p>
                 )}
               </div>
             )}
@@ -357,70 +319,65 @@ const AdminInbox = () => {
         </div>
 
         {/* Message Detail */}
-        <div className="w-full md:w-1/2 lg:w-7/12 bg-white rounded-lg shadow-sm flex flex-col h-full overflow-hidden">
+        <div className="w-1/2 bg-white rounded-lg shadow-sm flex flex-col">
           {selectedMessage ? (
             <>
-              <div className="p-6 border-b border-gray-100">
-                <div className="flex items-center mb-4">
-                  <AvatarFallback name={selectedMessage.sender.name} />
-                  <div className="ml-3">
-                    <h3 className="font-medium text-gray-900">{selectedMessage.sender.name}</h3>
-                    <p className="text-gray-500 text-sm">{selectedMessage.sender.email}</p>
-                    {selectedMessage.sender.phone && (
-                      <p className="text-gray-500 text-sm">{selectedMessage.sender.phone}</p>
+              {/* Header */}
+              <div className="p-6 border-b">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{selectedMessage.name}</h3>
+                    <p className="text-gray-600 text-sm">{selectedMessage.email}</p>
+                    {selectedMessage.phone && (
+                      <p className="text-gray-600 text-sm">{selectedMessage.phone}</p>
                     )}
-                    <p className="text-gray-500 text-sm">{selectedMessage.time}</p>
+                  </div>
+                  <div className="text-right text-sm text-gray-500">
+                    <p>{selectedMessage.date}</p>
+                    <p>{selectedMessage.time}</p>
                   </div>
                 </div>
-
-                <h2 className="text-xl font-semibold mb-2">{selectedMessage.subject}</h2>
+                <h2 className="text-xl font-semibold text-gray-900">{selectedMessage.subject}</h2>
+                {selectedMessage.replied && (
+                  <div className="mt-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    ✓ Replied
+                  </div>
+                )}
               </div>
               
-              {/* Content with inner scroll */}
+              {/* Content */}
               <div className="flex-1 overflow-y-auto p-6">
-                <p className="text-gray-700 whitespace-pre-line">{selectedMessage.content}</p>
+                <div className="prose prose-gray max-w-none">
+                  <p className="text-gray-700 whitespace-pre-line leading-relaxed">{selectedMessage.message}</p>
+                </div>
               </div>
 
-              {/* Reply Section */}
-              <div className="p-6 border-t border-gray-100">
-                <div className="flex items-center rounded-full border border-gray-200 bg-white pl-4 pr-2 py-1">
+              {/* Reply */}
+              <div className="p-6 border-t bg-gray-50">
+                <div className="flex items-center rounded-lg border bg-white shadow-sm">
                   <input 
                     type="text" 
-                    className="flex-1 text-sm outline-none border-none"
-                    placeholder={`Reply to ${selectedMessage.sender.name.split(' ')[0]}...`} 
+                    className="flex-1 px-4 py-3 border-none outline-none rounded-l-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder={`Reply to ${selectedMessage.name}...`} 
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendReply()}
-                    disabled={isSendingReply}
-                    aria-label="Reply message"
+                    onKeyPress={(e) => e.key === 'Enter' && replyText.trim() && handleSendReply()}
                   />
                   <button 
                     onClick={handleSendReply} 
-                    disabled={isSendingReply || !replyText.trim()}
-                    className="bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-full p-2 ml-2 transition-colors"
-                    aria-label="Send reply"
+                    disabled={!replyText.trim()}
+                    className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-r-lg px-4 py-3 transition-colors"
                   >
-                    {isSendingReply ? (
-                      <RefreshCw size={18} className="animate-spin" />
-                    ) : (
-                      <Send size={18} />
-                    )}
+                    <Send className="h-4 w-4" />
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Press Enter to send or click the send button
-                </p>
               </div>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400 p-6">
-              <svg className="h-16 w-16 mb-4 stroke-current" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-              </svg>
+            <div className="flex flex-col items-center justify-center h-full text-gray-400">
+              <Mail className="h-16 w-16 mb-4" />
               <p className="text-lg">Select a message to view</p>
-              <p className="text-sm text-gray-500 mt-1">
-                {messages.length === 0 ? 'No messages available' : `${messages.length} messages loaded`}
-              </p>
+              <p className="text-sm mt-2">Choose a message from the list on the left</p>
             </div>
           )}
         </div>
