@@ -433,7 +433,7 @@ const AddProductPage = () => {
                 {/* Price */}
                 <div>
                   <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
-                    Price <span className="text-red-500">*</span>
+                    Display Price <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -462,7 +462,7 @@ const AddProductPage = () => {
                 {/* Slashed Price */}
                 <div>
                   <label htmlFor="slashed_price" className="block text-sm font-medium text-gray-700 mb-2">
-                    Original Price (Optional)
+                    Slashed Price (Optional)
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
