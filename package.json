@@ -1,6 +1,7 @@
 {
   "name": "leksy-cosmetics",
   "private": true,
+  "proxy": "https://leksycosmetics.com",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
