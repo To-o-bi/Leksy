@@ -1,648 +1,604 @@
 import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, AlertCircle, CheckCircle, Upload, X } from 'lucide-react';
-import { productService } from '../../../api';
+import { ChevronLeft, Image, Plus, X, AlertCircle, CheckCircle } from 'lucide-react';
+import { productService } from '../../../api/services';
 
 const AddProductPage = () => {
-  const navigate = useNavigate(); 
   const fileInputRef = useRef(null);
-  
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   
   const [formData, setFormData] = useState({
     name: '',
     price: '',
     slashed_price: '',
-    description: '',
-    quantity: '',
     category: '',
+    quantity: '',
+    description: '',
+    images: []
   });
   
-  const [imageFiles, setImageFiles] = useState([]);
-  const [imagePreviewUrls, setImagePreviewUrls] = useState([]);
   const [errors, setErrors] = useState({});
-  
-  // Available product categories from API
-  const productCategories = [
-    'serums',
-    'moisturizers', 
-    'bathe and body',
-    'sunscreens',
-    'toners',
-    'face cleansers'
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewImages, setPreviewImages] = useState([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [notification, setNotification] = useState(null);
+
+  // Categories from your API config
+  const categories = [
+    { value: "serums", label: "Serums" },
+    { value: "face cleansers", label: "Face Cleansers" },
+    { value: "sunscreens", label: "Sunscreens" },
+    { value: "moisturizers", label: "Moisturizers" },
+    { value: "bathe and body", label: "Bathe and Body" },
+    { value: "toners", label: "Toners" }
   ];
-  
-  const handleChange = (e) => {
+
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
+    setFormData({
+      ...formData,
       [name]: value
-    }));
-    
-    // Clear field error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-    
-    // Clear general error
-    if (error) setError(null);
-  };
-  
-  const validateImageFile = (file) => {
-    const maxSize = 2 * 1024 * 1024; // 2MB
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    
-    if (!validTypes.includes(file.type)) {
-      return { valid: false, error: 'Only JPEG, PNG, and WebP images are allowed' };
-    }
-    
-    if (file.size > maxSize) {
-      return { valid: false, error: 'File size must be less than 2MB' };
-    }
-    
-    return { valid: true };
-  };
-  
-  const handleImageChange = (e) => {
-    const files = Array.from(e.target.files);
-    
-    if (imageFiles.length + files.length > 5) {
-      setErrors(prev => ({
-        ...prev,
-        images: 'Maximum 5 images allowed per product'
-      }));
-      return;
-    }
-    
-    const validFiles = [];
-    const invalidFiles = [];
-    
-    files.forEach(file => {
-      const validation = validateImageFile(file);
-      
-      if (validation.valid) {
-        validFiles.push(file);
-      } else {
-        invalidFiles.push({
-          name: file.name,
-          reason: validation.error
-        });
-      }
     });
     
-    // Show validation errors
-    if (invalidFiles.length > 0) {
-      const errorMessage = invalidFiles.map(f => `${f.name}: ${f.reason}`).join(', ');
-      setErrors(prev => ({
-        ...prev,
-        images: errorMessage
-      }));
-    }
-    
-    // Add valid files
-    if (validFiles.length > 0) {
-      setImageFiles(prev => [...prev, ...validFiles]);
-      
-      // Generate preview URLs
-      validFiles.forEach(file => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setImagePreviewUrls(prev => [...prev, reader.result]);
-        };
-        reader.readAsDataURL(file);
+    // Clear error when field is modified
+    if (errors[name]) {
+      setErrors({
+        ...errors,
+        [name]: null
       });
-      
-      // Clear image error if files are valid
-      if (errors.images && validFiles.length > 0) {
-        setErrors(prev => ({
-          ...prev,
-          images: ''
-        }));
-      }
-    }
-    
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
     }
   };
-  
-  const handleRemoveImage = (index) => {
-    setImageFiles(prev => prev.filter((_, i) => i !== index));
-    setImagePreviewUrls(prev => prev.filter((_, i) => i !== index));
-    
-    // Clear image error if we still have images
-    if (imageFiles.length > 1) {
-      setErrors(prev => ({
-        ...prev,
-        images: ''
-      }));
-    }
-  };
-  
+
   const validateForm = () => {
     const newErrors = {};
     
-    // Required field validation
-    if (!formData.name.trim()) {
-      newErrors.name = 'Product name is required';
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = 'Product name must be at least 2 characters';
-    }
+    if (!formData.name.trim()) newErrors.name = "Product name is required";
+    if (!formData.price) newErrors.price = "Price is required";
+    if (formData.price <= 0) newErrors.price = "Price must be greater than 0";
+    if (!formData.category) newErrors.category = "Category is required";
+    if (!formData.quantity) newErrors.quantity = "Quantity is required";
+    if (formData.quantity < 0) newErrors.quantity = "Quantity must be 0 or greater";
+    if (!formData.description.trim()) newErrors.description = "Description is required";
+    if (formData.images.length === 0) newErrors.images = "At least one product image is required";
     
-    if (!formData.price.trim()) {
-      newErrors.price = 'Price is required';
-    } else if (isNaN(formData.price) || parseFloat(formData.price) <= 0) {
-      newErrors.price = 'Please enter a valid price greater than 0';
-    }
-    
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required';
-    } else if (formData.description.trim().length < 10) {
-      newErrors.description = 'Description must be at least 10 characters';
-    }
-    
-    if (!formData.quantity.trim()) {
-      newErrors.quantity = 'Quantity is required';
-    } else if (isNaN(formData.quantity) || parseInt(formData.quantity) < 0) {
-      newErrors.quantity = 'Please enter a valid quantity (0 or greater)';
-    }
-    
-    if (!formData.category) {
-      newErrors.category = 'Category is required';
-    } else if (!productCategories.includes(formData.category)) {
-      newErrors.category = 'Invalid category selected';
-    }
-    
-    // Optional slashed price validation
-    if (formData.slashed_price && (isNaN(formData.slashed_price) || parseFloat(formData.slashed_price) <= 0)) {
-      newErrors.slashed_price = 'Please enter a valid original price';
-    }
-    
-    // Validate slashed price is greater than current price
-    if (formData.slashed_price && formData.price) {
-      const slashedPrice = parseFloat(formData.slashed_price);
-      const currentPrice = parseFloat(formData.price);
-      if (slashedPrice <= currentPrice) {
-        newErrors.slashed_price = 'Original price must be greater than current price';
-      }
-    }
-    
-    // Image validation
-    if (imageFiles.length === 0) {
-      newErrors.images = 'At least one product image is required';
+    // Validate slashed price is greater than main price if provided
+    if (formData.slashed_price && Number(formData.slashed_price) <= Number(formData.price)) {
+      newErrors.slashed_price = "Original price should be greater than current price";
     }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-  
-  const simulateProgress = () => {
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 15;
-      if (progress > 90) {
-        progress = 90;
-        clearInterval(interval);
-      }
-      setUploadProgress(Math.round(progress));
-    }, 300);
-    
-    return interval;
-  };
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!validateForm()) {
-      setError('Please correct the errors above and try again.');
+      setNotification({
+        type: 'error',
+        message: 'Please correct the errors above and try again.'
+      });
       return;
     }
     
     setIsSubmitting(true);
-    setError(null);
-    setSuccess(false);
-    setUploadProgress(0);
-    
-    const progressInterval = simulateProgress();
+    setNotification(null);
     
     try {
-      // Prepare product data for API
-      const productData = {
-        name: formData.name.trim(),
-        price: parseFloat(formData.price),
-        description: formData.description.trim(),
-        quantity: parseInt(formData.quantity, 10),
-        category: formData.category,
-        images: imageFiles
-      };
+      // Create FormData manually to ensure proper field names for your API
+      const formDataToSend = new FormData();
+      
+      // Add basic product data
+      formDataToSend.append('name', formData.name.trim());
+      formDataToSend.append('price', parseFloat(formData.price));
+      formDataToSend.append('description', formData.description.trim());
+      formDataToSend.append('quantity', parseInt(formData.quantity, 10));
+      formDataToSend.append('category', formData.category);
       
       // Add slashed price if provided
       if (formData.slashed_price) {
-        productData.slashed_price = parseFloat(formData.slashed_price);
+        formDataToSend.append('slashed_price', parseFloat(formData.slashed_price));
       }
       
-      console.log('Submitting product:', {
-        ...productData,
-        images: `${imageFiles.length} image files`
+      // IMPORTANT: Add images with proper field name (images[] as expected by API)
+      formData.images.forEach((file) => {
+        formDataToSend.append('images[]', file);
       });
       
-      // Call the API service
-      const response = await productService.addProduct(productData);
+      console.log('Submitting product with FormData...');
+      console.log('Image files count:', formData.images.length);
       
-      // Complete progress
-      clearInterval(progressInterval);
-      setUploadProgress(100);
+      // Use direct API call instead of productService to ensure proper FormData handling
+      const authToken = localStorage.getItem('authToken') || 
+                       document.cookie.match(/auth=([^;]+)/)?.[1] ? 
+                       atob(document.cookie.match(/auth=([^;]+)/)[1]) : null;
       
-      console.log('Product added successfully:', response);
+      const response = await fetch('/api/admin/add-product', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: formDataToSend // Send FormData directly
+      });
       
-      if (response && response.code === 200) {
-        setSuccess(true);
+      const result = await response.json();
+      
+      console.log('Product added successfully:', result);
+      
+      if (result && result.code === 200) {
+        setNotification({
+          type: 'success',
+          message: `Product "${formData.name}" has been added successfully!`
+        });
         
-        // Redirect after showing success message
+        // Reset form and redirect after successful submission
         setTimeout(() => {
-          navigate('/admin/products', {
-            state: {
-              notification: {
-                type: 'success',
-                message: `Product "${formData.name}" added successfully!`,
-                productId: response.product_id
-              }
-            }
-          });
+          // In real app, navigate to product stock page
+          window.location.href = '/admin/products/stock';
+          // Or if using React Router: navigate('/admin/products/stock');
         }, 2000);
       } else {
-        throw new Error(response?.message || 'Failed to add product');
+        throw new Error(result?.message || 'Failed to add product');
       }
       
-    } catch (err) {
-      clearInterval(progressInterval);
-      console.error('Error adding product:', err);
+    } catch (error) {
+      console.error('Error adding product:', error);
       
       // Handle specific API errors
-      if (err.message.includes('Validation failed')) {
-        setError(err.message);
-      } else if (err.message.includes('Authentication')) {
-        setError('Please log in again to continue.');
-        setTimeout(() => navigate('/admin/login'), 2000);
+      if (error.message.includes('Validation failed')) {
+        setNotification({
+          type: 'error',
+          message: error.message
+        });
+      } else if (error.message.includes('Authentication') || error.message.includes('Unauthorized')) {
+        setNotification({
+          type: 'error',
+          message: 'Please log in again to continue.'
+        });
       } else {
-        setError(err.message || 'Failed to add product. Please try again.');
+        setNotification({
+          type: 'error',
+          message: error.message || 'Failed to add product. Please try again.'
+        });
       }
-      
-      setUploadProgress(0);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleImageUpload = (e) => {
+    const files = e.target.files;
+    handleFileSelection(files);
+  };
   
-  const handleCancel = () => {
-    const hasChanges = Object.values(formData).some(value => value.trim() !== '') || imageFiles.length > 0;
+  const handleFileSelection = (files) => {
+    // Limit to maximum 5 images
+    const totalImages = previewImages.length + files.length;
+    if (totalImages > 5) {
+      setNotification({
+        type: 'error',
+        message: 'Maximum 5 images allowed per product'
+      });
+      return;
+    }
+    
+    // Create preview URLs for the images
+    const newPreviewImages = [...previewImages];
+    const newImages = [...formData.images];
+    
+    Array.from(files).forEach(file => {
+      // Only accept image files
+      if (!file.type.startsWith('image/')) {
+        setNotification({
+          type: 'error',
+          message: 'Only image files are allowed'
+        });
+        return;
+      }
+      
+      // Check file size (2MB limit)
+      if (file.size > 2 * 1024 * 1024) {
+        setNotification({
+          type: 'error',
+          message: `File ${file.name} is too large. Maximum size is 2MB`
+        });
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        newPreviewImages.push({
+          url: e.target.result,
+          file: file
+        });
+        setPreviewImages([...newPreviewImages]);
+      };
+      reader.readAsDataURL(file);
+      
+      newImages.push(file);
+    });
+    
+    setFormData({
+      ...formData,
+      images: newImages
+    });
+    
+    // Clear image error if we now have images
+    if (errors.images && newImages.length > 0) {
+      setErrors({
+        ...errors,
+        images: null
+      });
+    }
+  };
+  
+  const removeImage = (index) => {
+    const newPreviewImages = [...previewImages];
+    const newImages = [...formData.images];
+    
+    newPreviewImages.splice(index, 1);
+    newImages.splice(index, 1);
+    
+    setPreviewImages(newPreviewImages);
+    setFormData({
+      ...formData,
+      images: newImages
+    });
+  };
+  
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+  
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+  
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files) {
+      handleFileSelection(e.dataTransfer.files);
+    }
+  };
+
+  const handleBack = () => {
+    const hasChanges = Object.values(formData).some(value => 
+      typeof value === 'string' ? value.trim() !== '' : value.length > 0
+    );
     
     if (hasChanges && !window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
       return;
     }
     
-    navigate('/admin/products');
+    // In real app: navigate('/admin/products');
+    console.log('Would navigate back to products list...');
   };
-  
+
+  // Auto-hide notification after 5 seconds
+  React.useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
   return (
-    <div className="min-h-screen bg-gray-50 py-6">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          {/* Header */}
-          <div className="bg-white px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <button
-                  onClick={handleCancel}
-                  className="flex items-center text-gray-600 hover:text-gray-800 mr-4 transition-colors"
+    <div className="bg-gray-50 min-h-screen p-4 sm:p-6 md:p-8">
+      {/* Notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 max-w-md ${
+          notification.type === 'success' 
+            ? 'bg-green-50 text-green-800 border border-green-200' 
+            : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              {notification.type === 'success' ? (
+                <CheckCircle size={20} className="mr-2 flex-shrink-0" />
+              ) : (
+                <AlertCircle size={20} className="mr-2 flex-shrink-0" />
+              )}
+              <span>{notification.message}</span>
+            </div>
+            <button 
+              onClick={() => setNotification(null)} 
+              className="ml-4 text-xl font-bold hover:opacity-70"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto">
+        {/* Back button navigation */}
+        <div className="mb-6">
+          <button 
+            onClick={handleBack}
+            className="flex items-center text-gray-600 hover:text-pink-500 transition-colors"
+            disabled={isSubmitting}
+          >
+            <ChevronLeft size={20} />
+            <span className="ml-1">Back to Products</span>
+          </button>
+        </div>
+        
+        <h1 className="text-2xl font-medium mb-6 md:mb-8">Add New Product</h1>
+        
+        <div className="bg-white rounded-lg p-4 sm:p-6 md:p-8 shadow-sm">
+          <div className="flex flex-col md:flex-row">
+            {/* Image Upload Section */}
+            <div className="w-full md:w-1/3 md:mr-8 mb-6 md:mb-0">
+              <div
+                className={`${
+                  isDragging ? 'border-pink-500 bg-pink-50' : errors.images ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-gray-100'
+                } border-2 border-dashed h-64 rounded-lg flex items-center justify-center mb-4 transition-all cursor-pointer`}
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                {previewImages.length === 0 ? (
+                  <div className="text-center p-4">
+                    <div className="mx-auto bg-white p-4 rounded-full mb-2 inline-flex">
+                      <Image size={24} className="text-gray-400" />
+                    </div>
+                    <p className="text-gray-500 mb-2">Drag and drop images here or click to browse</p>
+                    <button 
+                      type="button" 
+                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-4 rounded-md text-sm"
+                      disabled={isSubmitting}
+                    >
+                      Add Image
+                    </button>
+                    <p className="text-xs text-gray-400 mt-2">Max 5 images, 2MB each</p>
+                  </div>
+                ) : (
+                  <div className="relative w-full h-full">
+                    <img 
+                      src={previewImages[0].url} 
+                      alt="Product preview" 
+                      className="h-full w-full object-contain rounded-lg" 
+                    />
+                    {!isSubmitting && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeImage(0);
+                        }}
+                        className="absolute top-2 right-2 bg-gray-800 bg-opacity-70 text-white p-1 rounded-full hover:bg-opacity-100"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                )}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImageUpload}
+                  multiple
+                  accept="image/*"
+                  className="hidden"
                   disabled={isSubmitting}
-                >
-                  <ChevronLeft size={20} />
-                  <span className="ml-1">Back</span>
-                </button>
-                <h1 className="text-2xl font-semibold text-gray-900">Add New Product</h1>
+                />
+              </div>
+              
+              {errors.images && (
+                <p className="mb-4 text-red-500 text-sm flex items-center">
+                  <AlertCircle size={16} className="mr-1" />
+                  {errors.images}
+                </p>
+              )}
+              
+              <div className="grid grid-cols-4 gap-2">
+                {[...Array(4)].map((_, index) => {
+                  const imageIndex = index + 1;
+                  const hasImage = previewImages.length > imageIndex;
+                  
+                  return (
+                    <div 
+                      key={index}
+                      className={`h-20 w-full bg-gray-100 rounded-md relative ${hasImage ? '' : 'flex items-center justify-center border border-gray-300 cursor-pointer'}`}
+                      onClick={() => !hasImage && !isSubmitting && fileInputRef.current?.click()}
+                    >
+                      {hasImage ? (
+                        <>
+                          <img 
+                            src={previewImages[imageIndex].url} 
+                            alt={`Product thumbnail ${imageIndex}`} 
+                            className="h-full w-full object-cover rounded-md" 
+                          />
+                          {!isSubmitting && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeImage(imageIndex);
+                              }}
+                              className="absolute top-1 right-1 bg-gray-800 bg-opacity-70 text-white p-1 rounded-full hover:bg-opacity-100"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <Plus size={20} className="text-gray-400" />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          </div>
-          
-          <div className="px-6 py-6">
-            {/* Success Message */}
-            {success && (
-              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
-                <div className="flex items-center">
-                  <CheckCircle size={20} className="mr-3 text-green-500 flex-shrink-0" />
-                  <div>
-                    <p className="text-green-800 font-medium">Product added successfully!</p>
-                    <p className="text-green-700 text-sm mt-1">
-                      Redirecting to products list...
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
             
-            {/* Error Message */}
-            {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-                <div className="flex items-center">
-                  <AlertCircle size={20} className="mr-3 text-red-500 flex-shrink-0" />
-                  <p className="text-red-800">{error}</p>
-                </div>
+            <div className="w-full md:w-2/3">
+              {/* Product Details */}
+              <div className="mb-6">
+                <label className="block text-gray-700 mb-2">Product Name*</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  disabled={isSubmitting}
+                  className={`w-full border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
+                  placeholder="Enter product name"
+                />
+                {errors.name && (
+                  <p className="mt-1 text-red-500 text-sm flex items-center">
+                    <AlertCircle size={16} className="mr-1" />
+                    {errors.name}
+                  </p>
+                )}
               </div>
-            )}
-
-            {/* Upload Progress */}
-            {isSubmitting && uploadProgress > 0 && (
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-blue-700">
-                    {uploadProgress < 100 ? 'Uploading product...' : 'Upload complete!'}
-                  </span>
-                  <span className="text-sm text-blue-700 font-medium">{uploadProgress}%</span>
-                </div>
-                <div className="w-full bg-blue-200 rounded-full h-2">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${uploadProgress}%` }}
-                  />
-                </div>
-              </div>
-            )}
-            
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Product Name */}
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                    Product Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                      errors.name ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Enter product name"
-                  />
-                  {errors.name && (
-                    <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-                  )}
-                </div>
-                
-                {/* Category */}
-                <div>
-                  <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
-                    Category <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    id="category"
-                    name="category"
-                    value={formData.category}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                      errors.category ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                  >
-                    <option value="">Select Category</option>
-                    {productCategories.map((category) => (
-                      <option key={category} value={category}>
-                        {category.split(' ').map(word => 
-                          word.charAt(0).toUpperCase() + word.slice(1)
-                        ).join(' ')}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.category && (
-                    <p className="mt-1 text-sm text-red-600">{errors.category}</p>
-                  )}
-                </div>
-                
-                {/* Price */}
-                <div>
-                  <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
-                    Price <span className="text-red-500">*</span>
-                  </label>
+              
+              <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 mb-6">
+                <div className="w-full sm:w-1/2">
+                  <label className="block text-gray-700 mb-2">Current Price*</label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500">₦</span>
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                      <span className="text-gray-700 font-bold">₦</span>
                     </div>
                     <input
                       type="number"
-                      id="price"
                       name="price"
                       value={formData.price}
-                      onChange={handleChange}
+                      onChange={handleInputChange}
                       disabled={isSubmitting}
                       min="0"
                       step="0.01"
-                      className={`w-full pl-8 pr-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                        errors.price ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      className={`w-full border ${errors.price ? 'border-red-500' : 'border-gray-300'} rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
                       placeholder="0.00"
                     />
                   </div>
                   {errors.price && (
-                    <p className="mt-1 text-sm text-red-600">{errors.price}</p>
+                    <p className="mt-1 text-red-500 text-sm flex items-center">
+                      <AlertCircle size={16} className="mr-1" />
+                      {errors.price}
+                    </p>
                   )}
                 </div>
                 
-                {/* Slashed Price */}
-                <div>
-                  <label htmlFor="slashed_price" className="block text-sm font-medium text-gray-700 mb-2">
-                    Original Price (Optional)
-                  </label>
+                <div className="w-full sm:w-1/2">
+                  <label className="block text-gray-700 mb-2">Original Price (Optional)</label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500">₦</span>
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                      <span className="text-gray-700 font-bold">₦</span>
                     </div>
                     <input
                       type="number"
-                      id="slashed_price"
                       name="slashed_price"
                       value={formData.slashed_price}
-                      onChange={handleChange}
+                      onChange={handleInputChange}
                       disabled={isSubmitting}
                       min="0"
                       step="0.01"
-                      className={`w-full pl-8 pr-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                        errors.slashed_price ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      className={`w-full border ${errors.slashed_price ? 'border-red-500' : 'border-gray-300'} rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
                       placeholder="0.00"
                     />
                   </div>
                   {errors.slashed_price && (
-                    <p className="mt-1 text-sm text-red-600">{errors.slashed_price}</p>
-                  )}
-                </div>
-                
-                {/* Quantity */}
-                <div className="md:col-span-2">
-                  <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-2">
-                    Quantity <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    id="quantity"
-                    name="quantity"
-                    value={formData.quantity}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    min="0"
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                      errors.quantity ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Enter available quantity"
-                  />
-                  {errors.quantity && (
-                    <p className="mt-1 text-sm text-red-600">{errors.quantity}</p>
-                  )}
-                </div>
-                
-                {/* Description */}
-                <div className="md:col-span-2">
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                    Description <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    rows={4}
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                      errors.description ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Enter product description"
-                  />
-                  {errors.description && (
-                    <p className="mt-1 text-sm text-red-600">{errors.description}</p>
-                  )}
-                </div>
-                
-                {/* Product Images */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Product Images <span className="text-red-500">*</span>
-                  </label>
-                  
-                  <div 
-                    className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                      errors.images ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-gray-400'
-                    }`}
-                  >
-                    <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="images"
-                        className="cursor-pointer text-blue-600 hover:text-blue-500 font-medium"
-                      >
-                        Choose files
-                        <input
-                          id="images"
-                          name="images"
-                          type="file"
-                          ref={fileInputRef}
-                          className="hidden"
-                          multiple
-                          accept="image/*"
-                          onChange={handleImageChange}
-                          disabled={isSubmitting}
-                        />
-                      </label>
-                      <p className="text-gray-500">or drag and drop</p>
-                      <p className="text-sm text-gray-400">
-                        PNG, JPG, WebP up to 2MB each (max 5 images)
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {errors.images && (
-                    <p className="mt-2 text-sm text-red-600">{errors.images}</p>
-                  )}
-                  
-                  {/* Image Previews */}
-                  {imagePreviewUrls.length > 0 && (
-                    <div className="mt-4">
-                      <p className="text-sm font-medium text-gray-700 mb-3">
-                        Selected Images ({imageFiles.length}/5):
-                      </p>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                        {imagePreviewUrls.map((url, index) => (
-                          <div key={index} className="relative group">
-                            <div className="aspect-square w-full overflow-hidden rounded-lg bg-gray-100">
-                              <img
-                                src={url}
-                                alt={`Preview ${index + 1}`}
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                            {!isSubmitting && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveImage(index)}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <X size={16} />
-                              </button>
-                            )}
-                            <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-                              {index + 1}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <p className="mt-1 text-red-500 text-sm flex items-center">
+                      <AlertCircle size={16} className="mr-1" />
+                      {errors.slashed_price}
+                    </p>
                   )}
                 </div>
               </div>
               
-              {/* Submit Buttons */}
-              <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+              <div className="mb-6">
+                <label className="block text-gray-700 mb-2">Category*</label>
+                <div className="relative">
+                  <select
+                    name="category"
+                    value={formData.category}
+                    onChange={handleInputChange}
+                    disabled={isSubmitting}
+                    className={`w-full border ${errors.category ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-pink-500`}
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map(category => (
+                      <option key={category.value} value={category.value}>
+                        {category.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </div>
+                </div>
+                {errors.category && (
+                  <p className="mt-1 text-red-500 text-sm flex items-center">
+                    <AlertCircle size={16} className="mr-1" />
+                    {errors.category}
+                  </p>
+                )}
+              </div>
+              
+              <div className="mb-6">
+                <label className="block text-gray-700 mb-2">Available Quantity*</label>
+                <input
+                  type="number"
+                  name="quantity"
+                  value={formData.quantity}
+                  onChange={handleInputChange}
+                  disabled={isSubmitting}
+                  min="0"
+                  className={`w-full border ${errors.quantity ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
+                  placeholder="Enter quantity"
+                />
+                {errors.quantity && (
+                  <p className="mt-1 text-red-500 text-sm flex items-center">
+                    <AlertCircle size={16} className="mr-1" />
+                    {errors.quantity}
+                  </p>
+                )}
+              </div>
+              
+              <div className="mb-6">
+                <label className="block text-gray-700 mb-2">Product Description*</label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  disabled={isSubmitting}
+                  rows="5"
+                  className={`w-full border ${errors.description ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
+                  placeholder="Write detailed information about your product..."
+                />
+                {errors.description && (
+                  <p className="mt-1 text-red-500 text-sm flex items-center">
+                    <AlertCircle size={16} className="mr-1" />
+                    {errors.description}
+                  </p>
+                )}
+              </div>
+              
+              <div className="mt-8">
                 <button
                   type="button"
-                  onClick={handleCancel}
-                  className="px-6 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                  onClick={handleSubmit}
                   disabled={isSubmitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`px-6 py-2 border border-transparent rounded-md text-sm font-medium text-white transition-colors ${
-                    isSubmitting 
-                      ? 'bg-gray-400 cursor-not-allowed' 
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
+                  className={`w-full ${isSubmitting ? 'bg-pink-400 cursor-not-allowed' : 'bg-pink-500 hover:bg-pink-600'} text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center`}
                 >
                   {isSubmitting ? (
-                    <div className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                       Adding Product...
-                    </div>
-                  ) : (
-                    'Add Product'
-                  )}
+                    </>
+                  ) : "Add Product"}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       </div>

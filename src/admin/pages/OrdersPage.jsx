@@ -1,102 +1,22 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, Eye, RefreshCw, Download, Calendar, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Filter, Eye, RefreshCw, AlertCircle } from 'lucide-react';
 import { orderService } from '../../api/services';
 
 const AllOrders = () => {
-  // State management
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [orderBy, setOrderBy] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
   const [orderStatus, setOrderStatus] = useState('successful');
   const [deliveryStatus, setDeliveryStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showModal, setShowModal] = useState(false);
   const [notification, setNotification] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [showOrderModal, setShowOrderModal] = useState(false);
   
   const ordersPerPage = 9;
-
-  // Auto-hide notification after 5 seconds
-  useEffect(() => {
-    if (notification) {
-      const timer = setTimeout(() => {
-        setNotification(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification]);
-
-  // Fetch orders from API
-  const fetchOrders = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const filters = {};
-      
-      // Add order status filter
-      if (orderStatus && orderStatus !== 'all') {
-        filters.order_status = orderStatus;
-      }
-      
-      // Add delivery status filter
-      if (deliveryStatus && deliveryStatus !== 'all') {
-        filters.delivery_status = deliveryStatus;
-      }
-      
-      // Add limit
-      filters.limit = 200;
-      
-      console.log('Fetching orders with filters:', filters);
-      
-      const response = await orderService.fetchOrders(filters);
-      console.log('Orders API response:', response);
-      
-      if (response && response.code === 200) {
-        const ordersData = response.products || [];
-        
-        // Format orders for display
-        const formattedOrders = ordersData.map((order, index) => ({
-          id: order.order_id || `order_${index}`,
-          name: order.name || 'Unknown Customer',
-          email: order.email || '',
-          phone: order.phone || '',
-          amount: parseFloat(order.amount_paid || order.amount_calculated || 0),
-          rawAmount: order.amount_paid || order.amount_calculated || 0,
-          date: formatDate(order.created_at),
-          rawDate: order.created_at,
-          orderStatus: order.order_status || 'unknown',
-          deliveryStatus: order.delivery_status || 'unknown',
-          deliveryMethod: order.delivery_method || '',
-          address: order.street_address ? `${order.street_address}, ${order.city}, ${order.state}` : 'Pickup',
-          state: order.state || '',
-          city: order.city || '',
-          streetAddress: order.street_address || '',
-          cart: order.cart_obj || [],
-          rawData: order
-        }));
-        
-        setOrders(formattedOrders);
-        console.log(`Loaded ${formattedOrders.length} orders`);
-      } else {
-        throw new Error(response?.message || 'Failed to fetch orders');
-      }
-    } catch (err) {
-      console.error('Error fetching orders:', err);
-      setError(err.message || 'Failed to load orders');
-      setNotification({
-        type: 'error',
-        message: err.message || 'Failed to load orders'
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [orderStatus, deliveryStatus]);
 
   // Format currency
   const formatCurrency = (amount) => {
@@ -128,23 +48,18 @@ const AllOrders = () => {
   const getStatusBadgeStyle = (status) => {
     switch (status?.toLowerCase()) {
       case 'successful':
-      case 'completed':
+      case 'delivered':
         return 'bg-green-100 text-green-600';
-      case 'pending':
       case 'order-received':
+      case 'pending':
         return 'bg-orange-100 text-orange-600';
-      case 'processing':
       case 'packaged':
         return 'bg-blue-100 text-blue-600';
       case 'in-transit':
         return 'bg-purple-100 text-purple-600';
-      case 'delivered':
-        return 'bg-green-100 text-green-600';
-      case 'cancelled':
       case 'failed':
+      case 'cancelled':
         return 'bg-red-100 text-red-600';
-      case 'flagged':
-        return 'bg-yellow-100 text-yellow-600';
       case 'unpaid':
         return 'bg-gray-100 text-gray-600';
       default:
@@ -152,10 +67,86 @@ const AllOrders = () => {
     }
   };
 
-  // Handle delivery status change
+  // Fetch orders (public endpoint - no auth required)
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const filters = {};
+      if (orderStatus !== 'all') filters.order_status = orderStatus;
+      if (deliveryStatus !== 'all') filters.delivery_status = deliveryStatus;
+      filters.limit = 200;
+      
+      console.log('Fetching orders with filters:', filters);
+      
+      // Make direct API call to avoid auto-added auth headers from orderService
+      const queryParams = new URLSearchParams(filters).toString();
+      const apiUrl = `https://leksycosmetics.com/api/fetch-orders?${queryParams}`;
+      
+      console.log('API URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const result = await response.json();
+      console.log('API Response:', result);
+      
+      if (result && result.code === 200) {
+        const ordersData = result.products || [];
+        
+        const formattedOrders = ordersData.map(order => ({
+          id: order.order_id,
+          name: order.name,
+          email: order.email,
+          phone: order.phone,
+          amount: order.amount_paid || order.amount_calculated || 0,
+          date: formatDate(order.created_at),
+          rawDate: order.created_at,
+          orderStatus: order.order_status,
+          deliveryStatus: order.delivery_status,
+          deliveryMethod: order.delivery_method,
+          address: order.street_address ? 
+            `${order.street_address}, ${order.city}, ${order.state}` : 'Pickup',
+          state: order.state,
+          city: order.city,
+          streetAddress: order.street_address,
+          cart: order.cart_obj || [],
+          rawData: order
+        }));
+        
+        setOrders(formattedOrders);
+        console.log(`Successfully loaded ${formattedOrders.length} orders`);
+      } else {
+        throw new Error(result?.message || 'Failed to fetch orders');
+      }
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setError(err.message || 'Failed to load orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle delivery status change (admin endpoint - requires auth)
   const handleDeliveryStatusChange = async (orderId, newStatus) => {
     try {
       setIsUpdating(true);
+      
+      // Check authentication for admin endpoint
+      const authToken = localStorage.getItem('authToken') || 
+                       document.cookie.match(/auth=([^;]+)/)?.[1] ? 
+                       atob(document.cookie.match(/auth=([^;]+)/)[1]) : null;
+      
+      if (!authToken) {
+        throw new Error('Admin login required to update order status');
+      }
+      
       await orderService.changeDeliveryStatus(orderId, newStatus);
       
       // Update local state
@@ -165,42 +156,41 @@ const AllOrders = () => {
           : order
       ));
       
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder({ ...selectedOrder, deliveryStatus: newStatus });
+      }
+      
       setNotification({
         type: 'success',
-        message: `Delivery status updated to "${newStatus}" successfully`
+        message: `Status updated to "${newStatus}" successfully`
       });
+      
+      setTimeout(() => setNotification(null), 3000);
     } catch (err) {
       console.error('Error updating delivery status:', err);
-      setNotification({
-        type: 'error',
-        message: 'Failed to update delivery status'
-      });
+      
+      if (err.message.includes('precondition') || err.message.includes('Unauthorized') || err.message.includes('Authentication') || err.message.includes('Admin login required')) {
+        setNotification({
+          type: 'error',
+          message: 'Admin authentication required to update order status. Please log in as admin.'
+        });
+      } else {
+        setNotification({
+          type: 'error',
+          message: err.message || 'Failed to update delivery status'
+        });
+      }
+      
+      setTimeout(() => setNotification(null), 5000);
     } finally {
       setIsUpdating(false);
     }
   };
 
-  // Reset all filters
-  const resetFilter = () => {
-    setFilterStatus('');
-    setOrderBy('');
-    setOrderStatus('successful');
-    setDeliveryStatus('all');
-    setSearchQuery('');
-    setCurrentPage(1);
-  };
-
-  // Apply status filter
-  const applyFilter = (status) => {
-    setFilterStatus(status);
-    setCurrentPage(1);
-  };
-
-  // Filter and sort orders
-  const filterAndSortOrders = useCallback(() => {
+  // Filter orders based on search
+  const filterOrders = () => {
     let filtered = [...orders];
     
-    // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(order => 
@@ -211,70 +201,32 @@ const AllOrders = () => {
       );
     }
     
-    // Apply delivery status filter
-    if (filterStatus) {
-      filtered = filtered.filter(order => 
-        order.deliveryStatus?.toLowerCase() === filterStatus.toLowerCase()
-      );
-    }
-    
-    // Apply sorting
-    if (orderBy === 'newest') {
-      filtered.sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
-    } else if (orderBy === 'oldest') {
-      filtered.sort((a, b) => new Date(a.rawDate) - new Date(b.rawDate));
-    } else if (orderBy === 'highest') {
-      filtered.sort((a, b) => b.amount - a.amount);
-    } else if (orderBy === 'lowest') {
-      filtered.sort((a, b) => a.amount - b.amount);
-    }
-    
     setFilteredOrders(filtered);
-  }, [orders, searchQuery, filterStatus, orderBy]);
+  };
 
   // View order details
   const viewOrderDetails = (order) => {
     setSelectedOrder(order);
-    setShowOrderModal(true);
+    setShowModal(true);
   };
 
-  // Export orders to CSV
-  const exportOrders = () => {
-    const csvContent = [
-      ['Order ID', 'Customer Name', 'Email', 'Phone', 'Amount', 'Date', 'Payment Status', 'Delivery Status', 'Address'],
-      ...filteredOrders.map(order => [
-        order.id,
-        order.name,
-        order.email,
-        order.phone,
-        order.rawAmount,
-        order.rawDate,
-        order.orderStatus,
-        order.deliveryStatus,
-        order.address
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `orders-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // Reset filters
+  const resetFilter = () => {
+    setOrderStatus('successful');
+    setDeliveryStatus('all');
+    setSearchQuery('');
+    setCurrentPage(1);
   };
 
-  // Fetch orders on component mount and when filters change
+  // Fetch orders on mount and filter changes
   useEffect(() => {
     fetchOrders();
-  }, [fetchOrders]);
+  }, [orderStatus, deliveryStatus]);
 
-  // Apply filters whenever dependencies change
+  // Filter orders when search changes
   useEffect(() => {
-    filterAndSortOrders();
-  }, [filterAndSortOrders]);
+    filterOrders();
+  }, [orders, searchQuery]);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
@@ -282,10 +234,6 @@ const AllOrders = () => {
   const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
   const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder);
 
-  // Check if any filters are active
-  const hasActiveFilters = searchQuery || filterStatus || orderBy || orderStatus !== 'successful' || deliveryStatus !== 'all';
-
-  // Loading state
   if (loading && orders.length === 0) {
     return (
       <div className="bg-white rounded-lg p-6 shadow-sm">
@@ -293,9 +241,7 @@ const AllOrders = () => {
           <div className="h-8 bg-gray-200 rounded w-48 mb-6"></div>
           <div className="space-y-4">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex space-x-4">
-                <div className="h-12 bg-gray-200 rounded w-full"></div>
-              </div>
+              <div key={i} className="h-12 bg-gray-200 rounded w-full"></div>
             ))}
           </div>
         </div>
@@ -303,7 +249,6 @@ const AllOrders = () => {
     );
   }
 
-  // Error state (only if no orders loaded)
   if (error && orders.length === 0) {
     return (
       <div className="bg-white rounded-lg p-6 shadow-sm">
@@ -313,9 +258,8 @@ const AllOrders = () => {
           <p className="text-gray-600 mb-4">{error}</p>
           <button 
             onClick={fetchOrders}
-            className="bg-pink-500 text-white px-6 py-2 rounded-md hover:bg-pink-600 flex items-center mx-auto"
+            className="bg-pink-500 text-white px-6 py-2 rounded-md hover:bg-pink-600"
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
             Try Again
           </button>
         </div>
@@ -327,17 +271,12 @@ const AllOrders = () => {
     <div className="space-y-6">
       {/* Notification */}
       {notification && (
-        <div className={`fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 transition-all duration-300 ${
+        <div className={`fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 ${
           notification.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
         }`}>
           <div className="flex items-center justify-between">
-            <span className="font-medium">{notification.message}</span>
-            <button 
-              onClick={() => setNotification(null)} 
-              className="ml-4 text-gray-500 hover:text-gray-700 text-xl font-bold"
-            >
-              ×
-            </button>
+            <span>{notification.message}</span>
+            <button onClick={() => setNotification(null)} className="ml-4 text-xl">×</button>
           </div>
         </div>
       )}
@@ -351,24 +290,14 @@ const AllOrders = () => {
               {loading ? 'Loading...' : `${filteredOrders.length} of ${orders.length} orders`}
             </p>
           </div>
-          <div className="flex gap-2">
-            <button 
-              onClick={exportOrders}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md flex items-center transition-colors"
-              disabled={filteredOrders.length === 0 || loading}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </button>
-            <button 
-              onClick={fetchOrders}
-              className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-md flex items-center transition-colors"
-              disabled={loading}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-          </div>
+          <button 
+            onClick={fetchOrders}
+            className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-md flex items-center"
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
 
         {/* Search and Filters */}
@@ -386,7 +315,7 @@ const AllOrders = () => {
           </div>
 
           {/* Filter Controls */}
-          <div className="flex flex-wrap gap-4 items-center">
+          <div className="flex gap-4 items-center">
             <div className="flex border border-gray-200 rounded-lg overflow-hidden">
               <button className="p-3 bg-gray-50 border-r border-gray-200">
                 <Filter className="h-5 w-5 text-gray-500" />
@@ -397,75 +326,37 @@ const AllOrders = () => {
             </div>
             
             {/* Order Status Filter */}
-            <div className="relative">
-              <select 
-                className="appearance-none bg-gray-50 border border-gray-200 rounded-lg py-2 px-4 text-sm pr-10 focus:ring-2 focus:ring-pink-500"
-                value={orderStatus}
-                onChange={(e) => setOrderStatus(e.target.value)}
-              >
-                <option value="successful">Successful Orders</option>
-                <option value="failed">Failed Orders</option>
-                <option value="flagged">Flagged Orders</option>
-                <option value="all">All Payment Status</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </div>
-            </div>
+            <select 
+              className="bg-gray-50 border border-gray-200 rounded-lg py-2 px-4 text-sm"
+              value={orderStatus}
+              onChange={(e) => setOrderStatus(e.target.value)}
+            >
+              <option value="successful">Successful Orders</option>
+              <option value="failed">Failed Orders</option>
+              <option value="flagged">Flagged Orders</option>
+              <option value="all">All Payment Status</option>
+            </select>
 
-            {/* Date Sorting */}
-            <div className="relative">
-              <select 
-                className="appearance-none bg-gray-50 border border-gray-200 rounded-lg py-2 px-4 text-sm pr-10 focus:ring-2 focus:ring-pink-500"
-                value={orderBy}
-                onChange={(e) => setOrderBy(e.target.value)}
-              >
-                <option value="">Default Order</option>
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="highest">Highest Amount</option>
-                <option value="lowest">Lowest Amount</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </div>
-            </div>
-            
             {/* Delivery Status Filter */}
-            <div className="relative">
-              <select 
-                className="appearance-none bg-gray-50 border border-gray-200 rounded-lg py-2 px-4 text-sm pr-10 focus:ring-2 focus:ring-pink-500"
-                value={filterStatus}
-                onChange={(e) => applyFilter(e.target.value)}
-              >
-                <option value="">All Delivery Status</option>
-                <option value="delivered">Delivered</option>
-                <option value="in-transit">In Transit</option>
-                <option value="packaged">Packaged</option>
-                <option value="order-received">Order Received</option>
-                <option value="unpaid">Unpaid</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </div>
-            </div>
+            <select 
+              className="bg-gray-50 border border-gray-200 rounded-lg py-2 px-4 text-sm"
+              value={deliveryStatus}
+              onChange={(e) => setDeliveryStatus(e.target.value)}
+            >
+              <option value="all">All Delivery Status</option>
+              <option value="delivered">Delivered</option>
+              <option value="in-transit">In Transit</option>
+              <option value="packaged">Packaged</option>
+              <option value="order-received">Order Received</option>
+              <option value="unpaid">Unpaid</option>
+            </select>
 
-            {/* Reset Filters */}
-            {hasActiveFilters && (
-              <button 
-                className="px-4 py-2 rounded-lg text-pink-500 hover:bg-pink-50 flex items-center transition-colors"
-                onClick={resetFilter}
-              >
-                <RefreshCw className="h-4 w-4 mr-1" />
-                Reset Filters
-              </button>
-            )}
+            <button 
+              className="px-4 py-2 rounded-lg text-pink-500 hover:bg-pink-50"
+              onClick={resetFilter}
+            >
+              Reset Filter
+            </button>
           </div>
         </div>
         
@@ -474,28 +365,28 @@ const AllOrders = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="pb-3 text-sm font-medium text-gray-500 uppercase tracking-wider">ORDER ID</th>
-                <th className="pb-3 text-sm font-medium text-gray-500 uppercase tracking-wider">CUSTOMER</th>
-                <th className="pb-3 text-sm font-medium text-gray-500 uppercase tracking-wider">AMOUNT</th>
-                <th className="pb-3 text-sm font-medium text-gray-500 uppercase tracking-wider">DATE</th>
-                <th className="pb-3 text-sm font-medium text-gray-500 uppercase tracking-wider">PAYMENT</th>
-                <th className="pb-3 text-sm font-medium text-gray-500 uppercase tracking-wider">DELIVERY</th>
-                <th className="pb-3 text-sm font-medium text-gray-500 uppercase tracking-wider">ACTION</th>
+                <th className="pb-3 text-sm font-medium text-gray-500 uppercase">ORDER ID</th>
+                <th className="pb-3 text-sm font-medium text-gray-500 uppercase">CUSTOMER</th>
+                <th className="pb-3 text-sm font-medium text-gray-500 uppercase">AMOUNT</th>
+                <th className="pb-3 text-sm font-medium text-gray-500 uppercase">DATE</th>
+                <th className="pb-3 text-sm font-medium text-gray-500 uppercase">PAYMENT</th>
+                <th className="pb-3 text-sm font-medium text-gray-500 uppercase">DELIVERY</th>
+                <th className="pb-3 text-sm font-medium text-gray-500 uppercase">ACTION</th>
               </tr>
             </thead>
             <tbody>
               {currentOrders.length > 0 ? currentOrders.map((order) => (
-                <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                  <td className="py-4 text-sm font-mono text-gray-900">{order.id}</td>
+                <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="py-4 text-sm font-mono">{order.id}</td>
                   <td className="py-4">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">{order.name}</div>
+                      <div className="text-sm font-medium">{order.name}</div>
                       <div className="text-xs text-gray-500">{order.email}</div>
-                      {order.phone && <div className="text-xs text-gray-500">{order.phone}</div>}
+                      <div className="text-xs text-gray-500">{order.phone}</div>
                     </div>
                   </td>
-                  <td className="py-4 text-sm font-semibold text-gray-900">{formatCurrency(order.amount)}</td>
-                  <td className="py-4 text-sm text-gray-900">{order.date}</td>
+                  <td className="py-4 text-sm font-semibold">{formatCurrency(order.amount)}</td>
+                  <td className="py-4 text-sm">{order.date}</td>
                   <td className="py-4">
                     <span className={`text-xs px-3 py-1 rounded-full font-medium ${getStatusBadgeStyle(order.orderStatus)}`}>
                       {order.orderStatus}
@@ -506,7 +397,7 @@ const AllOrders = () => {
                       value={order.deliveryStatus}
                       onChange={(e) => handleDeliveryStatusChange(order.id, e.target.value)}
                       disabled={isUpdating}
-                      className={`text-xs px-2 py-1 rounded-full border-0 cursor-pointer font-medium ${getStatusBadgeStyle(order.deliveryStatus)} ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'}`}
+                      className={`text-xs px-2 py-1 rounded-full border-0 cursor-pointer font-medium ${getStatusBadgeStyle(order.deliveryStatus)}`}
                     >
                       <option value="unpaid">Unpaid</option>
                       <option value="order-received">Order Received</option>
@@ -517,7 +408,7 @@ const AllOrders = () => {
                   </td>
                   <td className="py-4">
                     <button 
-                      className="text-pink-500 border border-pink-500 rounded-lg px-4 py-2 text-sm hover:bg-pink-50 flex items-center transition-colors"
+                      className="text-pink-500 border border-pink-500 rounded-lg px-4 py-2 text-sm hover:bg-pink-50 flex items-center"
                       onClick={() => viewOrderDetails(order)}
                     >
                       <Eye className="h-4 w-4 mr-1" />
@@ -528,21 +419,8 @@ const AllOrders = () => {
               )) : (
                 <tr>
                   <td colSpan="7" className="py-12 text-center text-gray-500">
-                    <div className="flex flex-col items-center">
-                      <div className="text-6xl mb-4">📦</div>
-                      <p className="text-lg font-medium text-gray-700">No orders found</p>
-                      <p className="text-sm mt-1">
-                        {hasActiveFilters ? 'Try adjusting your search or filters' : 'No orders have been placed yet'}
-                      </p>
-                      {hasActiveFilters && (
-                        <button 
-                          onClick={resetFilter}
-                          className="mt-4 text-pink-500 hover:text-pink-600 font-medium"
-                        >
-                          Clear all filters
-                        </button>
-                      )}
-                    </div>
+                    <div className="text-6xl mb-4">📦</div>
+                    <p className="text-lg font-medium">No orders found</p>
                   </td>
                 </tr>
               )}
@@ -560,25 +438,17 @@ const AllOrders = () => {
               <button 
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="h-8 w-8 flex justify-center items-center rounded border border-gray-200 disabled:opacity-50 hover:bg-gray-100 transition-colors"
+                className="h-8 w-8 flex justify-center items-center rounded border border-gray-200 disabled:opacity-50"
               >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
-                </svg>
+                ‹
               </button>
-              
-              <span className="text-sm text-gray-600 px-2">
-                Page {currentPage} of {totalPages}
-              </span>
-              
+              <span className="text-sm px-2">Page {currentPage} of {totalPages}</span>
               <button 
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className="h-8 w-8 flex justify-center items-center rounded border border-gray-200 disabled:opacity-50 hover:bg-gray-100 transition-colors"
+                className="h-8 w-8 flex justify-center items-center rounded border border-gray-200 disabled:opacity-50"
               >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
-                </svg>
+                ›
               </button>
             </div>
           </div>
@@ -586,77 +456,49 @@ const AllOrders = () => {
       </div>
 
       {/* Order Details Modal */}
-      {showOrderModal && selectedOrder && (
+      {showModal && selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">Order Details</h3>
+              <h3 className="text-xl font-semibold">Order Details</h3>
               <button 
-                onClick={() => setShowOrderModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                onClick={() => setShowModal(false)}
+                className="text-gray-400 hover:text-gray-600"
               >
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
+                ✕
               </button>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Order Information */}
-              <div className="space-y-4">
-                <h4 className="font-semibold text-gray-900 border-b pb-2">Order Information</h4>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Order ID</label>
-                    <p className="font-mono text-gray-900">{selectedOrder.id}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Date</label>
-                    <p className="text-gray-900">{selectedOrder.date}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Total Amount</label>
-                    <p className="font-semibold text-lg text-gray-900">{formatCurrency(selectedOrder.amount)}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Payment Status</label>
-                    <span className={`inline-block text-xs px-3 py-1 rounded-full font-medium ${getStatusBadgeStyle(selectedOrder.orderStatus)}`}>
+              {/* Order Info */}
+              <div>
+                <h4 className="font-semibold mb-3">Order Information</h4>
+                <div className="space-y-2 text-sm">
+                  <div><span className="font-medium">Order ID:</span> {selectedOrder.id}</div>
+                  <div><span className="font-medium">Date:</span> {selectedOrder.date}</div>
+                  <div><span className="font-medium">Amount:</span> {formatCurrency(selectedOrder.amount)}</div>
+                  <div><span className="font-medium">Payment:</span> 
+                    <span className={`ml-2 px-2 py-1 rounded text-xs ${getStatusBadgeStyle(selectedOrder.orderStatus)}`}>
                       {selectedOrder.orderStatus}
                     </span>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Delivery Status</label>
-                    <span className={`inline-block text-xs px-3 py-1 rounded-full font-medium ${getStatusBadgeStyle(selectedOrder.deliveryStatus)}`}>
+                  <div><span className="font-medium">Delivery:</span> 
+                    <span className={`ml-2 px-2 py-1 rounded text-xs ${getStatusBadgeStyle(selectedOrder.deliveryStatus)}`}>
                       {selectedOrder.deliveryStatus}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Customer Information */}
-              <div className="space-y-4">
-                <h4 className="font-semibold text-gray-900 border-b pb-2">Customer Information</h4>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Name</label>
-                    <p className="text-gray-900">{selectedOrder.name}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Email</label>
-                    <p className="text-gray-900">{selectedOrder.email || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Phone</label>
-                    <p className="text-gray-900">{selectedOrder.phone || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Delivery Method</label>
-                    <p className="text-gray-900 capitalize">{selectedOrder.deliveryMethod || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Address</label>
-                    <p className="text-gray-900">{selectedOrder.address}</p>
-                  </div>
+              {/* Customer Info */}
+              <div>
+                <h4 className="font-semibold mb-3">Customer Information</h4>
+                <div className="space-y-2 text-sm">
+                  <div><span className="font-medium">Name:</span> {selectedOrder.name}</div>
+                  <div><span className="font-medium">Email:</span> {selectedOrder.email}</div>
+                  <div><span className="font-medium">Phone:</span> {selectedOrder.phone}</div>
+                  <div><span className="font-medium">Method:</span> {selectedOrder.deliveryMethod}</div>
+                  <div><span className="font-medium">Address:</span> {selectedOrder.address}</div>
                 </div>
               </div>
             </div>
@@ -664,64 +506,29 @@ const AllOrders = () => {
             {/* Order Items */}
             {selectedOrder.cart && selectedOrder.cart.length > 0 && (
               <div className="mt-6">
-                <h4 className="font-semibold text-gray-900 border-b pb-2 mb-4">Order Items</h4>
-                <div className="space-y-3">
+                <h4 className="font-semibold mb-3">Order Items</h4>
+                <div className="space-y-2">
                   {selectedOrder.cart.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">{item.product_name || `Product ${index + 1}`}</p>
-                        <p className="text-sm text-gray-500">
-                          Qty: {item.ordered_quantity || 1} × {formatCurrency(item.product_price || 0)}
-                        </p>
-                        {item.product_image && (
-                          <div className="mt-2">
-                            <img 
-                              src={item.product_image} 
-                              alt={item.product_name}
-                              className="w-12 h-12 object-cover rounded border"
-                              onError={(e) => e.target.style.display = 'none'}
-                            />
-                          </div>
-                        )}
+                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                      <div>
+                        <p className="font-medium">{item.product_name}</p>
+                        <p className="text-sm text-gray-500">Qty: {item.ordered_quantity}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-gray-900">
-                          {formatCurrency((item.product_price || 0) * (item.ordered_quantity || 1))}
-                        </p>
+                        <p className="font-semibold">{formatCurrency(item.product_price * item.ordered_quantity)}</p>
                       </div>
                     </div>
                   ))}
-                  
-                  {/* Order Total */}
-                  <div className="border-t pt-3 mt-4">
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-lg">Total</span>
-                      <span className="font-bold text-xl text-gray-900">{formatCurrency(selectedOrder.amount)}</span>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
 
-            {/* Modal Actions */}
-            <div className="mt-6 flex justify-end space-x-3 pt-4 border-t">
+            <div className="mt-6 flex justify-end">
               <button 
-                onClick={() => setShowOrderModal(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
               >
                 Close
-              </button>
-              <button 
-                onClick={() => {
-                  // You can add print functionality here
-                  window.print();
-                }}
-                className="px-4 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600 transition-colors flex items-center"
-              >
-                <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
-                </svg>
-                Print Order
               </button>
             </div>
           </div>
