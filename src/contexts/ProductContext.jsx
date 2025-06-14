@@ -35,12 +35,8 @@ export const ProductProvider = ({ children }) => {
 
   /**
    * Fetch all products from the API
-   * @param {Object} options - Optional query parameters
-   * @param {boolean} forceRefresh - Force refresh even if cache is valid
-   * @returns {Promise<Array>} Products array
    */
   const fetchAllProducts = useCallback(async (options = {}, forceRefresh = false) => {
-    // Don't fetch if we have recent data and not forcing refresh
     if (!forceRefresh && products.length > 0 && !needsRefresh()) {
       console.log('Using cached products');
       return products;
@@ -68,7 +64,6 @@ export const ProductProvider = ({ children }) => {
       const errorMessage = err.message || 'Failed to load products';
       setError(errorMessage);
       
-      // Return empty array on error, but keep existing products if available
       if (products.length === 0) {
         return [];
       }
@@ -79,14 +74,13 @@ export const ProductProvider = ({ children }) => {
   }, [products, needsRefresh]);
 
   /**
-   * Get a product by ID with caching
-   * @param {string} productId - Product ID to find
-   * @param {boolean} useCache - Whether to use cached data
-   * @returns {Promise<Object|null>} Product object or null if not found
+   * Get a product by ID - Updated to match your API
    */
   const getProductById = useCallback(async (productId, useCache = true) => {
-    if (!productId) {
-      console.error('getProductById: No product ID provided');
+    console.log('getProductById called with:', productId);
+    
+    if (!productId || productId === 'undefined') {
+      console.error('getProductById: Invalid product ID provided:', productId);
       return null;
     }
 
@@ -106,17 +100,22 @@ export const ProductProvider = ({ children }) => {
     const cachedProduct = products.find(p => p.product_id === productId);
     if (cachedProduct && useCache) {
       console.log(`Found product in products list: ${productId}`);
+      // Cache it for future use
+      setCache(prev => new Map(prev).set(productId, {
+        product: cachedProduct,
+        timestamp: Date.now()
+      }));
       return cachedProduct;
     }
     
-    // Fetch from API
+    // Fetch from API using the correct endpoint
     setLoading(true);
     setError(null);
     
     try {
       console.log(`Fetching product from API: ${productId}`);
       const response = await productService.fetchProduct(productId);
-      console.log('Product fetch response:', response);
+      console.log('Single product API response:', response);
       
       if (response && response.code === 200 && response.product) {
         const product = response.product;
@@ -127,9 +126,10 @@ export const ProductProvider = ({ children }) => {
           timestamp: Date.now()
         }));
         
-        console.log(`Product fetched successfully: ${product.name}`);
+        console.log(`Product fetched successfully:`, product);
         return product;
       } else {
+        console.error('Product not found or invalid response:', response);
         throw new Error(response?.message || 'Product not found');
       }
     } catch (err) {
@@ -144,8 +144,6 @@ export const ProductProvider = ({ children }) => {
 
   /**
    * Filter products by category
-   * @param {string} category - Category to filter by
-   * @returns {Array} Filtered products
    */
   const filterByCategory = useCallback((category) => {
     if (!category || category === 'all') {
@@ -156,8 +154,6 @@ export const ProductProvider = ({ children }) => {
 
   /**
    * Search products by query
-   * @param {string} query - Search query
-   * @returns {Array} Filtered products
    */
   const searchProducts = useCallback((query) => {
     if (!query || !query.trim()) {
@@ -174,8 +170,6 @@ export const ProductProvider = ({ children }) => {
 
   /**
    * Get products by multiple categories
-   * @param {Array} categoryList - Array of categories
-   * @returns {Array} Filtered products
    */
   const filterByCategories = useCallback((categoryList) => {
     if (!categoryList || categoryList.length === 0) {
@@ -186,9 +180,6 @@ export const ProductProvider = ({ children }) => {
 
   /**
    * Sort products by specified field
-   * @param {string} sortBy - Field to sort by (name, price, category)
-   * @param {string} order - Sort order (asc, desc)
-   * @returns {Array} Sorted products
    */
   const sortProducts = useCallback((sortBy = 'name', order = 'asc') => {
     const sorted = [...products].sort((a, b) => {
@@ -218,8 +209,6 @@ export const ProductProvider = ({ children }) => {
 
   /**
    * Get products with filters and sorting
-   * @param {Object} options - Filter and sort options
-   * @returns {Array} Filtered and sorted products
    */
   const getFilteredProducts = useCallback((options = {}) => {
     let result = products;
@@ -269,8 +258,7 @@ export const ProductProvider = ({ children }) => {
   }, [fetchAllProducts]);
 
   /**
-   * Add product to local state (for optimistic updates)
-   * @param {Object} product - Product to add
+   * Add product to local state
    */
   const addProductToState = useCallback((product) => {
     setProducts(prev => [product, ...prev]);
@@ -278,8 +266,6 @@ export const ProductProvider = ({ children }) => {
 
   /**
    * Update product in local state
-   * @param {string} productId - Product ID to update
-   * @param {Object} updates - Product updates
    */
   const updateProductInState = useCallback((productId, updates) => {
     setProducts(prev => 
@@ -302,7 +288,6 @@ export const ProductProvider = ({ children }) => {
 
   /**
    * Remove product from local state
-   * @param {string} productId - Product ID to remove
    */
   const removeProductFromState = useCallback((productId) => {
     setProducts(prev => prev.filter(product => product.product_id !== productId));
