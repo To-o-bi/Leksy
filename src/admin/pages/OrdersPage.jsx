@@ -69,47 +69,28 @@ const AllOrders = () => {
     }
   };
 
-  // Get authentication token
-  const getAuthToken = () => {
-    try {
-      // Check cookie first
-      const cookieMatch = document.cookie.match(/auth=([^;]+)/);
-      if (cookieMatch) {
-        return atob(cookieMatch[1]);
-      }
-      
-      // Check localStorage
-      return localStorage.getItem('auth_token');
-    } catch (error) {
-      console.error('Error getting auth token:', error);
-      return null;
-    }
-  };
-
-  // Fetch orders using public endpoint
+  // Fetch orders using authenticated admin endpoint
   const fetchOrders = async () => {
     try {
       setLoading(true);
       setError(null);
+
+      // Check if user is authenticated
+      if (!isAuthenticated || !user) {
+        throw new Error('Admin authentication required to view orders. Please log in as admin.');
+      }
+
+      // Check if user has admin role
+      if (user.role !== 'admin' && user.role !== 'superadmin') {
+        throw new Error('Admin privileges required to view orders.');
+      }
       
       const filters = {};
       if (orderStatus !== 'all') filters.order_status = orderStatus;
       if (deliveryStatus !== 'all') filters.delivery_status = deliveryStatus;
       filters.limit = 200;
       
-      // Use public endpoint that doesn't require authentication
-      const queryParams = new URLSearchParams(filters).toString();
-      const apiUrl = `https://leksycosmetics.com/api/fetch-orders?${queryParams}`;
-      
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const result = await response.json();
+      const result = await orderService.fetchOrders(filters);
       
       if (result && result.code === 200) {
         const ordersData = result.products || [];
@@ -140,7 +121,19 @@ const AllOrders = () => {
       }
     } catch (err) {
       console.error('Error fetching orders:', err);
-      setError(err.message || 'Failed to load orders');
+      
+      let errorMessage = 'Failed to load orders';
+      
+      if (err.message.includes('precondition') || 
+          err.message.includes('Unauthorized') || 
+          err.message.includes('Authentication') ||
+          err.message.includes('Admin')) {
+        errorMessage = 'Admin authentication required. Please ensure you are logged in as an admin to view orders.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -161,13 +154,6 @@ const AllOrders = () => {
         throw new Error('Admin privileges required to update order status.');
       }
 
-      // Verify token exists
-      const authToken = getAuthToken();
-      if (!authToken) {
-        throw new Error('Authentication token not found. Please log in again.');
-      }
-
-      // Use the orderService which will add proper auth headers
       await orderService.changeDeliveryStatus(orderId, newStatus);
       
       // Update local state
@@ -248,10 +234,15 @@ const AllOrders = () => {
     }
   }, [notification]);
 
-  // Fetch orders on mount and filter changes
+  // Fetch orders on mount and filter changes (only if authenticated)
   useEffect(() => {
-    fetchOrders();
-  }, [orderStatus, deliveryStatus]);
+    if (isAuthenticated && user) {
+      fetchOrders();
+    } else {
+      setLoading(false);
+      setError('Admin authentication required to view orders. Please log in as admin.');
+    }
+  }, [orderStatus, deliveryStatus, isAuthenticated, user]);
 
   // Filter orders when search changes
   useEffect(() => {
@@ -284,14 +275,25 @@ const AllOrders = () => {
       <div className="bg-white rounded-lg p-6 shadow-sm">
         <div className="text-center py-12">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">Error Loading Orders</h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">
+            {error.includes('authentication') || error.includes('Admin') ? 'Authentication Required' : 'Error Loading Orders'}
+          </h3>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button 
-            onClick={fetchOrders}
-            className="bg-pink-500 text-white px-6 py-2 rounded-md hover:bg-pink-600"
-          >
-            Try Again
-          </button>
+          {error.includes('authentication') || error.includes('Admin') ? (
+            <button 
+              onClick={() => window.location.href = '/admin/login'}
+              className="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 mr-2"
+            >
+              Go to Login
+            </button>
+          ) : (
+            <button 
+              onClick={fetchOrders}
+              className="bg-pink-500 text-white px-6 py-2 rounded-md hover:bg-pink-600"
+            >
+              Try Again
+            </button>
+          )}
         </div>
       </div>
     );
@@ -319,11 +321,6 @@ const AllOrders = () => {
             <p className="text-gray-600 mt-1">
               {loading ? 'Loading...' : `${filteredOrders.length} of ${orders.length} orders`}
             </p>
-            {!isAuthenticated && (
-              <p className="text-amber-600 text-sm mt-1">
-                ⚠️ Login as admin to update order statuses
-              </p>
-            )}
           </div>
           <button 
             onClick={fetchOrders}
@@ -367,7 +364,7 @@ const AllOrders = () => {
               onChange={(e) => setOrderStatus(e.target.value)}
             >
               <option value="successful">Successful Orders</option>
-              <option value="failed">Failed Orders</option>
+              <option value="unsuccessful">Failed Orders</option>
               <option value="flagged">Flagged Orders</option>
               <option value="all">All Payment Status</option>
             </select>
