@@ -35,17 +35,37 @@ function useProvideAuth() {
   };
 
   useEffect(() => {
-    const hasToken = !!api.getToken();
-    const userData = getStoredUser();
-    
-    if (hasToken && userData) {
-      setUser(userData);
-    } else {
-      if (hasToken && !userData) clearAuthData();
-      if (!hasToken && userData) localStorage.removeItem('user');
-      setUser(null);
-    }
-    setIsLoading(false);
+    const initializeAuth = () => {
+      try {
+        const hasToken = !!api.getToken();
+        const userData = getStoredUser();
+        
+        console.log('Auth initialization:', { hasToken, hasUserData: !!userData });
+        
+        if (hasToken && userData) {
+          setUser(userData);
+          console.log('User authenticated:', userData.name || userData.username);
+        } else {
+          if (hasToken && !userData) {
+            console.log('Token exists but no user data, clearing auth');
+            clearAuthData();
+          }
+          if (!hasToken && userData) {
+            console.log('User data exists but no token, clearing user data');
+            localStorage.removeItem('user');
+          }
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        clearAuthData();
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeAuth();
   }, []);
 
   const login = async (username, password) => {
@@ -57,47 +77,39 @@ function useProvideAuth() {
     setError(null);
     
     try {
-      console.log('🔐 Starting login process...');
+      console.log('Starting login for:', username);
       const result = await authService.login(username.trim(), password);
-      console.log('🔐 Full login result:', result);
-      console.log('🔐 Result structure:', {
-        code: result.code,
-        hasToken: !!result.token,
-        hasUser: !!result.user,
-        hasAdmin: !!result.admin,
-        userKeys: result.user ? Object.keys(result.user) : 'no user',
-        adminKeys: result.admin ? Object.keys(result.admin) : 'no admin'
-      });
+      console.log('Login response:', { code: result.code, hasToken: !!result.token, hasUser: !!(result.user || result.admin) });
       
       if (result.code !== 200) {
-        throw new Error(result.message || 'Login failed - invalid response code');
+        throw new Error(result.message || 'Login failed');
       }
       
       if (!result.token) {
-        throw new Error('Login failed - no token received');
+        throw new Error('Login failed - no authentication token received');
       }
       
-      // Check for user data in different possible locations
-      let userData = null;
-      if (result.user) {
-        userData = result.user;
-      } else if (result.admin) {
-        userData = result.admin; // Sometimes backend returns 'admin' instead of 'user'
-      } else {
+      // Handle user data from different response formats
+      const userData = result.user || result.admin;
+      if (!userData) {
         throw new Error('Login failed - no user data received');
       }
       
+      // Set token first, then user data
+      api.setToken(result.token);
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
-      console.log('✅ Login successful, user set:', userData.name || userData.username);
+      
+      console.log('Login successful for:', userData.name || userData.username);
       return result;
       
     } catch (err) {
-      console.log('❌ Login error:', err.message);
-      let errorMessage = 'Login failed';
-      if (err.message.includes('Network')) errorMessage = 'Network error. Check your connection.';
-      else if (err.message.includes('timeout')) errorMessage = 'Request timed out. Try again.';
-      else if (err.message) errorMessage = err.message;
+      console.error('Login error:', err.message);
+      const errorMessage = err.message.includes('Network') 
+        ? 'Network error. Check your connection.'
+        : err.message.includes('timeout')
+        ? 'Request timed out. Try again.'
+        : err.message || 'Login failed';
       
       setError(errorMessage);
       setUser(null);
@@ -123,8 +135,6 @@ function useProvideAuth() {
     if (navigate) navigate('/login', { replace: true });
   };
 
-  const clearError = () => setError(null);
-
   const updateUser = (updates) => {
     const newUserData = { ...user, ...updates };
     localStorage.setItem('user', JSON.stringify(newUserData));
@@ -148,11 +158,8 @@ function useProvideAuth() {
     login,
     logout,
     updateUser,
-    clearError,
-    handleAuthError,
-    userRole: user?.role,
-    userName: user?.name,
-    userEmail: user?.email
+    clearError: () => setError(null),
+    handleAuthError
   };
 }
 

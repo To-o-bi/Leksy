@@ -1,6 +1,8 @@
-export const formatPrice = (price, currency = '₦') => {
+// src/api/utils.js
+
+export const formatPrice = (price) => {
   const num = typeof price === 'number' ? price : parseFloat(price) || 0;
-  return `${currency}${num.toLocaleString()}`;
+  return `₦${Math.round(num).toLocaleString('en-NG')}`;
 };
 
 export const formatDate = (dateString) => {
@@ -45,3 +47,74 @@ export const debounce = (func, wait = 300) => {
     timeout = setTimeout(() => func.apply(this, args), wait);
   };
 };
+
+export const formatStatus = (status) => {
+  return status?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown';
+};
+
+export const getStatusColor = (status) => {
+  const colors = {
+    'successful': 'green', 'delivered': 'green', 'completed': 'green',
+    'unsuccessful': 'red', 'unpaid': 'red', 'flagged': 'red',
+    'order-received': 'blue', 'packaged': 'purple', 'in-transit': 'orange',
+    'unheld': 'yellow', 'in-session': 'blue'
+  };
+  return colors[status?.toLowerCase()] || 'gray';
+};
+
+export const truncateText = (text, maxLength = 100) => {
+  if (!text || text.length <= maxLength) return text || '';
+  return text.substring(0, maxLength).trim() + '...';
+};
+
+export const calculateDiscount = (originalPrice, salePrice) => {
+  if (!originalPrice || !salePrice || salePrice >= originalPrice) return 0;
+  return Math.round(((originalPrice - salePrice) / originalPrice) * 100);
+};
+
+export const getCartSummary = (cart) => {
+  if (!Array.isArray(cart)) return { itemCount: 0, totalItems: 0, total: 0 };
+  
+  return cart.reduce((acc, item) => {
+    const qty = parseInt(item.quantity) || 0;
+    const price = parseFloat(item.price || item.product_price) || 0;
+    
+    acc.itemCount += 1;
+    acc.totalItems += qty;
+    acc.total += price * qty;
+    return acc;
+  }, { itemCount: 0, totalItems: 0, total: 0 });
+};
+
+export const storage = {
+  set: (key, value) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch { return false; }
+  },
+  get: (key, fallback = null) => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : fallback;
+    } catch { return fallback; }
+  },
+  remove: (key) => {
+    try {
+      localStorage.removeItem(key);
+      return true;
+    } catch { return false; }
+  }
+};
+
+export const NIGERIAN_STATES = [
+  'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue',
+  'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu',
+  'FCT', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi',
+  'Kogi', 'Kwara', 'Lagos', 'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun',
+  'Oyo', 'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara'
+];
+
+export const AGE_RANGES = ['18 - 25', '26 - 35', '36 - 45', '46 - 55', '56+'];
+export const SKIN_TYPES = ['oily', 'dry', 'combination', 'sensitive', 'normal'];
+

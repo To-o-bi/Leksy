@@ -1,3 +1,4 @@
+// src/api/services.js
 import api from './axios.js';
 import { ENDPOINTS, CATEGORIES } from './config.js';
 import { validateForm, validators } from './validation.js';
@@ -8,8 +9,13 @@ export const authService = {
       throw new Error('Username and password are required');
     }
     
-    // Use GET request with query parameters as per API doc
-    const response = await api.get(ENDPOINTS.ADMIN_LOGIN, { username, password });
+    const formData = new FormData();
+    formData.append('username', username);
+    formData.append('password', password);
+    
+    const response = await api.post('/admin/login', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
     
     if (response.data?.code === 200) {
       if (response.data.token) api.setToken(response.data.token);
@@ -154,22 +160,21 @@ export const contactService = {
     if (!contactData.message?.trim()) throw new Error('Message is required');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactData.email)) throw new Error('Invalid email format');
 
-    // Use POST request with query parameters as per API doc
-    const params = {
-      name: contactData.name.trim(),
-      email: contactData.email.trim(),
-      phone: contactData.phone.trim(),
-      subject: contactData.subject.trim(),
-      message: contactData.message.trim()
-    };
+    const formData = new FormData();
+    formData.append('name', contactData.name.trim());
+    formData.append('email', contactData.email.trim());
+    formData.append('phone', contactData.phone.trim());
+    formData.append('subject', contactData.subject.trim());
+    formData.append('message', contactData.message.trim());
 
-    const response = await api.post(ENDPOINTS.SUBMIT_CONTACT, null, { params });
+    const response = await api.postFormData(ENDPOINTS.SUBMIT_CONTACT, formData);
     return response.data;
   },
 
   async fetchSubmissions(filters = {}) {
     try {
       const response = await api.get(ENDPOINTS.FETCH_CONTACT_SUBMISSIONS, filters);
+      console.log('Contact API response:', response);
       return response.data || response;
     } catch (error) {
       console.error('Contact fetch error:', error);
@@ -177,7 +182,6 @@ export const contactService = {
     }
   }
 };
-
 export const orderService = {
   async initiateCheckout(checkoutData) {
     if (!checkoutData.phone?.trim()) throw new Error('Phone is required');

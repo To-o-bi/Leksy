@@ -15,7 +15,7 @@ export const ENDPOINTS = {
   FETCH_PRODUCTS: '/fetch-products',
   FETCH_ORDER: '/fetch-order',
   INITIATE_CHECKOUT: '/checkout/initiate',
-  FETCH_ORDERS: '/admin/fetch-orders',
+  FETCH_ORDERS: '/fetch-orders',
   CHANGE_DELIVERY_STATUS: '/admin/change-delivery-status',
   SUBMIT_CONTACT: '/submit-contact',
   FETCH_CONTACT_SUBMISSIONS: '/admin/fetch-contact-submissions',

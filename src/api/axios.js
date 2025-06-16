@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { API_CONFIG, ENDPOINTS } from './config.js';
+import { API_CONFIG } from './config.js';
 
 class ApiClient {
   constructor() {
@@ -14,7 +14,6 @@ class ApiClient {
   }
 
   setupInterceptors() {
-    // Request interceptor
     this.client.interceptors.request.use(
       (config) => {
         const token = this.getToken();
@@ -22,6 +21,7 @@ class ApiClient {
         
         if (isAdminRoute && token) {
           config.headers.Authorization = `Bearer ${token}`;
+          console.log('Adding auth header for admin route:', config.url, 'Token:', token ? 'Present' : 'Missing');
         }
         
         return config;
@@ -29,7 +29,6 @@ class ApiClient {
       (error) => Promise.reject(this.formatError(error))
     );
 
-    // Response interceptor with retry logic
     this.client.interceptors.response.use(
       (response) => {
         if (response.data?.token) {
@@ -42,11 +41,13 @@ class ApiClient {
         
         if (response?.status === 401) {
           this.clearAuth();
-          window.location.href = '/login';
+          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+            window.location.href = '/login';
+          }
           return Promise.reject(this.formatError(error));
         }
 
-        // Retry logic for network errors
+        // Retry logic
         if (this.shouldRetry(error) && config && !config._retry) {
           config._retryCount = (config._retryCount || 0) + 1;
           
@@ -79,7 +80,6 @@ class ApiClient {
     return new Error('An error occurred');
   }
 
-  // Request deduplication
   async request(config) {
     const key = this.getRequestKey(config);
     
@@ -99,15 +99,29 @@ class ApiClient {
     return `${config.method}-${config.url}-${JSON.stringify(config.params || {})}`;
   }
 
-  // Secure token handling with cookies
   getToken() {
-    const match = document.cookie.match(/auth=([^;]+)/);
-    return match ? atob(match[1]) : null;
+    try {
+      // Try cookie first
+      const match = document.cookie.match(/auth=([^;]+)/);
+      if (match) {
+        const decoded = atob(match[1]);
+        console.log('Token from cookie:', decoded ? 'Present' : 'Missing');
+        return decoded;
+      }
+      
+      // Fallback to localStorage
+      const token = localStorage.getItem('auth_token');
+      console.log('Token from localStorage:', token ? 'Present' : 'Missing');
+      return token;
+    } catch (error) {
+      console.error('Error getting token:', error);
+      return null;
+    }
   }
 
   setToken(token) {
     const encoded = btoa(token);
-    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toUTCString(); // 24 hours
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toUTCString();
     document.cookie = `auth=${encoded}; path=/; expires=${expires}; SameSite=Strict; Secure`;
   }
 
@@ -116,7 +130,6 @@ class ApiClient {
     localStorage.removeItem('user');
   }
 
-  // Core methods
   async get(url, params = {}) {
     const queryString = new URLSearchParams(params).toString();
     const fullUrl = queryString ? `${url}?${queryString}` : url;

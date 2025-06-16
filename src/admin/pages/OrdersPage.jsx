@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Eye, RefreshCw, AlertCircle } from 'lucide-react';
 import { orderService } from '../../api/services';
+import { useAuth } from '../../contexts/AuthContext';
 
 const AllOrders = () => {
+  const { isAuthenticated, user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -67,7 +69,24 @@ const AllOrders = () => {
     }
   };
 
-  // Fetch orders (public endpoint - no auth required)
+  // Get authentication token
+  const getAuthToken = () => {
+    try {
+      // Check cookie first
+      const cookieMatch = document.cookie.match(/auth=([^;]+)/);
+      if (cookieMatch) {
+        return atob(cookieMatch[1]);
+      }
+      
+      // Check localStorage
+      return localStorage.getItem('auth_token');
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  };
+
+  // Fetch orders using public endpoint
   const fetchOrders = async () => {
     try {
       setLoading(true);
@@ -78,13 +97,9 @@ const AllOrders = () => {
       if (deliveryStatus !== 'all') filters.delivery_status = deliveryStatus;
       filters.limit = 200;
       
-      console.log('Fetching orders with filters:', filters);
-      
-      // Make direct API call to avoid auto-added auth headers from orderService
+      // Use public endpoint that doesn't require authentication
       const queryParams = new URLSearchParams(filters).toString();
       const apiUrl = `https://leksycosmetics.com/api/fetch-orders?${queryParams}`;
-      
-      console.log('API URL:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -95,7 +110,6 @@ const AllOrders = () => {
       });
       
       const result = await response.json();
-      console.log('API Response:', result);
       
       if (result && result.code === 200) {
         const ordersData = result.products || [];
@@ -121,7 +135,6 @@ const AllOrders = () => {
         }));
         
         setOrders(formattedOrders);
-        console.log(`Successfully loaded ${formattedOrders.length} orders`);
       } else {
         throw new Error(result?.message || 'Failed to fetch orders');
       }
@@ -133,20 +146,28 @@ const AllOrders = () => {
     }
   };
 
-  // Handle delivery status change (admin endpoint - requires auth)
+  // Handle delivery status change using admin endpoint
   const handleDeliveryStatusChange = async (orderId, newStatus) => {
     try {
       setIsUpdating(true);
       
-      // Check authentication for admin endpoint
-      const authToken = localStorage.getItem('authToken') || 
-                       document.cookie.match(/auth=([^;]+)/)?.[1] ? 
-                       atob(document.cookie.match(/auth=([^;]+)/)[1]) : null;
-      
-      if (!authToken) {
-        throw new Error('Admin login required to update order status');
+      // Check if user is authenticated as admin
+      if (!isAuthenticated || !user) {
+        throw new Error('Admin authentication required. Please log in as admin.');
       }
-      
+
+      // Check if user has admin role
+      if (user.role !== 'admin' && user.role !== 'superadmin') {
+        throw new Error('Admin privileges required to update order status.');
+      }
+
+      // Verify token exists
+      const authToken = getAuthToken();
+      if (!authToken) {
+        throw new Error('Authentication token not found. Please log in again.');
+      }
+
+      // Use the orderService which will add proper auth headers
       await orderService.changeDeliveryStatus(orderId, newStatus);
       
       // Update local state
@@ -165,23 +186,24 @@ const AllOrders = () => {
         message: `Status updated to "${newStatus}" successfully`
       });
       
-      setTimeout(() => setNotification(null), 3000);
     } catch (err) {
       console.error('Error updating delivery status:', err);
       
-      if (err.message.includes('precondition') || err.message.includes('Unauthorized') || err.message.includes('Authentication') || err.message.includes('Admin login required')) {
-        setNotification({
-          type: 'error',
-          message: 'Admin authentication required to update order status. Please log in as admin.'
-        });
-      } else {
-        setNotification({
-          type: 'error',
-          message: err.message || 'Failed to update delivery status'
-        });
+      let errorMessage = 'Failed to update delivery status';
+      
+      if (err.message.includes('precondition') || 
+          err.message.includes('Unauthorized') || 
+          err.message.includes('Authentication') ||
+          err.message.includes('Admin')) {
+        errorMessage = 'Admin authentication required. Please ensure you are logged in as an admin.';
+      } else if (err.message) {
+        errorMessage = err.message;
       }
       
-      setTimeout(() => setNotification(null), 5000);
+      setNotification({
+        type: 'error',
+        message: errorMessage
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -217,6 +239,14 @@ const AllOrders = () => {
     setSearchQuery('');
     setCurrentPage(1);
   };
+
+  // Auto-dismiss notifications
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   // Fetch orders on mount and filter changes
   useEffect(() => {
@@ -289,6 +319,11 @@ const AllOrders = () => {
             <p className="text-gray-600 mt-1">
               {loading ? 'Loading...' : `${filteredOrders.length} of ${orders.length} orders`}
             </p>
+            {!isAuthenticated && (
+              <p className="text-amber-600 text-sm mt-1">
+                ⚠️ Login as admin to update order statuses
+              </p>
+            )}
           </div>
           <button 
             onClick={fetchOrders}
@@ -396,8 +431,8 @@ const AllOrders = () => {
                     <select
                       value={order.deliveryStatus}
                       onChange={(e) => handleDeliveryStatusChange(order.id, e.target.value)}
-                      disabled={isUpdating}
-                      className={`text-xs px-2 py-1 rounded-full border-0 cursor-pointer font-medium ${getStatusBadgeStyle(order.deliveryStatus)}`}
+                      disabled={isUpdating || !isAuthenticated || (user?.role !== 'admin' && user?.role !== 'superadmin')}
+                      className={`text-xs px-2 py-1 rounded-full border-0 cursor-pointer font-medium ${getStatusBadgeStyle(order.deliveryStatus)} ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <option value="unpaid">Unpaid</option>
                       <option value="order-received">Order Received</option>
