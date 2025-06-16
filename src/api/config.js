@@ -13,11 +13,18 @@ export const ENDPOINTS = {
   DELETE_PRODUCT: '/admin/delete-product',
   FETCH_PRODUCT: '/fetch-product',
   FETCH_PRODUCTS: '/fetch-products',
-  INITIATE_CHECKOUT: '/initiate-checkout',
-  FETCH_ORDERS: '/fetch-orders',
+  FETCH_ORDER: '/fetch-order',
+  INITIATE_CHECKOUT: '/checkout/initiate',
+  FETCH_ORDERS: '/admin/fetch-orders',
   CHANGE_DELIVERY_STATUS: '/admin/change-delivery-status',
   SUBMIT_CONTACT: '/submit-contact',
   FETCH_CONTACT_SUBMISSIONS: '/admin/fetch-contact-submissions',
+  FETCH_CONTACT_SUBMISSION: '/admin/fetch-contact-submission',
+  // Consultation endpoints
+  INITIATE_CONSULTATION: '/consultation/initiate',
+  FETCH_BOOKED_TIMES: '/consultation/fetch-booked-times',
+  FETCH_CONSULTATION: '/admin/fetch-consultation',
+  FETCH_CONSULTATIONS: '/fetch-consultations',
 };
 
 export const CATEGORIES = ['serums', 'moisturizers', 'bathe and body', 'sunscreens', 'toners', 'face cleansers'];
