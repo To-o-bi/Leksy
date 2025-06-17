@@ -1,10 +1,24 @@
 // components/ConsultationFormatSelector.js
 import React from 'react';
 
-const ConsultationFormatSelector = ({ register, errors, consultationFormats, selectedConsultationFormatId }) => {
+const ConsultationFormatSelector = ({ 
+  register, 
+  errors, 
+  consultationFormats, 
+  selectedConsultationFormatId,
+  setValue 
+}) => {
+  const handleFormatChange = (formatId) => {
+    if (setValue) {
+      setValue('consultationFormat', formatId);
+    }
+  };
+
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2 sm:mb-3">Consultation Format</label>
+      <label className="block text-sm font-medium text-gray-700 mb-2 sm:mb-3">
+        Consultation Format
+      </label>
       <div className="space-y-2 sm:space-y-3">
         {consultationFormats.map((format) => (
           <label 
@@ -20,6 +34,7 @@ const ConsultationFormatSelector = ({ register, errors, consultationFormats, sel
                 type="radio"
                 {...register('consultationFormat', { required: 'Please select a format' })}
                 value={format.id}
+                onChange={() => handleFormatChange(format.id)}
                 className="h-4 w-4 text-pink-500 focus:ring-pink-500 flex-shrink-0"
               />
               <span className="ml-3 font-medium text-sm sm:text-base leading-snug">

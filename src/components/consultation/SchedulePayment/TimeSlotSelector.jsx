@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
 const TIME_SLOTS = [
-  '2:00 PM',
-  '3:00 PM',
-  '4:00 PM',
-  '5:00 PM',
-  '6:00 PM'
+  '2:00 PM - 3:00 PM',
+  '3:00 PM - 4:00 PM', 
+  '4:00 PM - 5:00 PM',
+  '5:00 PM - 6:00 PM'
 ];
 
 const TimeSlotSelector = ({ 
@@ -17,7 +16,8 @@ const TimeSlotSelector = ({
   onSlotUnavailable,
   getBookedTimesForDate,
   checkSlotAvailability,
-  loading
+  loading,
+  setValue // Add setValue prop to update form field
 }) => {
   const [bookedTimes, setBookedTimes] = useState([]);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
@@ -31,6 +31,10 @@ const TimeSlotSelector = ({
       // If currently selected time is now booked, clear it
       if (selectedTime && booked.includes(selectedTime)) {
         onTimeChange('');
+        // Also clear the form field
+        if (setValue) {
+          setValue('timeSlot', '');
+        }
         if (onSlotUnavailable) {
           onSlotUnavailable(selectedTime);
         }
@@ -38,7 +42,7 @@ const TimeSlotSelector = ({
     } else {
       setBookedTimes([]);
     }
-  }, [selectedDate, selectedTime, onTimeChange, onSlotUnavailable, getBookedTimesForDate]);
+  }, [selectedDate, selectedTime, onTimeChange, onSlotUnavailable, getBookedTimesForDate, setValue]);
 
   const handleTimeChange = async (time) => {
     // Double-check availability with API before allowing selection
@@ -59,7 +63,12 @@ const TimeSlotSelector = ({
         setCheckingAvailability(false);
       }
     }
+    
+    // Update both local state and form field
     onTimeChange(time);
+    if (setValue) {
+      setValue('timeSlot', time);
+    }
   };
 
   const isTimeSlotDisabled = (time) => {
@@ -79,7 +88,7 @@ const TimeSlotSelector = ({
           <span className="text-xs text-blue-600 block mt-1">Loading availability...</span>
         )}
       </label>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-2 sm:gap-3">
         {TIME_SLOTS.map((time) => {
           const isDisabled = isTimeSlotDisabled(time);
           const isSelected = selectedTime === time;

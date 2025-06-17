@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { bookingAPI } from '../api/services/bookingApi';
+import { consultationService } from '../api/services';
 
 export const useBookingData = (selectedDate = null) => {
   const [bookedSlots, setBookedSlots] = useState([]);
@@ -7,90 +7,235 @@ export const useBookingData = (selectedDate = null) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch all booked slots
-  const fetchBookedSlots = useCallback(async () => {
+  // Fetch booked times for all dates or a specific date
+  const fetchBookedSlots = useCallback(async (date = null) => {
     setLoading(true);
     setError(null);
     try {
-      const slots = await bookingAPI.getBookedSlots();
-      setBookedSlots(slots);
+      const response = await consultationService.fetchBookedTimes(date);
+      
+      if (response.success && response.data) {
+        if (date) {
+          setAvailabilityData(prev => ({
+            ...prev,
+            [date]: {
+              booked_times: response.data.booked_times || [],
+              available_slots: response.data.available_slots || []
+            }
+          }));
+        } else {
+          setBookedSlots(response.data.booked_times || []);
+        }
+      }
     } catch (err) {
-      setError(err.message);
+      console.error('Error fetching booked slots:', err);
+      setError(err.message || 'Failed to fetch booking data');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Fetch availability for a specific date
   const fetchAvailabilityForDate = useCallback(async (date) => {
     if (!date) return;
     
     setLoading(true);
     setError(null);
     try {
-      const availability = await bookingAPI.getAvailabilityForDate(date);
-      setAvailabilityData(prev => ({
-        ...prev,
-        [date]: availability
-      }));
+      const response = await consultationService.fetchBookedTimes(date);
+      
+      if (response.success && response.data) {
+        setAvailabilityData(prev => ({
+          ...prev,
+          [date]: {
+            booked_times: response.data.booked_times || [],
+            available_slots: response.data.available_slots || []
+          }
+        }));
+      }
     } catch (err) {
-      setError(err.message);
+      console.error('Error fetching availability:', err);
+      setError(err.message || 'Failed to fetch availability data');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Check if a specific slot is available
-  const checkSlotAvailability = useCallback(async (date, time) => {
+  const checkSlotAvailability = useCallback(async (date, timeSlot) => {
     try {
-      return await bookingAPI.isSlotAvailable(date, time);
+      const dateAvailability = availabilityData[date];
+      if (dateAvailability) {
+        const bookedTimes = dateAvailability.booked_times || [];
+        return !bookedTimes.includes(timeSlot);
+      }
+
+      const response = await consultationService.fetchBookedTimes(date);
+      if (response.success && response.data) {
+        const bookedTimes = response.data.booked_times || [];
+        return !bookedTimes.includes(timeSlot);
+      }
+      
+      return true;
     } catch (err) {
-      setError(err.message);
+      console.error('Error checking slot availability:', err);
+      setError(err.message || 'Failed to check slot availability');
       return false;
     }
-  }, []);
+  }, [availabilityData]);
 
-  // Create a new booking
+  // Enhanced createBooking with detailed logging
   const createBooking = useCallback(async (bookingData) => {
+    console.log('🔍 Raw booking data received:', bookingData);
+    
     setLoading(true);
     setError(null);
+    
     try {
-      const result = await bookingAPI.createBooking(bookingData);
-      if (result.success) {
-        // Refresh data after successful booking
-        await fetchBookedSlots();
-        if (bookingData.date) {
-          await fetchAvailabilityForDate(bookingData.date);
-        }
+      // Build consultation data step by step with logging
+      const name = bookingData.name || 
+                   (bookingData.firstName && bookingData.lastName ? 
+                    `${bookingData.firstName} ${bookingData.lastName}`.trim() : '');
+      
+      const email = bookingData.email || '';
+      const phone = bookingData.phone || '';
+      
+      console.log('📝 Extracted basic info:', { name, email, phone });
+      
+      // Check for missing critical fields early
+      if (!name) {
+        throw new Error('Name is required. Please check firstName and lastName fields.');
       }
-      return result;
+      
+      if (!email) {
+        throw new Error('Email is required. Please check the email field.');
+      }
+      
+      if (!phone) {
+        throw new Error('Phone number is required.');
+      }
+
+      const consultationData = {
+        name: name,
+        email: email,
+        phone: phone,
+        age_range: bookingData.ageRange || bookingData.age_range || '',
+        gender: bookingData.gender || 'prefer-not-to-say',
+        skin_type: bookingData.skinType || bookingData.skin_type || '',
+        skin_concerns: Array.isArray(bookingData.skinConcerns) 
+          ? bookingData.skinConcerns 
+          : (Array.isArray(bookingData.skin_concerns) ? bookingData.skin_concerns : []),
+        channel: bookingData.consultationFormat || bookingData.channel || 'video-channel',
+        date: bookingData.date || bookingData.consultationDate || '',
+        time_range: bookingData.timeSlot || bookingData.time_range || '',
+        current_skincare_products: bookingData.currentSkincareProducts || bookingData.current_skincare_products || '',
+        additional_details: bookingData.additionalInfo || bookingData.additional_details || '',
+        success_redirect: bookingData.success_redirect
+      };
+
+      console.log('🎯 Final consultation data:', consultationData);
+
+      // Validate that we have all required fields
+      const requiredFields = ['name', 'email', 'phone', 'age_range', 'skin_type', 'channel', 'date', 'time_range'];
+      const missingFields = requiredFields.filter(field => !consultationData[field]);
+      
+      if (missingFields.length > 0) {
+        console.error('❌ Missing required fields:', missingFields);
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+
+      // Validate skin_concerns separately
+      if (!consultationData.skin_concerns || 
+          (Array.isArray(consultationData.skin_concerns) && consultationData.skin_concerns.length === 0)) {
+        console.error('❌ Missing skin concerns');
+        throw new Error('Please select at least one skin concern');
+      }
+
+      console.log('✅ All validation passed, calling consultation service...');
+
+      const response = await consultationService.initiateConsultation(consultationData);
+      
+      console.log('📞 Consultation service response:', response);
+      
+      if (response.success) {
+        // Refresh availability data after successful booking
+        const bookingDate = consultationData.date;
+        if (bookingDate) {
+          await fetchAvailabilityForDate(bookingDate);
+        }
+        await fetchBookedSlots();
+        
+        return {
+          success: true,
+          data: response.data,
+          hasPayment: !!response.data?.authorization_url
+        };
+      } else {
+        return {
+          success: false,
+          error: response.message || 'Booking failed'
+        };
+      }
     } catch (err) {
-      setError(err.message);
-      return { success: false, error: err.message };
+      console.error('💥 Error creating booking:', err);
+      const errorMessage = err.message || 'Failed to create booking';
+      setError(errorMessage);
+      return { 
+        success: false, 
+        error: errorMessage 
+      };
     } finally {
       setLoading(false);
     }
-  }, [fetchBookedSlots, fetchAvailabilityForDate]);
+  }, [fetchAvailabilityForDate, fetchBookedSlots]);
 
-  // Get booked times for a specific date
   const getBookedTimesForDate = useCallback((date) => {
     const dateAvailability = availabilityData[date];
     if (dateAvailability) {
       return dateAvailability.booked_times || [];
     }
     
-    // Fallback to checking bookedSlots
-    return bookedSlots
-      .filter(slot => slot.date === date)
-      .map(slot => slot.time);
+    if (Array.isArray(bookedSlots)) {
+      return bookedSlots
+        .filter(slot => slot.date === date)
+        .map(slot => slot.time || slot.time_range);
+    }
+    
+    return [];
   }, [availabilityData, bookedSlots]);
 
-  // Initial data fetch
+  const getAvailableSlotsForDate = useCallback((date) => {
+    const dateAvailability = availabilityData[date];
+    if (dateAvailability) {
+      return dateAvailability.available_slots || [];
+    }
+    return [];
+  }, [availabilityData]);
+
+  const hasAvailableSlots = useCallback((date) => {
+    const availableSlots = getAvailableSlotsForDate(date);
+    const bookedTimes = getBookedTimesForDate(date);
+    
+    if (availableSlots.length > 0) {
+      return availableSlots.some(slot => !bookedTimes.includes(slot));
+    }
+    
+    const defaultTimeSlots = [
+      '2:00 PM - 3:00 PM',
+      '3:00 PM - 4:00 PM', 
+      '4:00 PM - 5:00 PM',
+      '5:00 PM - 6:00 PM'
+    ];
+    
+    return defaultTimeSlots.some(slot => !bookedTimes.includes(slot));
+  }, [getAvailableSlotsForDate, getBookedTimesForDate]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
   useEffect(() => {
     fetchBookedSlots();
   }, [fetchBookedSlots]);
 
-  // Fetch availability when selectedDate changes
   useEffect(() => {
     if (selectedDate) {
       fetchAvailabilityForDate(selectedDate);
@@ -106,6 +251,9 @@ export const useBookingData = (selectedDate = null) => {
     fetchAvailabilityForDate,
     checkSlotAvailability,
     createBooking,
-    getBookedTimesForDate
+    getBookedTimesForDate,
+    getAvailableSlotsForDate,
+    hasAvailableSlots,
+    clearError
   };
 };
