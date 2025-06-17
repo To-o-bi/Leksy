@@ -252,7 +252,7 @@ const Form = () => {
               Try Again
             </button>
           </div>
-        ) : null}
+        ) : null} 
       </div>
     </div>
   );
