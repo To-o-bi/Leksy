@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useContext } from 'react';
 import { WishlistContext } from '../../../contexts/WishlistContext';
 import { useCart } from '../../../hooks/useCart';
@@ -104,6 +104,33 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
       document.body.style.overflow = 'auto';
     };
   }, [isOpen]);
+
+  // Memoize the cart items to prevent unnecessary recalculations
+  const memoizedCartItems = useMemo(() => {
+    return Array.isArray(localCart) ? localCart : [];
+  }, [localCart]);
+
+  // Memoize the wishlist items
+  const memoizedWishlistItems = useMemo(() => {
+    return Array.isArray(wishlist) ? wishlist : [];
+  }, [wishlist]);
+
+  // Memoize the total items calculation
+  const totalCartItems = useMemo(() => {
+    return memoizedCartItems.reduce((total, item) => total + (item.quantity || 1), 0);
+  }, [memoizedCartItems]);
+  
+  // Improved image error handler with multiple fallbacks
+  const handleImageError = useCallback((e) => {
+    e.target.onerror = null;
+    // Try a more reliable placeholder service first
+    if (!e.target.src.includes('picsum.photos')) {
+      e.target.src = 'https://picsum.photos/150/150?random=1';
+    } else {
+      // Fall back to a data URL placeholder if external services fail
+      e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
+    }
+  }, []);
   
   // Format price with error handling
   const formatPrice = useCallback((price) => {
@@ -162,20 +189,17 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
   
   // Add all wishlist items to cart
   const addAllToCart = useCallback(() => {
-    if (Array.isArray(wishlist) && wishlist.length > 0 && typeof contextAddToCart === 'function') {
-      wishlist.forEach(item => {
+    if (memoizedWishlistItems.length > 0 && typeof contextAddToCart === 'function') {
+      memoizedWishlistItems.forEach(item => {
         contextAddToCart(item);
       });
       // Switch to cart tab after adding all items
       setActiveTab('cart');
     }
-  }, [wishlist, contextAddToCart]);
+  }, [memoizedWishlistItems, contextAddToCart]);
   
   const renderCartItems = () => {
-    // Safe check for cart array
-    const cartItems = Array.isArray(localCart) ? localCart : [];
-    
-    if (cartItems.length === 0) {
+    if (memoizedCartItems.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center h-64">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -196,10 +220,10 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
       <>
         <div className="flex-1 overflow-y-auto">
           <h3 className="text-md font-medium text-gray-700 px-4 py-2 bg-gray-50">
-            Your Cart ({cartItems.reduce((total, item) => total + (item.quantity || 1), 0)})
+            Your Cart ({totalCartItems})
           </h3>
           <ul className="divide-y divide-gray-200">
-            {cartItems.map((item) => (
+            {memoizedCartItems.map((item) => (
               <li key={item.id} className="py-4 px-4 hover:bg-gray-50 transition-colors duration-200">
                 <div className="flex items-center space-x-4">
                   <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-md overflow-hidden">
@@ -208,10 +232,7 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
                         src={item.image} 
                         alt={item.name || 'Product'}
                         className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'https://via.placeholder.com/150';
-                        }}
+                        onError={handleImageError}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gray-200">
@@ -227,7 +248,7 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
                     <div className="flex items-center mt-1">
                       <button 
                         type="button"
-                        className="text-gray-400 hover:text-gray-500 bg-gray-100 rounded-full p-1"
+                        className="text-gray-400 hover:text-gray-500 bg-gray-100 rounded-full p-1 transition-colors duration-200"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -240,10 +261,10 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
                         </svg>
                       </button>
-                      <span className="mx-2 text-sm text-gray-700">{item.quantity || 1}</span>
+                      <span className="mx-2 text-sm text-gray-700 min-w-[20px] text-center">{item.quantity || 1}</span>
                       <button 
                         type="button"
-                        className="text-gray-400 hover:text-gray-500 bg-gray-100 rounded-full p-1"
+                        className="text-gray-400 hover:text-gray-500 bg-gray-100 rounded-full p-1 transition-colors duration-200"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -321,10 +342,7 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
   };
   
   const renderWishlistItems = () => {
-    // Safe check for wishlist array
-    const wishlistItems = Array.isArray(wishlist) ? wishlist : [];
-    
-    if (wishlistItems.length === 0) {
+    if (memoizedWishlistItems.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center h-64">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -345,9 +363,9 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
     return (
       <>
         <div className="flex-1 overflow-y-auto">
-          <h3 className="text-md font-medium text-gray-700 px-4 py-2 bg-gray-50">Your Wishlist ({wishlistItems.length})</h3>
+          <h3 className="text-md font-medium text-gray-700 px-4 py-2 bg-gray-50">Your Wishlist ({memoizedWishlistItems.length})</h3>
           <ul className="divide-y divide-gray-200">
-            {wishlistItems.map((item) => (
+            {memoizedWishlistItems.map((item) => (
               <li key={item.id} className="py-4 px-4 hover:bg-gray-50 transition-colors duration-200">
                 <div className="flex items-center space-x-4">
                   <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-md overflow-hidden">
@@ -356,10 +374,7 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
                         src={item.image} 
                         alt={item.name || 'Product'}
                         className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'https://via.placeholder.com/150';
-                        }}
+                        onError={handleImageError}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gray-200">
@@ -418,13 +433,13 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
             </Link>
             <button
               type="button"
-              className={`w-full bg-pink-500 text-white py-2 px-4 rounded-md text-sm font-medium text-center hover:bg-pink-600 transition-colors duration-300 ${wishlistItems.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`w-full bg-pink-500 text-white py-2 px-4 rounded-md text-sm font-medium text-center hover:bg-pink-600 transition-colors duration-300 ${memoizedWishlistItems.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 addAllToCart();
               }}
-              disabled={wishlistItems.length === 0}
+              disabled={memoizedWishlistItems.length === 0}
             >
               Add All to Cart
             </button>
@@ -461,26 +476,26 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
           <div className="flex items-center space-x-4">
             <button
               type="button"
-              className={`text-sm font-medium pb-2 ${activeTab === 'cart' ? 'text-pink-500 border-b-2 border-pink-500' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`text-sm font-medium pb-2 transition-colors duration-200 ${activeTab === 'cart' ? 'text-pink-500 border-b-2 border-pink-500' : 'text-gray-600 hover:text-gray-900'}`}
               onClick={() => setActiveTab('cart')}
               aria-pressed={activeTab === 'cart'}
               aria-label="View cart"
             >
-              Cart ({Array.isArray(localCart) ? localCart.reduce((total, item) => total + (item.quantity || 1), 0) : 0})
+              Cart ({totalCartItems})
             </button>
             <button
               type="button"
-              className={`text-sm font-medium pb-2 ${activeTab === 'wishlist' ? 'text-pink-500 border-b-2 border-pink-500' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`text-sm font-medium pb-2 transition-colors duration-200 ${activeTab === 'wishlist' ? 'text-pink-500 border-b-2 border-pink-500' : 'text-gray-600 hover:text-gray-900'}`}
               onClick={() => setActiveTab('wishlist')}
               aria-pressed={activeTab === 'wishlist'}
               aria-label="View wishlist"
             >
-              Wishlist ({Array.isArray(wishlist) ? wishlist.length : 0})
+              Wishlist ({memoizedWishlistItems.length})
             </button>
           </div>
           <button
             type="button"
-            className="text-gray-400 hover:text-gray-500"
+            className="text-gray-400 hover:text-gray-500 transition-colors duration-200"
             onClick={onClose}
             aria-label="Close panel"
           >
