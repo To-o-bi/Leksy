@@ -4,6 +4,16 @@ import { WishlistContext } from '../../contexts/WishlistContext';
 import { CartContext } from '../../contexts/CartContext';
 import ProductDetail from '../product/ProductDetail';
 
+// Utility function to decode HTML entities
+const decodeHtmlEntities = (text) => {
+  if (typeof text !== 'string') return text;
+  
+  // Create a temporary textarea element to use the browser's built-in HTML decoding
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+};
+
 const ProductCard = ({ product }) => {
   const { isInWishlist, addToWishlist, removeFromWishlist } = useContext(WishlistContext);
   const { addToCart } = useContext(CartContext);
@@ -22,17 +32,18 @@ const ProductCard = ({ product }) => {
 
     return {
       id: productId,
-      name: product.name || product.title || product.product_name || 'Unknown Product',
+      name: decodeHtmlEntities(product.name || product.title || product.product_name || 'Unknown Product'),
       price: parseFloat(product.price) || parseFloat(product.cost) || 0,
       originalPrice: product.slashed_price ? parseFloat(product.slashed_price) : undefined,
       image: product.images?.[0] || product.image || '/placeholder-image.jpg',
       images: product.images || (product.image ? [product.image] : []),
-      category: product.category || product.category_name || 'Uncategorized',
+      category: decodeHtmlEntities(product.category || product.category_name || 'Uncategorized'),
       stock: parseInt(product.available_qty) || parseInt(product.stock) || parseInt(product.inventory) || 0,
       isNew: product.isNew || product.is_new || false,
       discount: product.discount || (product.slashed_price && product.price ? 
         Math.round(((product.slashed_price - product.price) / product.slashed_price) * 100) : 0),
-      description: product.description || product.desc || '',
+      description: decodeHtmlEntities(product.description || product.desc || ''),
+      brand: decodeHtmlEntities(product.brand || product.manufacturer || ''),
       ...product // Keep original data for ProductDetail
     };
   }, [product]);
