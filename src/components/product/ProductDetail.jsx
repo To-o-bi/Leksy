@@ -1,15 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useCart } from '../../hooks/useCart';
 import { useNavigate } from 'react-router-dom';
+import { WishlistContext } from '../../contexts/WishlistContext';
 import Notification from '../common/Notification';
+
+// HTML entity decoder helper function
+const decodeHtmlEntities = (text) => {
+  if (!text || typeof text !== 'string') return text;
+  
+  const entityMap = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#039;': "'",
+    '&apos;': "'",
+    '&#x27;': "'",
+    '&#x2F;': '/',
+    '&#x60;': '`',
+    '&#x3D;': '='
+  };
+  
+  return text.replace(/&[#\w]+;/g, (entity) => {
+    return entityMap[entity] || entity;
+  });
+};
 
 const ProductDetail = ({ product, isModal = false }) => {
   const { addToCart } = useCart();
   const navigate = useNavigate();
   const [quantity, setQuantity] = useState(1);
   const [notification, setNotification] = useState(null);
-  const [isInWishlist, setIsInWishlist] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
+
+  // Use WishlistContext instead of localStorage
+  const { wishlist, addToWishlist, removeFromWishlist } = useContext(WishlistContext) || {};
 
   // Normalize product data to handle different API structures
   const normalizedProduct = React.useMemo(() => {
@@ -17,14 +42,14 @@ const ProductDetail = ({ product, isModal = false }) => {
     
     return {
       id: product.product_id || product.id || product._id,
-      name: product.name || product.title || product.product_name || 'Unknown Product',
+      name: decodeHtmlEntities(product.name || product.title || product.product_name || 'Unknown Product'),
       price: parseFloat(product.price) || parseFloat(product.cost) || 0,
       originalPrice: product.slashed_price ? parseFloat(product.slashed_price) : undefined,
-      description: product.description || product.desc || '',
+      description: decodeHtmlEntities(product.description || product.desc || ''),
       image: product.images?.[0] || product.image || '/placeholder-image.jpg',
       images: product.images || (product.image ? [product.image] : ['/placeholder-image.jpg']),
-      category: product.category || product.category_name || 'Uncategorized',
-      brand: product.brand || product.manufacturer || '',
+      category: decodeHtmlEntities(product.category || product.category_name || 'Uncategorized'),
+      brand: decodeHtmlEntities(product.brand || product.manufacturer || ''),
       stock: parseInt(product.available_qty) || parseInt(product.stock) || parseInt(product.inventory) || 0,
       rating: parseFloat(product.rating) || 0,
       reviews: product.reviews || [],
@@ -35,13 +60,13 @@ const ProductDetail = ({ product, isModal = false }) => {
     };
   }, [product]);
 
-  // Check if product is in wishlist on component mount
-  useEffect(() => {
-    if (!normalizedProduct?.id) return;
-    
-    const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
-    setIsInWishlist(wishlist.some(item => item.id === normalizedProduct.id));
-  }, [normalizedProduct?.id]);
+  // Check if product is in wishlist using context
+  const isInWishlist = React.useMemo(() => {
+    if (!normalizedProduct?.id || !Array.isArray(wishlist)) return false;
+    return wishlist.some(item => 
+      (item.id || item.product_id || item._id) === normalizedProduct.id
+    );
+  }, [wishlist, normalizedProduct?.id]);
 
   // Don't render if no valid product data
   if (!normalizedProduct || !normalizedProduct.id) {
@@ -158,26 +183,35 @@ const ProductDetail = ({ product, isModal = false }) => {
   };
 
   const handleToggleWishlist = () => {
-    const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
+    // Check if wishlist functions are available
+    if (!addToWishlist || !removeFromWishlist) {
+      setNotification({
+        type: 'error',
+        message: 'Wishlist functionality is not available.',
+      });
+      
+      setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+      return;
+    }
+
+    const wishlistItem = {
+      id: normalizedProduct.id,
+      name: normalizedProduct.name,
+      price: normalizedProduct.price,
+      image: productImages[0],
+    };
     
     if (isInWishlist) {
-      const updatedWishlist = wishlist.filter(item => item.id !== normalizedProduct.id);
-      localStorage.setItem('wishlist', JSON.stringify(updatedWishlist));
-      setIsInWishlist(false);
+      removeFromWishlist(normalizedProduct.id);
       
       setNotification({
         type: 'info',
         message: 'Product removed from wishlist!',
       });
     } else {
-      const updatedWishlist = [...wishlist, {
-        id: normalizedProduct.id,
-        name: normalizedProduct.name,
-        price: normalizedProduct.price,
-        image: productImages[0],
-      }];
-      localStorage.setItem('wishlist', JSON.stringify(updatedWishlist));
-      setIsInWishlist(true);
+      addToWishlist(wishlistItem);
       
       setNotification({
         type: 'success',
@@ -429,7 +463,7 @@ const ProductDetail = ({ product, isModal = false }) => {
                       <svg className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                       </svg>
-                      <span>{benefit}</span>
+                      <span>{decodeHtmlEntities(benefit)}</span>
                     </li>
                   ))
                 ) : (
