@@ -1,4 +1,4 @@
-// Form.js
+// Form.js - Ultimate Debug Version
 import React, { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import ProcessingOverlay from './ProcessingOverlay';
@@ -9,7 +9,7 @@ import PersonalInformationStep from './PersonalInformationStep';
 import SkinConcernsStep from './SkinConcernsStep'; 
 import SchedulePaymentStep from './SchedulePayment/SchedulePaymentStep';
 import { CONSULTATION_FORMATS, mapTimeSlotToAPIRange, getAPIChannel } from './constants';
-import { consultationService } from '../../api/services'; // Import the consultation service
+import { consultationService } from '../../api/services';
 
 const Form = () => {
   const { register, handleSubmit, formState: { errors, touchedFields, dirtyFields }, watch, trigger, getValues, setValue } = useForm({
@@ -34,7 +34,7 @@ const Form = () => {
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [submissionStatus, setSubmissionStatus] = useState(null); // 'success', 'failed', null
+  const [submissionStatus, setSubmissionStatus] = useState(null);
   const [bookedTimes, setBookedTimes] = useState([]);
 
   const selectedFormatId = watch('consultationFormat');
@@ -70,53 +70,134 @@ const Form = () => {
     }
   }, [selectedDate, fetchBookedTimes]);
 
+  // Ultimate validation function with detailed logging
+  const createConsultationPayload = (formData) => {
+    console.log('🔧 STARTING PAYLOAD CREATION');
+    console.log('Raw form data:', formData);
+    
+    // Get current form values
+    const currentValues = getValues();
+    console.log('Current form values from getValues():', currentValues);
+    
+    // Merge data
+    const mergedData = { ...formData, ...currentValues };
+    console.log('Merged data:', mergedData);
+    
+    // Create payload step by step with validation
+    const payload = {};
+    
+    // Helper function to validate and add field
+    const addField = (apiField, sourceField, isRequired = true, transform = null) => {
+      let value = mergedData[sourceField];
+      
+      if (transform && typeof transform === 'function') {
+        value = transform(value);
+      }
+      
+      console.log(`Processing ${apiField}:`, {
+        sourceField,
+        rawValue: mergedData[sourceField],
+        transformedValue: value,
+        type: typeof value,
+        isRequired,
+        isEmpty: !value || (typeof value === 'string' && value.trim() === '') || (Array.isArray(value) && value.length === 0)
+      });
+      
+      if (isRequired && (!value || (typeof value === 'string' && value.trim() === '') || (Array.isArray(value) && value.length === 0))) {
+        throw new Error(`${apiField} is required but is empty or invalid`);
+      }
+      
+      if (value !== undefined && value !== null && value !== '') {
+        payload[apiField] = value;
+      }
+    };
+    
+    try {
+      // Required fields
+      addField('name', 'name', true, (v) => v?.toString().trim());
+      addField('email', 'email', true, (v) => v?.toString().trim());
+      addField('phone', 'phone', true, (v) => v?.toString().trim());
+      addField('age_range', 'age_range', true, (v) => v?.toString().trim());
+      addField('gender', 'gender', true, (v) => v?.toString().trim());
+      addField('skin_type', 'skin_type', true, (v) => v?.toString().trim());
+      
+      // Handle skin_concerns array
+      addField('skin_concerns', 'skin_concerns', true, (v) => {
+        if (Array.isArray(v)) {
+          return v.filter(concern => concern && concern.toString().trim());
+        } else if (v) {
+          return [v.toString().trim()].filter(Boolean);
+        }
+        return [];
+      });
+      
+      // Handle channel
+      addField('channel', 'consultationFormat', true, (v) => {
+        const channel = getAPIChannel(v);
+        console.log('Channel transformation:', { input: v, output: channel });
+        return channel;
+      });
+      
+      // Handle date
+      addField('date', 'consultationDate', true, (v) => v?.toString().trim());
+      
+      // Handle time_range
+      addField('time_range', 'timeSlot', true, (v) => {
+        const range = mapTimeSlotToAPIRange(v);
+        console.log('Time range transformation:', { input: v, output: range });
+        return range;
+      });
+      
+      // Success redirect
+      payload.success_redirect = `${window.location.origin}/consultation/success`;
+      
+      // Optional fields
+      addField('current_skincare_products', 'current_skincare_products', false, (v) => v?.toString().trim());
+      addField('additional_details', 'additional_details', false, (v) => v?.toString().trim());
+      
+      console.log('✅ FINAL PAYLOAD:', payload);
+      
+      // Final validation check
+      const requiredApiFields = ['email', 'name', 'phone', 'age_range', 'gender', 'skin_type', 'skin_concerns', 'channel', 'date', 'time_range', 'success_redirect'];
+      const missingFields = [];
+      
+      requiredApiFields.forEach(field => {
+        const value = payload[field];
+        if (!value || (typeof value === 'string' && value.trim() === '') || (Array.isArray(value) && value.length === 0)) {
+          missingFields.push(field);
+        }
+      });
+      
+      if (missingFields.length > 0) {
+        console.error('❌ MISSING FIELDS:', missingFields);
+        console.error('Current payload:', payload);
+        throw new Error(`Still missing required fields after processing: ${missingFields.join(', ')}`);
+      }
+      
+      return payload;
+      
+    } catch (error) {
+      console.error('❌ PAYLOAD CREATION FAILED:', error);
+      throw error;
+    }
+  };
+
   const submitConsultation = async (formData) => {
     try {
       setIsProcessing(true);
       
-      // Get current form values to ensure we have the latest data
-      const currentValues = getValues();
-      console.log('Current form values:', currentValues); // Debug log
+      console.log('🚀 =================================');
+      console.log('🚀 FORM SUBMISSION STARTED');
+      console.log('🚀 =================================');
       
-      // Use current values instead of formData for more reliable data
-      const timeSlot = currentValues.timeSlot || formData.timeSlot;
-      const consultationFormat = currentValues.consultationFormat || formData.consultationFormat;
-      const consultationDate = currentValues.consultationDate || formData.consultationDate;
+      // Create the payload with detailed logging
+      const consultationData = createConsultationPayload(formData);
       
-      // Validate required fields before submission
-      if (!timeSlot) {
-        throw new Error('Please select a time slot');
-      }
+      console.log('📤 SENDING TO API:', consultationData);
       
-      if (!consultationFormat) {
-        throw new Error('Please select a consultation format');
-      }
-      
-      if (!consultationDate) {
-        throw new Error('Please select a consultation date');
-      }
-      
-      const consultationData = {
-        name: (currentValues.name || formData.name).trim(),
-        email: currentValues.email || formData.email,
-        phone: currentValues.phone || formData.phone,
-        age_range: currentValues.age_range || formData.age_range,
-        gender: (currentValues.gender || formData.gender) || 'prefer-not-to-say',
-        skin_type: currentValues.skin_type || formData.skin_type,
-        skin_concerns: Array.isArray(currentValues.skin_concerns || formData.skin_concerns) 
-          ? (currentValues.skin_concerns || formData.skin_concerns)
-          : [currentValues.skin_concerns || formData.skin_concerns].filter(Boolean),
-        channel: getAPIChannel(consultationFormat), // Use helper function
-        date: consultationDate,
-        time_range: mapTimeSlotToAPIRange(timeSlot), // Use helper function to map time slot
-        current_skincare_products: (currentValues.current_skincare_products || formData.current_skincare_products) || '',
-        additional_details: (currentValues.additional_details || formData.additional_details) || '',
-        success_redirect: `${window.location.origin}/consultation/success`
-      };
-
-      console.log('Submitting consultation data:', consultationData); // Debug log
-
       const response = await consultationService.initiateConsultation(consultationData);
+      
+      console.log('📥 API RESPONSE:', response);
       
       if (response.success) {
         if (response.data?.authorization_url) {
@@ -129,9 +210,15 @@ const Form = () => {
         throw new Error(response.message || 'Consultation booking failed');
       }
     } catch (error) {
-      console.error('Consultation booking error:', error);
+      console.error('❌ =================================');
+      console.error('❌ CONSULTATION BOOKING ERROR');
+      console.error('❌ =================================');
+      console.error('Error object:', error);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      
       setSubmissionStatus('failed');
-      alert(error.message || 'Failed to book consultation. Please try again.');
+      alert(`Booking failed: ${error.message}`);
     } finally {
       setIsProcessing(false);
     }
@@ -181,6 +268,9 @@ const Form = () => {
     }
 
     const isValid = await trigger(fieldsToValidate);
+    console.log('Validation result for step', step, ':', isValid);
+    console.log('Current form values:', getValues());
+    
     if (isValid) {
       setStep(s => s + 1);
     }
@@ -190,6 +280,9 @@ const Form = () => {
 
   const finalSubmitHandler = async (data) => {
     if (step === 3) {
+      console.log('🎯 FINAL SUBMIT HANDLER TRIGGERED');
+      console.log('Form data passed to handler:', data);
+      console.log('Current form state:', getValues());
       await submitConsultation(data);
     }
   };
@@ -201,6 +294,31 @@ const Form = () => {
   return (
     <div className="min-h-screen bg-gray-50 px-3 sm:px-4 py-6 sm:py-8 lg:py-12">
       <div className="container mx-auto max-w-4xl">
+        {/* Debug Panel */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+          <h3 className="font-bold text-yellow-800 mb-2">🐛 Debug Info (Step {step})</h3>
+          <div className="text-xs space-y-2">
+            <div>
+              <strong>Current form values:</strong>
+              <pre className="bg-white p-2 rounded mt-1 overflow-auto max-h-32">
+                {JSON.stringify(getValues(), null, 2)}
+              </pre>
+            </div>
+            <div>
+              <strong>Watched values:</strong>
+              <div>selectedFormatId: {selectedFormatId || 'undefined'}</div>
+              <div>selectedDate: {selectedDate || 'undefined'}</div>
+            </div>
+            {step === 3 && (
+              <div>
+                <strong>API Helpers Test:</strong>
+                <div>getAPIChannel({selectedFormatId}): {getAPIChannel(selectedFormatId) || 'undefined'}</div>
+                <div>mapTimeSlotToAPIRange({getValues().timeSlot}): {mapTimeSlotToAPIRange(getValues().timeSlot) || 'undefined'}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {!submitted ? (
           <form onSubmit={handleSubmit(finalSubmitHandler)} className="bg-white rounded-lg sm:rounded-xl shadow-lg overflow-hidden">
             <ProgressIndicator currentStep={step} />

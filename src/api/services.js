@@ -243,58 +243,122 @@ export const orderService = {
   }
 };
 
-// Add consultation service based on API documentation
 export const consultationService = {
   async initiateConsultation(consultationData) {
-    const requiredFields = ['name', 'email', 'phone', 'age_range', 'gender', 'skin_type', 'skin_concerns', 'channel', 'date', 'time_range'];
+    console.log('🔍 Raw consultation data received:', consultationData);
     
-    for (const field of requiredFields) {
-      if (!consultationData[field]) {
-        throw new Error(`${field.replace('_', ' ')} is required`);
-      }
-    }
-
-    const validChannels = ['video-channel', 'whatsapp'];
-    const validTimeRanges = ['2:00 PM - 3:00 PM', '3:00 PM - 4:00 PM', '4:00 PM - 5:00 PM', '5:00 PM - 6:00 PM'];
-    
-    if (!validChannels.includes(consultationData.channel)) {
-      throw new Error('Invalid channel');
-    }
-    
-    if (!validTimeRanges.includes(consultationData.time_range)) {
-      throw new Error('Invalid time range');
-    }
-
-    const params = {
-      name: consultationData.name,
-      email: consultationData.email,
-      phone: consultationData.phone,
-      age_range: consultationData.age_range,
-      gender: consultationData.gender,
-      skin_type: consultationData.skin_type,
-      skin_concerns: Array.isArray(consultationData.skin_concerns) 
-        ? consultationData.skin_concerns.join(',') 
-        : consultationData.skin_concerns,
-      channel: consultationData.channel,
-      date: consultationData.date,
-      time_range: consultationData.time_range
+    // Helper function to check if a value is truly empty
+    const isEmpty = (value) => {
+      if (value === null || value === undefined) return true;
+      if (typeof value === 'string') return value.trim() === '';
+      if (Array.isArray(value)) return value.length === 0 || value.every(isEmpty);
+      return false;
     };
-
-    if (consultationData.current_skincare_products) {
-      params.current_skincare_products = consultationData.current_skincare_products;
+    
+    // Build clean data
+    const cleanData = {
+      name: consultationData.name?.toString().trim(),
+      email: consultationData.email?.toString().trim(),
+      phone: consultationData.phone?.toString().trim(),
+      age_range: consultationData.age_range?.toString().trim(),
+      gender: consultationData.gender?.toString().trim(),
+      skin_type: consultationData.skin_type?.toString().trim(),
+      channel: consultationData.channel?.toString().trim(),
+      date: consultationData.date?.toString().trim(),
+      time_range: consultationData.time_range?.toString().trim(),
+      success_redirect: consultationData.success_redirect || `${window.location.origin}/consultation/success`
+    };
+    
+    // Handle skin_concerns
+    let skinConcerns = consultationData.skin_concerns;
+    if (Array.isArray(skinConcerns)) {
+      cleanData.skin_concerns = skinConcerns.filter(c => !isEmpty(c)).join(',');
+    } else {
+      cleanData.skin_concerns = skinConcerns?.toString().trim();
     }
     
-    if (consultationData.additional_details) {
-      params.additional_details = consultationData.additional_details;
+    // Add optional fields
+    if (!isEmpty(consultationData.current_skincare_products)) {
+      cleanData.current_skincare_products = consultationData.current_skincare_products.toString().trim();
     }
     
-    if (consultationData.success_redirect) {
-      params.success_redirect = consultationData.success_redirect;
+    if (!isEmpty(consultationData.additional_details)) {
+      cleanData.additional_details = consultationData.additional_details.toString().trim();
     }
-
-    // Use POST request as per API doc
-    const response = await api.post(ENDPOINTS.INITIATE_CONSULTATION, null, { params });
-    return response.data;
+    
+    console.log('✅ Clean data prepared:', cleanData);
+    
+    // Try multiple approaches since we're not sure what the backend expects
+    
+    // APPROACH 1: POST with query parameters (as shown in API doc)
+    try {
+      console.log('🚀 APPROACH 1: POST with query parameters');
+      const queryString = new URLSearchParams(cleanData).toString();
+      const url = `${ENDPOINTS.INITIATE_CONSULTATION}?${queryString}`;
+      console.log('Full URL:', url);
+      
+      const response1 = await api.post(url);
+      console.log('✅ APPROACH 1 SUCCESS:', response1.data);
+      return response1.data;
+    } catch (error1) {
+      console.log('❌ APPROACH 1 FAILED:', error1.response?.data?.message || error1.message);
+    }
+    
+    // APPROACH 2: POST with data in body
+    try {
+      console.log('🚀 APPROACH 2: POST with data in body');
+      const response2 = await api.post(ENDPOINTS.INITIATE_CONSULTATION, cleanData);
+      console.log('✅ APPROACH 2 SUCCESS:', response2.data);
+      return response2.data;
+    } catch (error2) {
+      console.log('❌ APPROACH 2 FAILED:', error2.response?.data?.message || error2.message);
+    }
+    
+    // APPROACH 3: POST with FormData (like contact form)
+    try {
+      console.log('🚀 APPROACH 3: POST with FormData');
+      const formData = new FormData();
+      Object.entries(cleanData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          formData.append(key, value);
+        }
+      });
+      
+      // Log FormData contents
+      console.log('FormData contents:');
+      for (let [key, value] of formData.entries()) {
+        console.log(`  ${key}: ${value}`);
+      }
+      
+      const response3 = await api.postFormData(ENDPOINTS.INITIATE_CONSULTATION, formData);
+      console.log('✅ APPROACH 3 SUCCESS:', response3.data);
+      return response3.data;
+    } catch (error3) {
+      console.log('❌ APPROACH 3 FAILED:', error3.response?.data?.message || error3.message);
+    }
+    
+    // APPROACH 4: POST with params in config (original approach)
+    try {
+      console.log('🚀 APPROACH 4: POST with params in config');
+      const response4 = await api.post(ENDPOINTS.INITIATE_CONSULTATION, null, { params: cleanData });
+      console.log('✅ APPROACH 4 SUCCESS:', response4.data);
+      return response4.data;
+    } catch (error4) {
+      console.log('❌ APPROACH 4 FAILED:', error4.response?.data?.message || error4.message);
+    }
+    
+    // APPROACH 5: GET request with query parameters
+    try {
+      console.log('🚀 APPROACH 5: GET with query parameters');
+      const response5 = await api.get(ENDPOINTS.INITIATE_CONSULTATION, cleanData);
+      console.log('✅ APPROACH 5 SUCCESS:', response5.data);
+      return response5.data;
+    } catch (error5) {
+      console.log('❌ APPROACH 5 FAILED:', error5.response?.data?.message || error5.message);
+    }
+    
+    // If all approaches failed
+    throw new Error('All API request approaches failed. Check console for detailed error messages.');
   },
 
   async fetchBookedTimes(date = null) {

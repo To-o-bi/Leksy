@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Eye, RefreshCw, AlertCircle, Calendar, Phone, Mail, User, CheckCircle } from 'lucide-react';
-import api from '../../api/axios';
-import { useAuth } from '../../contexts/AuthContext';
 
 const BookingsPage = () => {
-  const { isAuthenticated, user } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [filteredBookings, setFilteredBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -84,27 +81,38 @@ const BookingsPage = () => {
       setLoading(true);
       setError(null);
 
-      // Check if user is authenticated
-      if (!isAuthenticated || !user) {
-        throw new Error('Admin authentication required to view consultation bookings. Please log in as admin.');
-      }
-
-      // Check if user has admin role
-      if (user.role !== 'admin' && user.role !== 'superadmin') {
-        throw new Error('Admin privileges required to view consultation bookings.');
+      // Get admin token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Admin authentication required. Please log in as admin.');
       }
 
       const filters = {
         limit: 100
       };
 
-      // Use the correct endpoint from API documentation
-      const response = await api.get('/fetch-consultations', filters);
+      // Use fetch to call the consultations API
+      const response = await fetch('https://leksycosmetics.com/api/fetch-consultations', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Unauthorized. Please log in as admin.');
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
       
-      if (response.data && response.data.code === 200) {
+      if (data && data.code === 200) {
         // Handle both coming and past consultations as per API structure
-        const comingConsultations = response.data.coming_consultations || [];
-        const pastConsultations = response.data.past_consultations || [];
+        const comingConsultations = data.coming_consultations || [];
+        const pastConsultations = data.past_consultations || [];
         const allConsultations = [...comingConsultations, ...pastConsultations];
         
         const formattedBookings = allConsultations.map((consultation) => ({
@@ -135,16 +143,15 @@ const BookingsPage = () => {
         
         setBookings(formattedBookings);
       } else {
-        throw new Error(response.data?.message || 'Failed to fetch consultation bookings');
+        throw new Error(data?.message || 'Failed to fetch consultation bookings');
       }
     } catch (err) {
       console.error('Error fetching bookings:', err);
       
       let errorMessage = 'Failed to load consultation bookings';
       
-      if (err.message.includes('precondition') || 
-          err.message.includes('Unauthorized') || 
-          err.message.includes('Authentication') ||
+      if (err.message.includes('Unauthorized') || 
+          err.message.includes('authentication') ||
           err.message.includes('Admin')) {
         errorMessage = 'Admin authentication required. Please ensure you are logged in as an admin to view consultation bookings.';
       } else if (err.message) {
@@ -192,14 +199,12 @@ const BookingsPage = () => {
     setFilteredBookings(filtered);
   };
 
-  // Update session status (placeholder - you'd need to implement this API endpoint)
+  // Update session status
   const updateSessionStatus = async (id, newStatus) => {
     try {
       setIsUpdating(true);
       
-      // This would be your API call to update session status
-      // await consultationService.updateSessionStatus(id, newStatus);
-      
+      // Update local state immediately for better UX
       setBookings(prev => prev.map(booking => 
         booking.id === id ? { ...booking, sessionStatus: newStatus } : booking
       ));
@@ -212,6 +217,9 @@ const BookingsPage = () => {
         type: 'success',
         message: `Session status updated to "${newStatus}"`
       });
+      
+      // Here you would make the actual API call to update the status
+      // await updateConsultationStatus(id, newStatus);
       
     } catch (err) {
       setNotification({
@@ -239,13 +247,8 @@ const BookingsPage = () => {
 
   // Fetch bookings on mount
   useEffect(() => {
-    if (isAuthenticated && user) {
-      fetchBookings();
-    } else {
-      setLoading(false);
-      setError('Admin authentication required to view consultation bookings. Please log in as admin.');
-    }
-  }, [isAuthenticated, user]);
+    fetchBookings();
+  }, []);
 
   // Filter bookings when dependencies change
   useEffect(() => {
@@ -284,7 +287,7 @@ const BookingsPage = () => {
           <p className="text-gray-600 mb-4">{error}</p>
           {error.includes('authentication') || error.includes('Admin') ? (
             <button 
-              onClick={() => window.location.href = '/login'}
+              onClick={() => window.location.href = '/admin/login'}
               className="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 mr-2"
             >
               Go to Login
@@ -423,7 +426,7 @@ const BookingsPage = () => {
                     <select
                       value={booking.sessionStatus}
                       onChange={(e) => updateSessionStatus(booking.id, e.target.value)}
-                      disabled={isUpdating || !isAuthenticated}
+                      disabled={isUpdating}
                       className={`text-xs px-2 py-1 rounded-full border-0 cursor-pointer font-medium ${getStatusBadgeStyle(booking.sessionStatus)}`}
                     >
                       <option value="unheld">Unheld</option>
@@ -606,7 +609,7 @@ const BookingsPage = () => {
                   <h4 className="font-semibold text-gray-900 border-b pb-2 mb-4">Actions</h4>
                   <div className="space-y-3">
                     <button
-                      onClick={() => alert(`Confirmation email would be sent to ${selectedBooking.email}`)}
+                      onClick={() => alert(`Meeting link would be sent to ${selectedBooking.email}`)}
                       className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
                     >
                       Send Meeting Link

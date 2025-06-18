@@ -1,4 +1,4 @@
-// constants.js
+// constants.js - Fixed version
 export const SKIN_CONCERNS = [
   { id: 'acne', name: 'Acne and Blemishes' },
   { id: 'dryness', name: 'Dryness and Dehydration' },
@@ -27,29 +27,23 @@ export const GENDER_OPTIONS = [
   { value: 'other', label: 'Other' }
 ];
 
-// Display time slots for UI
-export const TIME_SLOTS = [
-  '9:00 AM', '10:00 AM', '11:00 AM', '1:00 PM',
-  '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'
-];
-
 // Updated consultation formats to use API-compatible IDs
 export const CONSULTATION_FORMATS = [
   { 
-    id: 'video-channel', // Changed from 'video' to match API
+    id: 'video-channel', // Matches API expectation
     name: 'Live Beauty Session (via Zoom/Google Meet)', 
     price: 35000, 
     displayPrice: '₦35,000' 
   },
   { 
-    id: 'whatsapp', // This already matches API
+    id: 'whatsapp', // Matches API expectation
     name: 'Leksy WhatsApp Session', 
     price: 15000, 
     displayPrice: '₦15,000' 
   }
 ];
 
-// API time ranges as per documentation
+// API time ranges as per documentation - these are what the API expects
 export const API_TIME_RANGES = [
   '2:00 PM - 3:00 PM',
   '3:00 PM - 4:00 PM', 
@@ -57,24 +51,61 @@ export const API_TIME_RANGES = [
   '5:00 PM - 6:00 PM'
 ];
 
-// Mapping helper for backwards compatibility
-export const API_CHANNELS = {
-  video: 'video-channel',
-  whatsapp: 'whatsapp'
-};
-
-// Helper function to map display time slots to API time ranges
+// FIXED: Helper function to map time slots to API ranges
 export const mapTimeSlotToAPIRange = (timeSlot) => {
+  // If it's already in the correct format, return as-is
+  if (API_TIME_RANGES.includes(timeSlot)) {
+    return timeSlot;
+  }
+  
+  // Map individual times to ranges (for backwards compatibility)
   const timeMap = {
     '2:00 PM': '2:00 PM - 3:00 PM',
     '3:00 PM': '3:00 PM - 4:00 PM',
     '4:00 PM': '4:00 PM - 5:00 PM',
     '5:00 PM': '5:00 PM - 6:00 PM'
   };
-  return timeMap[timeSlot] || timeSlot;
+  
+  const mappedTime = timeMap[timeSlot];
+  if (mappedTime) {
+    return mappedTime;
+  }
+  
+  // If no mapping found, log for debugging and return original
+  console.warn('⚠️ Time slot mapping failed for:', timeSlot);
+  console.warn('Available mappings:', Object.keys(timeMap));
+  console.warn('Available API ranges:', API_TIME_RANGES);
+  
+  return timeSlot;
 };
 
-// Helper function to get API channel from format ID
+// FIXED: Helper function to get API channel from format ID
 export const getAPIChannel = (formatId) => {
-  return formatId; // Since we've updated the IDs to match API expectations
+  // Validate that the formatId is one we support
+  const validChannels = ['video-channel', 'whatsapp'];
+  
+  if (!formatId) {
+    console.warn('⚠️ No formatId provided to getAPIChannel');
+    return null;
+  }
+  
+  if (!validChannels.includes(formatId)) {
+    console.warn('⚠️ Invalid formatId:', formatId);
+    console.warn('Valid channels:', validChannels);
+    return null;
+  }
+  
+  return formatId; // Since our IDs now match the API expectations
+};
+
+// Export these for debugging
+export const DEBUG_INFO = {
+  validChannels: ['video-channel', 'whatsapp'],
+  validTimeRanges: API_TIME_RANGES,
+  timeMapping: {
+    '2:00 PM': '2:00 PM - 3:00 PM',
+    '3:00 PM': '3:00 PM - 4:00 PM',
+    '4:00 PM': '4:00 PM - 5:00 PM',
+    '5:00 PM': '5:00 PM - 6:00 PM'
+  }
 };

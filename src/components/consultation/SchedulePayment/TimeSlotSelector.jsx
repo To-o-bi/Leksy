@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
+// Updated time slots to match API expectations and fix the mapping issue
 const TIME_SLOTS = [
   '2:00 PM - 3:00 PM',
   '3:00 PM - 4:00 PM', 
@@ -17,7 +18,7 @@ const TimeSlotSelector = ({
   getBookedTimesForDate,
   checkSlotAvailability,
   loading,
-  setValue // Add setValue prop to update form field
+  setValue
 }) => {
   const [bookedTimes, setBookedTimes] = useState([]);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
