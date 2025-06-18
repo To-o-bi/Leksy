@@ -484,7 +484,7 @@ const AddProductPage = () => {
                 </div>
                 
                 <div className="w-full sm:w-1/2">
-                  <label className="block text-gray-700 mb-2">Original Price (Optional)</label>
+                  <label className="block text-gray-700 mb-2">Slashed Price (Optional)</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
                       <span className="text-gray-700 font-bold">₦</span>

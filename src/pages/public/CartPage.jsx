@@ -4,6 +4,7 @@ import { useCart } from '../../hooks/useCart';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import Button from '../../components/common/Button';
 import Notification from '../../components/common/Notification';
+import { SiVisa, SiMastercard, SiPaypal } from 'react-icons/si';
 
 const CartPage = () => {
   const { cart, removeFromCart, updateQuantity, clearCart, totalItems, totalPrice } = useCart();
@@ -12,7 +13,7 @@ const CartPage = () => {
 
   // Format price as currency
   const formatPrice = (price) => {
-    return `$${parseFloat(price).toFixed(2)}`;
+    return `₦${parseFloat(price).toFixed(2)}`;
   };
   
   const handleContinueShopping = () => {
@@ -216,10 +217,10 @@ const CartPage = () => {
               
               <div className="mt-6 text-center">
                 <div className="text-sm text-gray-500 mb-2">Secure Payment</div>
-                <div className="flex justify-center gap-2">
-                  <img src="/assets/images/icons/visa.svg" alt="Visa" className="h-6" />
-                  <img src="/assets/images/icons/mastercard.svg" alt="Mastercard" className="h-6" />
-                  <img src="/assets/images/icons/paypal.svg" alt="PayPal" className="h-6" />
+                <div className="flex justify-center gap-5">
+                    <SiVisa className="h-12 w-12 text-blue-600" />
+                    <SiMastercard className="h-12 w-12 text-red-600" />
+                    <SiPaypal className="h-10 w-10 text-blue-500" />
                 </div>
               </div>
             </div>
