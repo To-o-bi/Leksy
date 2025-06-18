@@ -19,6 +19,29 @@ const AdminInbox = () => {
     return txt.value;
   };
 
+  // Get initials from name
+  const getInitials = (name) => {
+    if (!name) return 'UN';
+    return name
+      .split(' ')
+      .map(word => word.charAt(0))
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  // Generate avatar color based on name - maintaining original color scheme
+  const getAvatarColor = (name, isRead) => {
+    if (!name) return isRead ? 'from-gray-400 to-gray-500' : 'from-pink-500 to-rose-500';
+    
+    if (isRead) {
+      return 'from-gray-400 to-gray-500';
+    }
+    
+    // Use original pink/rose color scheme for unread messages
+    return 'from-pink-500 to-rose-500';
+  };
+
   useEffect(() => {
     loadMessages();
   }, []);
@@ -110,19 +133,44 @@ const AdminInbox = () => {
     }
   };
 
+  // Fixed formatTime function
   const formatTime = (dateString) => {
     if (!dateString) return '';
     try {
       const date = new Date(dateString);
-      const now = new Date();
-      const diffInMinutes = Math.floor((now - date) / (1000 * 60));
       
       if (isNaN(date.getTime())) return '';
       
-      if (diffInMinutes < 1) return 'now';
-      if (diffInMinutes < 60) return `${diffInMinutes} mins ago`;
-      if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`;
+      const now = new Date();
+      const diffInMilliseconds = now.getTime() - date.getTime();
       
+      // Convert to different time units
+      const diffInSeconds = Math.floor(diffInMilliseconds / 1000);
+      const diffInMinutes = Math.floor(diffInSeconds / 60);
+      const diffInHours = Math.floor(diffInMinutes / 60);
+      const diffInDays = Math.floor(diffInHours / 24);
+      
+      // Less than 1 minute (0-59 seconds)
+      if (diffInSeconds < 60) {
+        return 'now';
+      }
+      
+      // Less than 1 hour (1-59 minutes)
+      if (diffInMinutes < 60) {
+        return diffInMinutes === 1 ? '1 min ago' : `${diffInMinutes} mins ago`;
+      }
+      
+      // Less than 24 hours (1-23 hours)
+      if (diffInHours < 24) {
+        return diffInHours === 1 ? '1 hour ago' : `${diffInHours} hours ago`;
+      }
+      
+      // Less than 7 days
+      if (diffInDays < 7) {
+        return diffInDays === 1 ? '1 day ago' : `${diffInDays} days ago`;
+      }
+      
+      // More than 7 days - show actual time
       return date.toLocaleTimeString('en-US', { 
         hour: 'numeric', 
         minute: '2-digit',
@@ -148,7 +196,7 @@ const AdminInbox = () => {
     if (!replyText.trim() || !selectedMessage) return;
     
     try {
-      // Simulate sending reply (you'll need to implement actual email sending)
+      // Simulate sending reply
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       setNotification({
@@ -183,7 +231,7 @@ const AdminInbox = () => {
     }
   }, [notification]);
 
-  // Filter messages based on search (messages are already decoded)
+  // Filter messages based on search
   const filteredMessages = messages.filter(msg => 
     msg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     msg.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -289,12 +337,12 @@ const AdminInbox = () => {
               </button>
             </div>
             
-            {/* Enhanced Search */}
+            {/* Enhanced Search with better visibility */}
             <div className="relative group">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-pink-500 transition-colors" />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-600 group-focus-within:text-pink-600 transition-colors z-10" />
               <input
                 type="text"
-                className="w-full pl-12 pr-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:bg-white/80 focus:border-pink-300/60 transition-all duration-200 shadow-sm"
+                className="w-full pl-12 pr-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:bg-white/90 focus:border-pink-400/80 transition-all duration-200 shadow-sm"
                 placeholder="Search messages..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -314,7 +362,7 @@ const AdminInbox = () => {
             </div>
           </div>
 
-          {/* Enhanced Messages List */}
+          {/* Enhanced Messages List with Initials */}
           <div className="flex-1 overflow-y-auto">
             {filteredMessages.length > 0 ? (
               <div className="p-4 space-y-2">
@@ -330,12 +378,12 @@ const AdminInbox = () => {
                     >
                       <div className="flex items-start gap-3">
                         <div className="relative">
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md ${
-                            !message.read 
-                              ? 'bg-gradient-to-br from-pink-500 to-rose-500' 
-                              : 'bg-gradient-to-br from-gray-400 to-gray-500'
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md bg-gradient-to-br ${
+                            getAvatarColor(message.name, message.read)
                           }`}>
-                            <User className="w-5 h-5 text-white" />
+                            <span className="text-sm font-bold text-white">
+                              {getInitials(message.name)}
+                            </span>
                           </div>
                           {!message.read && (
                             <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-orange-400 to-pink-500 rounded-full border-2 border-white shadow-sm animate-pulse"></div>
@@ -399,11 +447,13 @@ const AdminInbox = () => {
         <div className="flex-1 flex flex-col bg-white/40 backdrop-blur-sm">
           {selectedMessage ? (
             <>
-              {/* Enhanced Message Header */}
+              {/* Enhanced Message Header with Initials */}
               <div className="p-6 border-b border-gray-100/60 bg-gradient-to-r from-white/70 to-pink-50/30 backdrop-blur-sm">
                 <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center shadow-xl">
-                    <User className="w-8 h-8 text-white" />
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-xl bg-gradient-to-br ${getAvatarColor(selectedMessage.name, selectedMessage.read)}`}>
+                    <span className="text-xl font-bold text-white">
+                      {getInitials(selectedMessage.name)}
+                    </span>
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">

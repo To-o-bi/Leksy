@@ -5,17 +5,25 @@ import { CartContext } from '../../contexts/CartContext';
 import ProductDetail from '../product/ProductDetail'; 
 
 const ProductCard = ({ product }) => {
+  // DEBUG: Log the product object to see its structure
+  console.log("ProductCard received product:", product);
+  
   const { isInWishlist, addToWishlist, removeFromWishlist } = useContext(WishlistContext);
   const { addToCart } = useContext(CartContext);
   const [showQuickView, setShowQuickView] = useState(false);
   
-  const wishlisted = isInWishlist(product.id);
+  // Handle different possible ID field names based on your API structure
+  const productId = product?.product_id || product?.id || product?._id || product?.productId;
+  
+  console.log("Resolved product ID:", productId);
+  
+  const wishlisted = isInWishlist(productId);
   
   const toggleWishlist = (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (wishlisted) {
-      removeFromWishlist(product.id);
+      removeFromWishlist(productId);
     } else {
       addToWishlist(product);
     }
@@ -46,18 +54,46 @@ const ProductCard = ({ product }) => {
     }).format(price);
   };
 
+  // Don't render if no valid product ID
+  if (!productId) {
+    console.error("ProductCard: No valid product ID found", product);
+    return (
+      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+        <strong>Error:</strong> Product ID missing
+        <br />
+        <small>Check console for product data</small>
+      </div>
+    );
+  }
+
+  // Normalize product data based on your API structure
+  const normalizedProduct = {
+    id: productId,
+    name: product.name || 'Unknown Product',
+    price: parseFloat(product.price) || 0,
+    originalPrice: product.slashed_price ? parseFloat(product.slashed_price) : undefined,
+    image: product.images?.[0] || product.image || '/placeholder-image.jpg',
+    images: product.images || [],
+    category: product.category || 'Uncategorized',
+    stock: parseInt(product.available_qty) || parseInt(product.stock) || 0,
+    isNew: product.isNew || product.is_new || false,
+    discount: product.discount || 0,
+    description: product.description || '',
+    ...product // Keep original data
+  };
+
   return (
     <>
       <div className="group relative bg-white rounded-lg border border-gray-200 overflow-hidden transition-all duration-200 hover:shadow-lg">
         <div className="relative overflow-hidden pt-[100%]">
-          {product.isNew && (
+          {normalizedProduct.isNew && (
             <div className="absolute top-3 left-3 z-10 bg-green-600 text-white text-xs font-medium px-2.5 py-1 rounded-sm">
               New
             </div>
           )}
-          {product.discount && (
+          {normalizedProduct.discount > 0 && (
             <div className="absolute top-3 right-12 z-10 bg-red-600 text-white text-xs font-medium px-2.5 py-1 rounded-sm">
-              -{product.discount}%
+              -{normalizedProduct.discount}%
             </div>
           )}
           
@@ -73,10 +109,10 @@ const ProductCard = ({ product }) => {
             </svg>
           </button>
           
-          <Link to={`/product/${product.id}`} className="block absolute inset-0">
+          <Link to={`/product/${productId}`} className="block absolute inset-0">
             <img
-              src={product.image}
-              alt={product.name}
+              src={normalizedProduct.image}
+              alt={normalizedProduct.name}
               className="absolute top-0 left-0 w-full h-full object-cover object-center transition-transform duration-500 ease-out group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -99,9 +135,9 @@ const ProductCard = ({ product }) => {
         <div className="p-4">
           <div className="flex justify-between items-start mb-1">
             <div className="flex items-start flex-1">
-              <Link to={`/product/${product.id}`} className="block flex-1">
+              <Link to={`/product/${productId}`} className="block flex-1">
                 <h3 className="text-gray-600 font-medium text-sm leading-tight hover:text-gray-600 transition-colors line-clamp-2">
-                  {product.name}
+                  {normalizedProduct.name}
                 </h3>
               </Link>
               
@@ -118,30 +154,26 @@ const ProductCard = ({ product }) => {
                 </svg>
               </button>
             </div>
-            
-            {/* {product.rating && (
-              <div className="flex items-center ml-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                </svg>
-                <span className="text-xs text-gray-600 ml-1">{product.rating}</span>
-              </div>
-            )} */}
           </div>
           <div className="flex items-center justify-between mt-2">
             <div>
               <p className="text-gray-900 font-semibold text-lg">
-                {formatPrice(product.price)}
+                {formatPrice(normalizedProduct.price)}
               </p>
-              {product.originalPrice && (
+              {normalizedProduct.originalPrice && (
                 <p className="text-gray-500 text-xs line-through">
-                  {formatPrice(product.originalPrice)}
+                  {formatPrice(normalizedProduct.originalPrice)}
                 </p>
               )}
             </div>
-            {product.stock <= 5 && product.stock > 0 && (
+            {normalizedProduct.stock <= 5 && normalizedProduct.stock > 0 && (
               <span className="text-xs text-orange-600 font-medium">
-                Only {product.stock} left
+                Only {normalizedProduct.stock} left
+              </span>
+            )}
+            {normalizedProduct.stock === 0 && (
+              <span className="text-xs text-red-600 font-medium">
+                Out of Stock
               </span>
             )}
           </div>
@@ -160,7 +192,7 @@ const ProductCard = ({ product }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            <ProductDetail product={product} />
+            <ProductDetail product={normalizedProduct} />
           </div>
         </div>
       )}
