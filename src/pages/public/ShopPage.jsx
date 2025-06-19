@@ -172,7 +172,7 @@ const ShopPage = () => {
   
   if (loading && allProducts.length === 0) {
     return (
-      <div className="container mx-auto px-4 md:px-8 lg:px-12 max-w-7xl py-16">
+      <div className="w-[90%] mx-auto py-16">
         <div className="text-center">
           <Loader />
           <p className="mt-4 text-gray-600">Loading products...</p>
@@ -183,7 +183,7 @@ const ShopPage = () => {
 
   if (error && allProducts.length === 0) {
     return (
-      <div className="container mx-auto px-4 md:px-8 lg:px-12 max-w-7xl py-16 text-center">
+      <div className="w-[90%] mx-auto py-16 text-center">
         <h2 className="text-2xl font-semibold text-red-600">Error Loading Products</h2>
         <p className="mt-2 text-gray-600">{error}</p>
         <div className="mt-6 flex flex-col sm:flex-row justify-center gap-4">
@@ -223,8 +223,8 @@ const ShopPage = () => {
       {/* Hero banner */}
       <Hero />
       
-      {/* Content */}
-      <div className="container mx-auto px-4 md:px-8 lg:px-12 max-w-7xl py-8">
+      {/* Content - 90% width */}
+      <div className="w-[87%] mx-auto py-8">
         
         {/* Filters and search */}
         <div className="mb-8">
