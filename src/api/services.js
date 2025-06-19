@@ -1,7 +1,7 @@
 // src/api/services.js
 import api from './axios.js';
 import { ENDPOINTS, CATEGORIES } from './config.js';
-import { validateForm, validators } from './validation.js';
+// import { validateForm, validators } from './validation.js';
 
 export const authService = {
   async login(username, password) {
@@ -73,45 +73,57 @@ export const productService = {
   },
 
   async addProduct(productData) {
+    // Validation
     if (!productData.name?.trim()) throw new Error('Product name is required');
     if (!productData.price || parseFloat(productData.price) <= 0) throw new Error('Valid price is required');
     if (!productData.description?.trim()) throw new Error('Description is required');
     if (!productData.quantity || parseInt(productData.quantity) < 0) throw new Error('Valid quantity is required');
     if (!productData.category || !CATEGORIES.includes(productData.category)) throw new Error('Valid category is required');
-
-    // Use GET request with query parameters as per API doc
-    const params = {
-      name: productData.name,
-      price: productData.price,
-      description: productData.description,
-      quantity: productData.quantity,
-      category: productData.category
-    };
-
-    if (productData.slashed_price) params.slashed_price = productData.slashed_price;
-
-    // Handle images separately if provided
+    
+    // Validate concern_options - this is required according to the API
+    if (!productData.concern_options || productData.concern_options.length === 0) {
+      throw new Error('At least one concern option is required');
+    }
+    
+    // Validate images if provided
     if (productData.images?.length) {
       productData.images.forEach(image => {
         if (!image.type?.startsWith('image/')) throw new Error('Only image files allowed');
         if (image.size > 2 * 1024 * 1024) throw new Error('Image must be less than 2MB');
       });
-      
-      // For images, we need to use FormData with POST
-      const formData = new FormData();
-      Object.entries(params).forEach(([key, value]) => {
-        formData.append(key, value);
-      });
-      productData.images.forEach(image => {
-        formData.append('images', image);
-      });
-      
-      const response = await api.postFormData(ENDPOINTS.ADD_PRODUCT, formData);
-      return response.data;
     }
-
-    // If no images, use GET with query parameters
-    const response = await api.get(ENDPOINTS.ADD_PRODUCT, params);
+    
+    // Always use FormData for file uploads
+    const formData = new FormData();
+    
+    // Add basic product data
+    formData.append('name', productData.name.trim());
+    formData.append('price', productData.price.toString());
+    formData.append('description', productData.description.trim());
+    formData.append('quantity', productData.quantity.toString());
+    formData.append('category', productData.category);
+    
+    // Add concern_options as comma-separated string
+    if (Array.isArray(productData.concern_options)) {
+      formData.append('concern_options', productData.concern_options.join(','));
+    } else {
+      formData.append('concern_options', productData.concern_options.toString());
+    }
+    
+    // Add slashed price if provided
+    if (productData.slashed_price) {
+      formData.append('slashed_price', productData.slashed_price.toString());
+    }
+    
+    // Add images - use 'images[]' as the field name for multiple files
+    if (productData.images?.length) {
+      productData.images.forEach(image => {
+        formData.append('images[]', image);
+      });
+    }
+    
+    // Use POST with FormData
+    const response = await api.postFormData(ENDPOINTS.ADD_PRODUCT, formData);
     return response.data;
   },
 
@@ -120,10 +132,19 @@ export const productService = {
     
     // Add only the fields that are being updated
     Object.entries(productData).forEach(([key, value]) => {
-      if (key !== 'images' && value !== undefined) {
+      if (key !== 'images' && key !== 'concern_options' && value !== undefined) {
         params[key] = value;
       }
     });
+
+    // Handle concern_options specially
+    if (productData.concern_options) {
+      if (Array.isArray(productData.concern_options)) {
+        params.concern_options = productData.concern_options.join(',');
+      } else {
+        params.concern_options = productData.concern_options.toString();
+      }
+    }
 
     // Handle images separately if provided
     if (productData.images?.length) {
@@ -182,6 +203,7 @@ export const contactService = {
     }
   }
 };
+
 export const orderService = {
   async initiateCheckout(checkoutData) {
     if (!checkoutData.phone?.trim()) throw new Error('Phone is required');

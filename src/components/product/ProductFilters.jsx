@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { getCategories, getCategoryDisplayName, getSkinConcerns } from '../../utils/api';
 
@@ -9,22 +9,30 @@ export default function ProductFilters({ selectedFilters, onFilterChange, horizo
   
   const filterRef = useRef(null);
 
-  // Get categories and concerns from utils
-  const categories = getCategories();
-  const availableConcerns = getSkinConcerns();
+  // Get categories and concerns from utils - memoize to prevent re-computation
+  const categories = useMemo(() => getCategories(), []);
+  const availableConcerns = useMemo(() => getSkinConcerns(), []);
 
-  // Initialize skin concerns state
+  // Initialize skin concerns state - only run once
   useEffect(() => {
     const initialConcerns = {};
     availableConcerns.forEach(concern => {
       initialConcerns[concern] = false;
     });
     setSkinConcerns(initialConcerns);
-  }, []);
+  }, [availableConcerns]);
 
   // Update skinConcerns state when selectedFilters.concerns changes
+  // Use JSON.stringify for deep comparison to prevent unnecessary updates
+  const selectedConcernsString = useMemo(() => 
+    JSON.stringify(selectedFilters.concerns || []), 
+    [selectedFilters.concerns]
+  );
+
   useEffect(() => {
-    if (selectedFilters.concerns && selectedFilters.concerns.length > 0) {
+    const selectedConcernsArray = JSON.parse(selectedConcernsString);
+    
+    if (selectedConcernsArray && selectedConcernsArray.length > 0) {
       const newConcernState = {};
       
       // Initialize all concerns to false
@@ -33,7 +41,7 @@ export default function ProductFilters({ selectedFilters, onFilterChange, horizo
       });
       
       // Set selected ones to true
-      selectedFilters.concerns.forEach(concern => {
+      selectedConcernsArray.forEach(concern => {
         if (availableConcerns.includes(concern)) {
           newConcernState[concern] = true;
         }
@@ -48,7 +56,7 @@ export default function ProductFilters({ selectedFilters, onFilterChange, horizo
       });
       setSkinConcerns(resetConcerns);
     }
-  }, [selectedFilters.concerns, availableConcerns]);
+  }, [selectedConcernsString, availableConcerns]);
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -78,35 +86,48 @@ export default function ProductFilters({ selectedFilters, onFilterChange, horizo
   }, [onFilterChange]);
 
   const toggleConcern = useCallback((concern) => {
-    setSkinConcerns(prevState => {
-      const newConcernState = {
-        ...prevState,
-        [concern]: !prevState[concern]
-      };
+    // Calculate new state without relying on setSkinConcerns callback
+    const isCurrentlySelected = skinConcerns[concern] || false;
+    const newConcernState = {
+      ...skinConcerns,
+      [concern]: !isCurrentlySelected
+    };
+    
+    setSkinConcerns(newConcernState);
+    
+    // Update selected concerns in parent component
+    const selectedConcerns = Object.entries(newConcernState)
+      .filter(([_, isSelected]) => isSelected)
+      .map(([concernName]) => concernName);
       
-      // Update selected concerns in parent component
-      const selectedConcerns = Object.entries(newConcernState)
-        .filter(([_, isSelected]) => isSelected)
-        .map(([concernName]) => concernName);
-        
-      onFilterChange({ concerns: selectedConcerns });
-      
-      return newConcernState;
-    });
-  }, [onFilterChange]);
+    onFilterChange({ concerns: selectedConcerns });
+  }, [onFilterChange, skinConcerns]);
 
   const removeConcern = useCallback((concernToRemove) => {
+    if (!selectedFilters.concerns) return;
+    
     const updatedConcerns = selectedFilters.concerns.filter(concern => concern !== concernToRemove);
     onFilterChange({ concerns: updatedConcerns });
   }, [onFilterChange, selectedFilters.concerns]);
 
-  // Check if any filters are applied
-  const hasCategory = selectedFilters.category && selectedFilters.category !== '';
-  const hasConcerns = selectedFilters.concerns && selectedFilters.concerns.length > 0;
-  const hasFilters = hasCategory || hasConcerns;
+  // Memoize computed values to prevent unnecessary recalculations
+  const hasCategory = useMemo(() => 
+    selectedFilters.category && selectedFilters.category !== '', 
+    [selectedFilters.category]
+  );
+  
+  const hasConcerns = useMemo(() => 
+    selectedFilters.concerns && selectedFilters.concerns.length > 0, 
+    [selectedFilters.concerns]
+  );
+  
+  const hasFilters = useMemo(() => 
+    hasCategory || hasConcerns, 
+    [hasCategory, hasConcerns]
+  );
 
-  // Determine what to display in the filter button
-  const getButtonLabel = useCallback(() => {
+  // Determine what to display in the filter button - memoized
+  const buttonLabel = useMemo(() => {
     if (hasCategory && !hasConcerns) {
       return getCategoryDisplayName(selectedFilters.category);
     } else if (!hasCategory && hasConcerns) {
@@ -134,7 +155,7 @@ export default function ProductFilters({ selectedFilters, onFilterChange, horizo
           aria-expanded={isFilterOpen}
         >
           <span className={`${hasFilters ? 'text-pink-600' : 'text-gray-600'} truncate`}>
-            {getButtonLabel()}
+            {buttonLabel}
           </span>
           <ChevronDown 
             className={`w-4 h-4 ${hasFilters ? 'text-pink-500' : 'text-gray-500'} ml-2 transition-transform ${
@@ -264,7 +285,7 @@ export default function ProductFilters({ selectedFilters, onFilterChange, horizo
             <div className="mb-2">
               <h3 className="text-sm font-medium text-gray-700 mb-2">Selected Concerns:</h3>
               <div className="flex flex-wrap gap-2">
-                {selectedFilters.concerns.map((concern) => (
+                {selectedFilters.concerns?.map((concern) => (
                   <span key={concern} className="px-3 py-1 text-sm bg-pink-100 text-pink-800 rounded-full inline-flex items-center">
                     {concern}
                     <button 

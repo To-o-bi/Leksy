@@ -12,6 +12,7 @@ const AddProductPage = () => {
     category: '',
     quantity: '',
     description: '',
+    concern_options: [],
     images: []
   });
   
@@ -21,7 +22,7 @@ const AddProductPage = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [notification, setNotification] = useState(null);
 
-  // Categories from your API config
+  // Categories from your API config - make sure these match your service file CATEGORIES
   const categories = [
     { value: "serums", label: "Serums" },
     { value: "face cleansers", label: "Face Cleansers" },
@@ -29,6 +30,16 @@ const AddProductPage = () => {
     { value: "moisturizers", label: "Moisturizers" },
     { value: "bathe and body", label: "Bathe and Body" },
     { value: "toners", label: "Toners" }
+  ];
+
+  // Refined skin concern options
+  const concernOptions = [
+    { value: "anti_aging", label: "Anti-Aging" },
+    { value: "oily_skin", label: "Oily Skin" },
+    { value: "dry_skin", label: "Dry Skin" },
+    { value: "acne", label: "Acne" },
+    { value: "hyperpigmentation", label: "Hyperpigmentation" },
+    { value: "sensitive_skin", label: "Sensitive Skin" }
   ];
 
   const handleInputChange = (e) => {
@@ -47,6 +58,25 @@ const AddProductPage = () => {
     }
   };
 
+  const handleConcernToggle = (concernValue) => {
+    const updatedConcerns = formData.concern_options.includes(concernValue)
+      ? formData.concern_options.filter(c => c !== concernValue)
+      : [...formData.concern_options, concernValue];
+    
+    setFormData({
+      ...formData,
+      concern_options: updatedConcerns
+    });
+    
+    // Clear error when concerns are modified
+    if (errors.concern_options) {
+      setErrors({
+        ...errors,
+        concern_options: null
+      });
+    }
+  };
+
   const validateForm = () => {
     const newErrors = {};
     
@@ -57,6 +87,7 @@ const AddProductPage = () => {
     if (!formData.quantity) newErrors.quantity = "Quantity is required";
     if (formData.quantity < 0) newErrors.quantity = "Quantity must be 0 or greater";
     if (!formData.description.trim()) newErrors.description = "Description is required";
+    if (formData.concern_options.length === 0) newErrors.concern_options = "At least one skin concern is required";
     if (formData.images.length === 0) newErrors.images = "At least one product image is required";
     
     // Validate slashed price is greater than main price if provided
@@ -83,43 +114,29 @@ const AddProductPage = () => {
     setNotification(null);
     
     try {
-      // Create FormData manually to ensure proper field names for your API
-      const formDataToSend = new FormData();
-      
-      // Add basic product data
-      formDataToSend.append('name', formData.name.trim());
-      formDataToSend.append('price', parseFloat(formData.price));
-      formDataToSend.append('description', formData.description.trim());
-      formDataToSend.append('quantity', parseInt(formData.quantity, 10));
-      formDataToSend.append('category', formData.category);
+      // Prepare data for the productService
+      const productData = {
+        name: formData.name.trim(),
+        price: parseFloat(formData.price),
+        description: formData.description.trim(),
+        quantity: parseInt(formData.quantity, 10),
+        category: formData.category,
+        concern_options: formData.concern_options, // Required field
+        images: formData.images
+      };
       
       // Add slashed price if provided
       if (formData.slashed_price) {
-        formDataToSend.append('slashed_price', parseFloat(formData.slashed_price));
+        productData.slashed_price = parseFloat(formData.slashed_price);
       }
       
-      // IMPORTANT: Add images with proper field name (images[] as expected by API)
-      formData.images.forEach((file) => {
-        formDataToSend.append('images[]', file);
+      console.log('Submitting product via productService...', {
+        ...productData,
+        images: `${productData.images.length} files`
       });
       
-      console.log('Submitting product with FormData...');
-      console.log('Image files count:', formData.images.length);
-      
-      // Use direct API call instead of productService to ensure proper FormData handling
-      const authToken = localStorage.getItem('authToken') || 
-                       document.cookie.match(/auth=([^;]+)/)?.[1] ? 
-                       atob(document.cookie.match(/auth=([^;]+)/)[1]) : null;
-      
-      const response = await fetch('/api/admin/add-product', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: formDataToSend // Send FormData directly
-      });
-      
-      const result = await response.json();
+      // Use the productService instead of direct fetch
+      const result = await productService.addProduct(productData);
       
       console.log('Product added successfully:', result);
       
@@ -143,22 +160,34 @@ const AddProductPage = () => {
       console.error('Error adding product:', error);
       
       // Handle specific API errors
-      if (error.message.includes('Validation failed')) {
-        setNotification({
-          type: 'error',
-          message: error.message
-        });
+      let errorMessage = 'Failed to add product. Please try again.';
+      
+      if (error.message.includes('name is required')) {
+        errorMessage = 'Product name is required.';
+      } else if (error.message.includes('price is required')) {
+        errorMessage = 'Valid price is required.';
+      } else if (error.message.includes('description is required')) {
+        errorMessage = 'Description is required.';
+      } else if (error.message.includes('quantity is required')) {
+        errorMessage = 'Valid quantity is required.';
+      } else if (error.message.includes('category is required')) {
+        errorMessage = 'Valid category is required.';
+      } else if (error.message.includes('concern option')) {
+        errorMessage = 'At least one skin concern is required.';
+      } else if (error.message.includes('Only image files allowed')) {
+        errorMessage = 'Only image files are allowed.';
+      } else if (error.message.includes('Image must be less than 2MB')) {
+        errorMessage = 'Images must be less than 2MB each.';
       } else if (error.message.includes('Authentication') || error.message.includes('Unauthorized')) {
-        setNotification({
-          type: 'error',
-          message: 'Please log in again to continue.'
-        });
-      } else {
-        setNotification({
-          type: 'error',
-          message: error.message || 'Failed to add product. Please try again.'
-        });
+        errorMessage = 'Please log in again to continue.';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
+      
+      setNotification({
+        type: 'error',
+        message: errorMessage
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -264,7 +293,8 @@ const AddProductPage = () => {
 
   const handleBack = () => {
     const hasChanges = Object.values(formData).some(value => 
-      typeof value === 'string' ? value.trim() !== '' : value.length > 0
+      typeof value === 'string' ? value.trim() !== '' : 
+      Array.isArray(value) ? value.length > 0 : false
     );
     
     if (hasChanges && !window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
@@ -557,6 +587,50 @@ const AddProductPage = () => {
                   <p className="mt-1 text-red-500 text-sm flex items-center">
                     <AlertCircle size={16} className="mr-1" />
                     {errors.quantity}
+                  </p>
+                )}
+              </div>
+
+              {/* Skin Concerns Section - Fixed UI layout */}
+              <div className="mb-6">
+                <label className="block text-gray-700 mb-2">Skin Concerns*</label>
+                <p className="text-sm text-gray-500 mb-3">Select which skin concerns this product addresses:</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {concernOptions.map(concern => (
+                    <label 
+                      key={concern.value} 
+                      className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${
+                        formData.concern_options.includes(concern.value)
+                          ? 'bg-pink-50 border-pink-300 text-pink-700'
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.concern_options.includes(concern.value)}
+                        onChange={() => handleConcernToggle(concern.value)}
+                        disabled={isSubmitting}
+                        className="sr-only"
+                      />
+                      <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center flex-shrink-0 ${
+                        formData.concern_options.includes(concern.value)
+                          ? 'bg-pink-500 border-pink-500'
+                          : 'border-gray-300'
+                      }`}>
+                        {formData.concern_options.includes(concern.value) && (
+                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className="text-sm font-medium">{concern.label}</span>
+                    </label>
+                  ))}
+                </div>
+                {errors.concern_options && (
+                  <p className="mt-2 text-red-500 text-sm flex items-center">
+                    <AlertCircle size={16} className="mr-1" />
+                    {errors.concern_options}
                   </p>
                 )}
               </div>
