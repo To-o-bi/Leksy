@@ -9,11 +9,9 @@ const Message = ({
   duration = 3000, 
   onClose 
 }) => {
-  const [isVisible, setIsVisible] = useState(show);
   const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
-    setIsVisible(show);
     setIsExiting(false);
     
     let timer;
@@ -33,12 +31,9 @@ const Message = ({
     
     // Small delay to allow exit animation to play
     setTimeout(() => {
-      setIsVisible(false);
       if (onClose) onClose();
     }, 300);
   };
-
-  if (!isVisible) return null;
 
   const messageIcon = () => {
     switch (type) {
@@ -71,7 +66,7 @@ const Message = ({
   return (
     <div 
       className={`
-        fixed top-4 right-4 p-4 rounded-md shadow-lg z-50
+        p-4 rounded-md shadow-lg
         border-l-4 max-w-md w-full md:w-96
         flex items-start gap-3
         transform transition-all duration-300 ease-in-out

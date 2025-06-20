@@ -1,5 +1,5 @@
 // src/contexts/MessageContext.jsx
-import React, { createContext, useState, useCallback, useContext } from 'react';
+import React, { createContext, useState, useCallback, useContext, useRef } from 'react';
 import Message from '../components/common/Message';
 
 export const MessageContext = createContext();
@@ -14,11 +14,12 @@ export const useMessage = () => {
 
 export const MessageProvider = ({ children }) => {
   const [messages, setMessages] = useState([]);
-  const [counter, setCounter] = useState(0);
+  // Use useRef to maintain counter across re-renders without causing re-renders
+  const counterRef = useRef(0);
 
   const showMessage = useCallback((message, type = 'success', duration = 3000) => {
-    const id = counter;
-    setCounter(prev => prev + 1);
+    // Increment counter and get unique ID
+    const id = counterRef.current++;
     
     setMessages(prev => [...prev, { id, message, type, duration, show: true }]);
     
@@ -30,7 +31,7 @@ export const MessageProvider = ({ children }) => {
     }
     
     return id;
-  }, [counter]);
+  }, []); // Remove counter dependency since we're using ref
 
   const hideMessage = useCallback((id) => {
     setMessages(prev => prev.map(msg => 
