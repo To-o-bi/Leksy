@@ -164,9 +164,9 @@ export default function ProductFilters({ selectedFilters, onFilterChange, horizo
           />
         </button>
 
-        {/* Combined dropdown with tabs */}
+        {/* Combined dropdown with tabs - FIXED Z-INDEX AND POSITIONING */}
         {isFilterOpen && (
-          <div className="absolute z-10 w-64 mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
+          <div className="absolute z-50 w-64 mt-1 bg-white border border-gray-200 rounded-md shadow-lg right-0">
             {/* Tab headers */}
             <div className="flex border-b border-gray-200">
               <button
