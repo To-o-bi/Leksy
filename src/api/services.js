@@ -8,21 +8,21 @@ export const authService = {
     if (!username || !password) {
       throw new Error('Username and password are required');
     }
-    
+
     const formData = new FormData();
     formData.append('username', username);
     formData.append('password', password);
-    
+
     const response = await api.post('/admin/login', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
-    
+
     if (response.data?.code === 200) {
       if (response.data.token) api.setToken(response.data.token);
       if (response.data.user) localStorage.setItem('user', JSON.stringify(response.data.user));
       return response.data;
     }
-    
+
     throw new Error(response.data?.message || 'Login failed');
   },
 
@@ -62,7 +62,7 @@ export const productService = {
     if (filters.productIds?.length) params.products_ids_array = filters.productIds.join(',');
     if (filters.sort) params.sort = filters.sort;
     if (filters.limit) params.limit = filters.limit;
-    
+
     const response = await api.get(ENDPOINTS.FETCH_PRODUCTS, params);
     return response.data;
   },
@@ -73,71 +73,59 @@ export const productService = {
   },
 
   async addProduct(productData) {
-    // Validation
     if (!productData.name?.trim()) throw new Error('Product name is required');
     if (!productData.price || parseFloat(productData.price) <= 0) throw new Error('Valid price is required');
     if (!productData.description?.trim()) throw new Error('Description is required');
     if (!productData.quantity || parseInt(productData.quantity) < 0) throw new Error('Valid quantity is required');
     if (!productData.category || !CATEGORIES.includes(productData.category)) throw new Error('Valid category is required');
-    
-    // Validate concern_options - this is required according to the API
+
     if (!productData.concern_options || productData.concern_options.length === 0) {
       throw new Error('At least one concern option is required');
     }
-    
-    // Validate images if provided
+
     if (productData.images?.length) {
       productData.images.forEach(image => {
         if (!image.type?.startsWith('image/')) throw new Error('Only image files allowed');
         if (image.size > 2 * 1024 * 1024) throw new Error('Image must be less than 2MB');
       });
     }
-    
-    // Always use FormData for file uploads
+
     const formData = new FormData();
-    
-    // Add basic product data
     formData.append('name', productData.name.trim());
     formData.append('price', productData.price.toString());
     formData.append('description', productData.description.trim());
     formData.append('quantity', productData.quantity.toString());
     formData.append('category', productData.category);
-    
-    // Add concern_options as comma-separated string
+
     if (Array.isArray(productData.concern_options)) {
       formData.append('concern_options', productData.concern_options.join(','));
     } else {
       formData.append('concern_options', productData.concern_options.toString());
     }
-    
-    // Add slashed price if provided
+
     if (productData.slashed_price) {
       formData.append('slashed_price', productData.slashed_price.toString());
     }
-    
-    // Add images - use 'images[]' as the field name for multiple files
+
     if (productData.images?.length) {
       productData.images.forEach(image => {
         formData.append('images[]', image);
       });
     }
-    
-    // Use POST with FormData
+
     const response = await api.postFormData(ENDPOINTS.ADD_PRODUCT, formData);
     return response.data;
   },
 
   async updateProduct(productId, productData) {
     const params = { product_id: productId };
-    
-    // Add only the fields that are being updated
+
     Object.entries(productData).forEach(([key, value]) => {
       if (key !== 'images' && key !== 'concern_options' && value !== undefined) {
         params[key] = value;
       }
     });
 
-    // Handle concern_options specially
     if (productData.concern_options) {
       if (Array.isArray(productData.concern_options)) {
         params.concern_options = productData.concern_options.join(',');
@@ -146,7 +134,6 @@ export const productService = {
       }
     }
 
-    // Handle images separately if provided
     if (productData.images?.length) {
       const formData = new FormData();
       Object.entries(params).forEach(([key, value]) => {
@@ -155,20 +142,34 @@ export const productService = {
       productData.images.forEach(image => {
         formData.append('images', image);
       });
-      
+
       const response = await api.postFormData(ENDPOINTS.UPDATE_PRODUCT, formData);
       return response.data;
     }
 
-    // If no images, use GET with query parameters
     const response = await api.get(ENDPOINTS.UPDATE_PRODUCT, params);
     return response.data;
   },
 
-  async deleteProduct(productId) {
-    // Use GET request with query parameters as per API doc
-    const response = await api.get(ENDPOINTS.DELETE_PRODUCT, { product_id: productId });
-    return response.data;
+    async deleteProduct(productId) {
+    try {
+      // Try FormData approach (similar to login and other endpoints)
+      const formData = new FormData();
+      formData.append('product_id', productId);
+      
+      const response = await api.postFormData(ENDPOINTS.DELETE_PRODUCT, formData);
+      
+      // Log the response to debug
+      console.log('Delete API response:', response);
+      console.log('Response data:', response.data);
+      
+      // Return the full response data structure that your frontend expects
+      return response.data || response;
+    } catch (error) {
+      console.error('Delete product API error:', error);
+      // Re-throw the error so your frontend can handle it
+      throw error;
+    }
   }
 };
 
@@ -217,7 +218,6 @@ export const orderService = {
       if (!checkoutData.street_address?.trim()) throw new Error('Street address is required');
     }
 
-    // API expects name and email as well according to the documentation
     const params = {
       name: checkoutData.name || '',
       email: checkoutData.email || '',
@@ -236,7 +236,6 @@ export const orderService = {
       params.success_redirect = checkoutData.success_redirect;
     }
 
-    // Use POST request as per API doc (checkout/initiate uses POST)
     const response = await api.post(ENDPOINTS.INITIATE_CHECKOUT, null, { params });
     return response.data;
   },
@@ -247,7 +246,6 @@ export const orderService = {
   },
 
   async fetchOrder(orderId) {
-    // Add single order fetch endpoint
     const response = await api.get(ENDPOINTS.FETCH_ORDER, { order_id: orderId });
     return response.data;
   },
@@ -256,7 +254,6 @@ export const orderService = {
     const validStatuses = ['unpaid', 'order-received', 'packaged', 'in-transit', 'delivered'];
     if (!validStatuses.includes(newStatus)) throw new Error('Invalid delivery status');
 
-    // Use GET request with query parameters as per API doc
     const response = await api.get(ENDPOINTS.CHANGE_DELIVERY_STATUS, {
       order_id: orderId,
       new_delivery_status: newStatus
@@ -268,16 +265,14 @@ export const orderService = {
 export const consultationService = {
   async initiateConsultation(consultationData) {
     console.log('🔍 Raw consultation data received:', consultationData);
-    
-    // Helper function to check if a value is truly empty
+
     const isEmpty = (value) => {
       if (value === null || value === undefined) return true;
       if (typeof value === 'string') return value.trim() === '';
       if (Array.isArray(value)) return value.length === 0 || value.every(isEmpty);
       return false;
     };
-    
-    // Build clean data
+
     const cleanData = {
       name: consultationData.name?.toString().trim(),
       email: consultationData.email?.toString().trim(),
@@ -290,103 +285,72 @@ export const consultationService = {
       time_range: consultationData.time_range?.toString().trim(),
       success_redirect: consultationData.success_redirect || `${window.location.origin}/consultation/success`
     };
-    
-    // Handle skin_concerns
+
     let skinConcerns = consultationData.skin_concerns;
     if (Array.isArray(skinConcerns)) {
       cleanData.skin_concerns = skinConcerns.filter(c => !isEmpty(c)).join(',');
     } else {
       cleanData.skin_concerns = skinConcerns?.toString().trim();
     }
-    
-    // Add optional fields
+
     if (!isEmpty(consultationData.current_skincare_products)) {
       cleanData.current_skincare_products = consultationData.current_skincare_products.toString().trim();
     }
-    
+
     if (!isEmpty(consultationData.additional_details)) {
       cleanData.additional_details = consultationData.additional_details.toString().trim();
     }
-    
-    console.log('✅ Clean data prepared:', cleanData);
-    
-    // Try multiple approaches since we're not sure what the backend expects
-    
-    // APPROACH 1: POST with query parameters (as shown in API doc)
+
     try {
-      console.log('🚀 APPROACH 1: POST with query parameters');
       const queryString = new URLSearchParams(cleanData).toString();
       const url = `${ENDPOINTS.INITIATE_CONSULTATION}?${queryString}`;
-      console.log('Full URL:', url);
-      
       const response1 = await api.post(url);
-      console.log('✅ APPROACH 1 SUCCESS:', response1.data);
       return response1.data;
     } catch (error1) {
       console.log('❌ APPROACH 1 FAILED:', error1.response?.data?.message || error1.message);
     }
-    
-    // APPROACH 2: POST with data in body
+
     try {
-      console.log('🚀 APPROACH 2: POST with data in body');
       const response2 = await api.post(ENDPOINTS.INITIATE_CONSULTATION, cleanData);
-      console.log('✅ APPROACH 2 SUCCESS:', response2.data);
       return response2.data;
     } catch (error2) {
       console.log('❌ APPROACH 2 FAILED:', error2.response?.data?.message || error2.message);
     }
-    
-    // APPROACH 3: POST with FormData (like contact form)
+
     try {
-      console.log('🚀 APPROACH 3: POST with FormData');
       const formData = new FormData();
       Object.entries(cleanData).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
           formData.append(key, value);
         }
       });
-      
-      // Log FormData contents
-      console.log('FormData contents:');
-      for (let [key, value] of formData.entries()) {
-        console.log(`  ${key}: ${value}`);
-      }
-      
       const response3 = await api.postFormData(ENDPOINTS.INITIATE_CONSULTATION, formData);
-      console.log('✅ APPROACH 3 SUCCESS:', response3.data);
       return response3.data;
     } catch (error3) {
       console.log('❌ APPROACH 3 FAILED:', error3.response?.data?.message || error3.message);
     }
-    
-    // APPROACH 4: POST with params in config (original approach)
+
     try {
-      console.log('🚀 APPROACH 4: POST with params in config');
       const response4 = await api.post(ENDPOINTS.INITIATE_CONSULTATION, null, { params: cleanData });
-      console.log('✅ APPROACH 4 SUCCESS:', response4.data);
       return response4.data;
     } catch (error4) {
       console.log('❌ APPROACH 4 FAILED:', error4.response?.data?.message || error4.message);
     }
-    
-    // APPROACH 5: GET request with query parameters
+
     try {
-      console.log('🚀 APPROACH 5: GET with query parameters');
       const response5 = await api.get(ENDPOINTS.INITIATE_CONSULTATION, cleanData);
-      console.log('✅ APPROACH 5 SUCCESS:', response5.data);
       return response5.data;
     } catch (error5) {
       console.log('❌ APPROACH 5 FAILED:', error5.response?.data?.message || error5.message);
     }
-    
-    // If all approaches failed
+
     throw new Error('All API request approaches failed. Check console for detailed error messages.');
   },
 
   async fetchBookedTimes(date = null) {
     const params = {};
     if (date) params.date = date;
-    
+
     const response = await api.get(ENDPOINTS.FETCH_BOOKED_TIMES, params);
     return response.data;
   },

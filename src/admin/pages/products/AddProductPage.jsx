@@ -354,7 +354,7 @@ const AddProductPage = () => {
             <ChevronLeft size={20} />
             <span className="ml-1">Back to Products</span>
           </button>
-        </div>
+        </div>  
         
         <h1 className="text-2xl font-medium mb-6 md:mb-8">Add New Product</h1>
         
