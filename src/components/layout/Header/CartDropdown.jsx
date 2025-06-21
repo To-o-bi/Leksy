@@ -11,7 +11,8 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
     cart = [], 
     totalItems = 0, 
     removeFromCart = () => console.warn('removeFromCart not available'), 
-    updateCartItemQuantity = () => console.warn('updateCartItemQuantity not available'), 
+    updateCartItemQuantity = () => console.warn('updateCartItemQuantity not available'),
+    addToCart = () => console.warn('addToCart not available'), // Added this line
     cartTotal = 0 
   } = cartContext;
   
@@ -19,8 +20,7 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
   const wishlistContext = useContext(WishlistContext) || {};
   const { 
     wishlist = [], 
-    removeFromWishlist = () => console.warn('removeFromWishlist not available'), 
-    addToCart: contextAddToCart = () => console.warn('addToCart not available') 
+    removeFromWishlist = () => console.warn('removeFromWishlist not available')
   } = wishlistContext;
   
   const sidebarRef = useRef(null);
@@ -170,15 +170,21 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
     }
   }, [removeFromCart]);
   
-  // Handle adding item from wishlist to cart
+  // Handle adding item from wishlist to cart - FIXED TO USE CART'S addToCart
   const addWishlistItemToCart = useCallback((item) => {
-    // Call context function if available
-    if (typeof contextAddToCart === 'function') {
-      contextAddToCart(item);
-      // Optionally switch to cart tab
-      setActiveTab('cart');
+    // Call cart context function to add to cart if available
+    if (typeof addToCart === 'function') {
+      addToCart(item);
     }
-  }, [contextAddToCart]);
+    
+    // Remove the item from wishlist after adding to cart
+    if (typeof removeFromWishlist === 'function') {
+      removeFromWishlist(item.id);
+    }
+    
+    // Switch to cart tab to show the added item
+    setActiveTab('cart');
+  }, [addToCart, removeFromWishlist]);
   
   // Handle removing item from wishlist
   const handleRemoveFromWishlist = useCallback((itemId) => {
@@ -187,16 +193,23 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
     }
   }, [removeFromWishlist]);
   
-  // Add all wishlist items to cart
+  // Add all wishlist items to cart - FIXED TO USE CART'S addToCart
   const addAllToCart = useCallback(() => {
-    if (memoizedWishlistItems.length > 0 && typeof contextAddToCart === 'function') {
+    if (memoizedWishlistItems.length > 0 && typeof addToCart === 'function' && typeof removeFromWishlist === 'function') {
+      // Add all items to cart
       memoizedWishlistItems.forEach(item => {
-        contextAddToCart(item);
+        addToCart(item);
       });
+      
+      // Remove all items from wishlist
+      memoizedWishlistItems.forEach(item => {
+        removeFromWishlist(item.id);
+      });
+      
       // Switch to cart tab after adding all items
       setActiveTab('cart');
     }
-  }, [memoizedWishlistItems, contextAddToCart]);
+  }, [memoizedWishlistItems, addToCart, removeFromWishlist]);
   
   const renderCartItems = () => {
     if (memoizedCartItems.length === 0) {
@@ -237,7 +250,7 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gray-200">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                       </div>
                     )}
@@ -379,7 +392,7 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gray-200">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                       </div>
                     )}
