@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, Trash2, Edit, Plus, ChevronLeft, ChevronRight, ShoppingBag } from 'lucide-react';
+import { Eye, Trash2, Edit, Plus, ChevronLeft, ChevronRight, ShoppingBag, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { productService } from '../../../api';
 
@@ -13,6 +13,12 @@ const ProductStockPage = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [activeProduct, setActiveProduct] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Bulk selection states
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState(new Set());
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   
   const itemsPerPage = 10;
 
@@ -69,6 +75,103 @@ const ProductStockPage = () => {
     }
   };
 
+  // Bulk selection handlers
+  const handleSelectModeToggle = () => {
+    setIsSelectionMode(!isSelectionMode);
+    setSelectedProducts(new Set());
+  };
+
+  const handleProductSelect = (productId) => {
+    const newSelected = new Set(selectedProducts);
+    if (newSelected.has(productId)) {
+      newSelected.delete(productId);
+    } else {
+      newSelected.add(productId);
+    }
+    setSelectedProducts(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    const currentProductIds = currentProducts.map(p => p.product_id);
+    const allCurrentSelected = currentProductIds.every(id => selectedProducts.has(id));
+    
+    const newSelected = new Set(selectedProducts);
+    if (allCurrentSelected) {
+      currentProductIds.forEach(id => newSelected.delete(id));
+    } else {
+      currentProductIds.forEach(id => newSelected.add(id));
+    }
+    setSelectedProducts(newSelected);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedProducts.size === 0) return;
+    
+    setIsBulkDeleting(true);
+    const selectedProductIds = Array.from(selectedProducts);
+    const selectedProductNames = products
+      .filter(p => selectedProducts.has(p.product_id))
+      .map(p => p.name);
+    
+    try {
+      // Delete products one by one using your existing API
+      const deletePromises = selectedProductIds.map(productId => 
+        productService.deleteProduct(productId)
+      );
+      
+      const results = await Promise.allSettled(deletePromises);
+      
+      // Check which deletions were successful
+      const successfulDeletions = [];
+      const failedDeletions = [];
+      
+      results.forEach((result, index) => {
+        const productId = selectedProductIds[index];
+        if (result.status === 'fulfilled' && result.value?.code === 200) {
+          successfulDeletions.push(productId);
+        } else {
+          failedDeletions.push(productId);
+        }
+      });
+      
+      // Update products list by removing successfully deleted products
+      if (successfulDeletions.length > 0) {
+        setProducts(prev => prev.filter(p => !successfulDeletions.includes(p.product_id)));
+      }
+      
+      // Show notification based on results
+      if (failedDeletions.length === 0) {
+        setNotification({
+          type: 'success',
+          message: `Successfully deleted ${successfulDeletions.length} product${successfulDeletions.length > 1 ? 's' : ''}`
+        });
+      } else if (successfulDeletions.length === 0) {
+        setNotification({
+          type: 'error',
+          message: 'Failed to delete selected products'
+        });
+      } else {
+        setNotification({
+          type: 'success',
+          message: `Deleted ${successfulDeletions.length} products. ${failedDeletions.length} failed to delete.`
+        });
+      }
+      
+      // Reset selection
+      setSelectedProducts(new Set());
+      setShowBulkDeleteModal(false);
+      setIsSelectionMode(false);
+      
+    } catch (error) {
+      setNotification({
+        type: 'error',
+        message: 'An error occurred during bulk deletion'
+      });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   const formatPrice = (price) => {
     if (!price) return '₦0.00';
     return '₦' + parseFloat(price).toLocaleString('en-US', { 
@@ -89,6 +192,11 @@ const ProductStockPage = () => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentProducts = products.slice(startIndex, startIndex + itemsPerPage);
 
+  // Check if all current page products are selected
+  const currentPageProductIds = currentProducts.map(p => p.product_id);
+  const allCurrentPageSelected = currentPageProductIds.length > 0 && 
+    currentPageProductIds.every(id => selectedProducts.has(id));
+
   return (
     <div className="bg-gray-50 min-h-screen p-6">
       
@@ -107,13 +215,47 @@ const ProductStockPage = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-medium text-gray-800">Product Stock</h1>
-        <button 
-          onClick={() => navigate('/admin/products/add')}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center"
-        >
-          <Plus size={16} className="mr-2" />
-          Add New
-        </button>
+        <div className="flex items-center space-x-3">
+          {!isSelectionMode ? (
+            <>
+              <button 
+                onClick={handleSelectModeToggle}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md flex items-center"
+              >
+                Select Products
+              </button>
+              <button 
+                onClick={() => navigate('/admin/products/add')}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center"
+              >
+                <Plus size={16} className="mr-2" />
+                Add New
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-sm text-gray-600">
+                {selectedProducts.size} selected
+              </span>
+              {selectedProducts.size > 0 && (
+                <button 
+                  onClick={() => setShowBulkDeleteModal(true)}
+                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md flex items-center"
+                >
+                  <Trash2 size={16} className="mr-2" />
+                  Delete Selected
+                </button>
+              )}
+              <button 
+                onClick={handleSelectModeToggle}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md flex items-center"
+              >
+                <X size={16} className="mr-2" />
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Products Table */}
@@ -121,6 +263,16 @@ const ProductStockPage = () => {
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
+              {isSelectionMode && (
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={allCurrentPageSelected}
+                    onChange={handleSelectAll}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </th>
+              )}
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Image</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Product</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Category</th>
@@ -132,14 +284,14 @@ const ProductStockPage = () => {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan="6" className="px-4 py-8 text-center">
+                <td colSpan={isSelectionMode ? "7" : "6"} className="px-4 py-8 text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
                   <p className="text-gray-500 mt-2">Loading products...</p>
                 </td>
               </tr>
             ) : products.length === 0 ? (
               <tr>
-                <td colSpan="6" className="px-4 py-8 text-center">
+                <td colSpan={isSelectionMode ? "7" : "6"} className="px-4 py-8 text-center">
                   <ShoppingBag size={48} className="text-gray-300 mx-auto mb-3" />
                   <p className="text-gray-500">No products found</p>
                   <button 
@@ -153,6 +305,16 @@ const ProductStockPage = () => {
             ) : (
               currentProducts.map((product) => (
                 <tr key={product.product_id} className="border-b hover:bg-gray-50">
+                  {isSelectionMode && (
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedProducts.has(product.product_id)}
+                        onChange={() => handleProductSelect(product.product_id)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </td>
+                  )}
                   <td className="px-4 py-3">
                     <div className="w-12 h-12 rounded-md overflow-hidden bg-gray-100">
                       <img 
@@ -182,6 +344,7 @@ const ProductStockPage = () => {
                       <button 
                         onClick={() => navigate(`/admin/products/edit/${product.product_id}`)}
                         className="text-gray-500 hover:text-gray-700"
+                        disabled={isSelectionMode}
                       >
                         <Edit size={16} />
                       </button>
@@ -191,6 +354,7 @@ const ProductStockPage = () => {
                           setShowDeleteModal(true);
                         }}
                         className="text-gray-500 hover:text-red-500"
+                        disabled={isSelectionMode}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -229,7 +393,7 @@ const ProductStockPage = () => {
         )}
       </div>
 
-      {/* Delete Modal */}
+      {/* Single Product Delete Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
@@ -251,6 +415,34 @@ const ProductStockPage = () => {
                 disabled={isSubmitting}
               >
                 {isSubmitting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Modal */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-medium mb-4">Confirm Bulk Delete</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete {selectedProducts.size} selected product{selectedProducts.size > 1 ? 's' : ''}? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowBulkDeleteModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                disabled={isBulkDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:opacity-50"
+                disabled={isBulkDeleting}
+              >
+                {isBulkDeleting ? 'Deleting...' : `Delete ${selectedProducts.size} Product${selectedProducts.size > 1 ? 's' : ''}`}
               </button>
             </div>
           </div>
