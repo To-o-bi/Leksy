@@ -1,8 +1,13 @@
+// config/api.js
 export const API_CONFIG = {
   BASE_URL: import.meta.env.VITE_API_URL || 'https://leksycosmetics.com/api',
   TIMEOUT: 30000,
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000,
+  HEADERS: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
 };
 
 export const ENDPOINTS = {
@@ -25,6 +30,11 @@ export const ENDPOINTS = {
   FETCH_BOOKED_TIMES: '/consultation/fetch-booked-times',
   FETCH_CONSULTATION: '/admin/fetch-consultation',
   FETCH_CONSULTATIONS: '/fetch-consultations',
+  
+  // Newsletter endpoints
+  ADD_NEWSLETTER_SUBSCRIBER: '/newsletter-subscribers/add',
+  REMOVE_NEWSLETTER_SUBSCRIBER: '/newsletter-subscribers/remove',
+  FETCH_NEWSLETTER_SUBSCRIBERS: '/admin/fetch-newsletter-subscribers'
 };
 
 export const CATEGORIES = ['serums', 'moisturizers', 'bathe and body', 'sunscreens', 'toners', 'face cleansers'];

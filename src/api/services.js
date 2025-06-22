@@ -1,6 +1,6 @@
 // src/api/services.js
 import api from './axios.js';
-import { ENDPOINTS, CATEGORIES } from './config.js';
+import { ENDPOINTS, CATEGORIES, API_CONFIG } from './config.js';
 // import { validateForm, validators } from './validation.js';
 
 export const authService = {
@@ -117,39 +117,51 @@ export const productService = {
     return response.data;
   },
 
-  async updateProduct(productId, productData) {
-    const params = { product_id: productId };
+    async updateProduct(productId, productData) {
+  // Always include product_id in the params
+  const params = new URLSearchParams();
+  params.append('product_id', productId);
 
-    Object.entries(productData).forEach(([key, value]) => {
-      if (key !== 'images' && key !== 'concern_options' && value !== undefined) {
-        params[key] = value;
-      }
+  // Add other fields if they exist in productData
+  if (productData.name) params.append('name', productData.name);
+  if (productData.price) params.append('price', productData.price);
+  if (productData.description) params.append('description', productData.description);
+  if (productData.quantity) params.append('quantity', productData.quantity);
+  if (productData.category) params.append('category', productData.category);
+  if (productData.slashed_price) params.append('slashed_price', productData.slashed_price);
+  
+  if (productData.concern_options) {
+    params.append('concern_options', 
+      Array.isArray(productData.concern_options) 
+        ? productData.concern_options.join(',') 
+        : productData.concern_options.toString()
+    );
+  }
+
+  // Handle image uploads separately
+  if (productData.images?.length) {
+    const formData = new FormData();
+    // Add all params to formData
+    params.forEach((value, key) => {
+      formData.append(key, value);
     });
-
-    if (productData.concern_options) {
-      if (Array.isArray(productData.concern_options)) {
-        params.concern_options = productData.concern_options.join(',');
-      } else {
-        params.concern_options = productData.concern_options.toString();
-      }
-    }
-
-    if (productData.images?.length) {
-      const formData = new FormData();
-      Object.entries(params).forEach(([key, value]) => {
-        formData.append(key, value.toString());
-      });
-      productData.images.forEach(image => {
-        formData.append('images', image);
-      });
-
-      const response = await api.postFormData(ENDPOINTS.UPDATE_PRODUCT, formData);
-      return response.data;
-    }
-
-    const response = await api.get(ENDPOINTS.UPDATE_PRODUCT, params);
+    // Add images
+    productData.images.forEach(image => {
+      formData.append('images', image);
+    });
+    
+    const response = await api.postFormData(ENDPOINTS.UPDATE_PRODUCT, formData);
     return response.data;
-  },
+  }
+
+  // For non-image updates
+  const response = await api.post(ENDPOINTS.UPDATE_PRODUCT, params, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  });
+  return response.data;
+},
 
     async deleteProduct(productId) {
     try {
@@ -365,3 +377,144 @@ export const consultationService = {
     return response.data;
   }
 };
+
+// Optimized newsletter service (FormData only)
+class NewsletterService {
+  async addSubscriber(email) {
+    try {
+      // Validate email
+      if (!email || !email.trim()) {
+        return {
+          success: false,
+          message: 'Please enter a valid email address'
+        };
+      }
+
+      const cleanEmail = email.trim();
+      
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanEmail)) {
+        return {
+          success: false,
+          message: 'Please enter a valid email address'
+        };
+      }
+
+      console.log('🔄 Attempting newsletter subscription for:', cleanEmail);
+
+      // Use FormData (confirmed working approach)
+      const formData = new FormData();
+      formData.append('email', cleanEmail);
+      
+      const response = await api.postFormData(ENDPOINTS.ADD_NEWSLETTER_SUBSCRIBER, formData);
+      
+      console.log('✅ Newsletter subscription successful:', response.data);
+      
+      if (response.data?.code === 200) {
+        return {
+          success: true,
+          data: response.data,
+          message: response.data.message || 'Successfully subscribed to newsletter!'
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data,
+          message: response.data?.message || 'Failed to subscribe. Please try again.'
+        };
+      }
+    } catch (error) {
+      console.error('❌ Newsletter service error:', error);
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Network error. Please check your connection and try again.';
+      
+      return {
+        success: false,
+        error: error.response?.data || error,
+        message: errorMessage
+      };
+    }
+  }
+
+  async removeSubscriber(email) {
+    try {
+      if (!email || !email.trim()) {
+        return {
+          success: false,
+          message: 'Please enter a valid email address'
+        };
+      }
+
+      const cleanEmail = email.trim();
+      
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanEmail)) {
+        return {
+          success: false,
+          message: 'Please enter a valid email address'
+        };
+      }
+
+      console.log('🔄 Attempting newsletter unsubscription for:', cleanEmail);
+
+      // Use FormData (consistent with add subscriber)
+      const formData = new FormData();
+      formData.append('email', cleanEmail);
+      
+      const response = await api.postFormData(ENDPOINTS.REMOVE_NEWSLETTER_SUBSCRIBER, formData);
+      
+      if (response.data?.code === 200) {
+        return {
+          success: true,
+          data: response.data,
+          message: response.data.message || 'Successfully unsubscribed!'
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data,
+          message: response.data?.message || 'Failed to unsubscribe. Please try again.'
+        };
+      }
+    } catch (error) {
+      console.error('❌ Newsletter unsubscribe error:', error);
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Network error. Please check your connection and try again.';
+      
+      return {
+        success: false,
+        error: error.response?.data || error,
+        message: errorMessage
+      };
+    }
+  }
+
+  async fetchSubscribers(limit = null) {
+    try {
+      const params = {};
+      if (limit) params.limit = limit;
+
+      const response = await api.get(ENDPOINTS.FETCH_NEWSLETTER_SUBSCRIBERS, params);
+      
+      return {
+        success: true,
+        data: response.data,
+        subscribers: response.data?.submission || response.data?.subscribers || [],
+        message: response.data?.message || 'Subscribers fetched successfully!'
+      };
+    } catch (error) {
+      console.error('❌ Newsletter fetch subscribers error:', error);
+      return {
+        success: false,
+        error: error.response?.data || error,
+        message: error.response?.data?.message || 'Failed to fetch subscribers.'
+      };
+    }
+  }
+}
+
+export const newsletterService = new NewsletterService();

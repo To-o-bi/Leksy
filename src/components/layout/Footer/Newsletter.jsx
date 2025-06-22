@@ -1,14 +1,50 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import logo from '/assets/images/icons/leksy-logo.png';
+import { newsletterService } from '../../../api/services';
 
 const Newsletter = () => {
   const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState(''); // 'success' or 'error'
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle newsletter signup
-    setEmail('');
+    
+    if (!email) {
+      setMessage('Please enter a valid email address');
+      setMessageType('error');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage('');
+    
+    try {
+      const result = await newsletterService.addSubscriber(email);
+      
+      if (result.success) {
+        setMessage(result.message);
+        setMessageType('success');
+        setEmail(''); // Clear the form on success
+      } else {
+        setMessage(result.message);
+        setMessageType('error');
+      }
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      setMessage('An unexpected error occurred. Please try again.');
+      setMessageType('error');
+    } finally {
+      setIsSubmitting(false);
+      
+      // Clear message after 5 seconds
+      setTimeout(() => {
+        setMessage('');
+        setMessageType('');
+      }, 5000);
+    }
   };
 
   return (
@@ -34,25 +70,42 @@ const Newsletter = () => {
         </div>
 
         {/* Form - Fully responsive with optimized breakpoints */}
-        <form 
-          onSubmit={handleSubmit} 
-          className="w-full sm:w-full md:w-auto lg:min-w-[300px] xl:min-w-[360px] flex flex-col sm:flex-row gap-2 sm:gap-0 shrink-0"
-        >
-          <input
-            type="email"
-            placeholder="Your email address"
-            className="w-full flex-1 py-2.5 sm:py-3 md:py-2.5 lg:py-3 xl:py-3.5 px-3 sm:px-4 text-sm sm:text-base md:text-sm lg:text-base rounded-lg sm:rounded-none sm:rounded-l-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent border border-gray-200 bg-white placeholder-gray-400 transition-all duration-200"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <button
-            type="submit"
-            className="w-full sm:w-auto sm:px-4 md:px-5 lg:px-6 xl:px-8 py-2.5 sm:py-3 md:py-2.5 lg:py-3 xl:py-3.5 bg-pink-500 text-white rounded-lg sm:rounded-none sm:rounded-r-lg font-medium text-sm sm:text-base md:text-sm lg:text-base hover:bg-pink-600 active:bg-pink-700 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
+        <div className="w-full sm:w-full md:w-auto lg:min-w-[300px] xl:min-w-[360px] shrink-0">
+          <form 
+            onSubmit={handleSubmit} 
+            className="flex flex-col sm:flex-row gap-2 sm:gap-0"
           >
-            Subscribe
-          </button>
-        </form>
+            <input
+              type="email"
+              placeholder="Your email address"
+              className="w-full flex-1 py-2.5 sm:py-3 md:py-2.5 lg:py-3 xl:py-3.5 px-3 sm:px-4 text-sm sm:text-base md:text-sm lg:text-base rounded-lg sm:rounded-none sm:rounded-l-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent border border-gray-200 bg-white placeholder-gray-400 transition-all duration-200"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={isSubmitting}
+              required
+            />
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`w-full sm:w-auto sm:px-4 md:px-5 lg:px-6 xl:px-8 py-2.5 sm:py-3 md:py-2.5 lg:py-3 xl:py-3.5 bg-pink-500 text-white rounded-lg sm:rounded-none sm:rounded-r-lg font-medium text-sm sm:text-base md:text-sm lg:text-base hover:bg-pink-600 active:bg-pink-700 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
+                isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {isSubmitting ? 'Subscribing...' : 'Subscribe'}
+            </button>
+          </form>
+          
+          {/* Success/Error Message */}
+          {message && (
+            <div className={`mt-3 p-3 rounded-lg text-sm transition-all duration-200 ${
+              messageType === 'success' 
+                ? 'bg-green-100 text-green-800 border border-green-200' 
+                : 'bg-red-100 text-red-800 border border-red-200'
+            }`}>
+              {message}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
