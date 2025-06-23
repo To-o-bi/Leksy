@@ -101,7 +101,10 @@ const CheckoutSuccessPage = () => {
       const response = await fetch(`${BASE_URL}/api/fetch-order?order_id=${orderIdToFetch}`);
       const result = await response.json();
       
-      if (result.code === 200 && result.product) {
+      console.log('API Response:', result); // Debug log
+      
+      // Handle different response formats
+      if ((result.code === 200 || result.code === 1) && result.product) {
         setOrderDetails(result.product);
         
         // Clear pending order details from memory since we now have the real order
@@ -114,14 +117,21 @@ const CheckoutSuccessPage = () => {
             message: 'Payment verification failed. Please contact support.'
           });
         }
+      } else if (result.code === 1 && result.message) {
+        // Handle case where code is 1 but it's actually an error
+        throw new Error(result.message);
+      } else if (!response.ok) {
+        // Handle HTTP error responses
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       } else {
-        throw new Error(result.message || 'Failed to fetch order details');
+        // Handle unexpected response structure
+        throw new Error(result.message || `Unexpected response format: ${JSON.stringify(result)}`);
       }
     } catch (error) {
       console.error('Error fetching order details:', error);
       setNotification({
         type: 'error',
-        message: 'Unable to load order details. Please contact support if this persists.'
+        message: `Unable to load order details: ${error.message}. Please contact support if this persists.`
       });
     } finally {
       setIsLoading(false);
@@ -294,8 +304,10 @@ const CheckoutSuccessPage = () => {
               </div>
             </div>
           </div>
+        )}
 
-          {/* Order Items */}
+        {/* Order Items */}
+        {orderDetails && (
           <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
             <h2 className="text-lg font-semibold text-gray-800 mb-6">Order Items</h2>
             <div className="space-y-4">

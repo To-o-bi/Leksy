@@ -251,5 +251,5 @@ export const calculateShipping = (deliveryMethod) => {
  * @returns {string} Success redirect URL
  */
 export const getSuccessRedirectUrl = () => {
-  return `${window.location.origin}/checkout/success`;
+  return `${window.location.origin}/checkout/checkout-success`;
 };

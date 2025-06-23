@@ -37,6 +37,8 @@ const InboxPage = lazy(() => import('../admin/pages/InboxPage'));
 const BookingsPage = lazy(() => import('../admin/pages/BookingsPage'));
 const NewBookingPage = lazy(() => import('../admin/pages/NewBookingPage'));
 const EditBookingPage = lazy(() => import('../admin/pages/EditBookingPage'));
+const NewsletterAdmin = lazy(() => import('../admin/pages/NewsletterAdmin'));
+const DeliveryFees = lazy(() => import('../admin/pages/DeliveryFees'));
 
 // Improved LoginWrapper with better redirect handling
 const LoginWrapper = () => {
@@ -98,6 +100,9 @@ const AppRoutes = () => {
           <Route path="bookings/:id" element={<BookingsPage />} />
           <Route path="bookings/new" element={<NewBookingPage />} />
           <Route path="bookings/edit/:id" element={<EditBookingPage />} />
+
+          <Route path="newletter" element={<NewsletterAdmin />} />
+          <Route path="delivery" element={<DeliveryFees />} />
         </Route>
 
         {/* Fallback route */}
