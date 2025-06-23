@@ -1,5 +1,5 @@
 // src/components/Message.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
 
 const Message = ({ 
@@ -10,6 +10,15 @@ const Message = ({
   onClose 
 }) => {
   const [isExiting, setIsExiting] = useState(false);
+
+  const handleClose = useCallback(() => {
+    setIsExiting(true);
+    
+    // Small delay to allow exit animation to play
+    setTimeout(() => {
+      if (onClose) onClose();
+    }, 300);
+  }, [onClose]);
 
   useEffect(() => {
     setIsExiting(false);
@@ -24,16 +33,7 @@ const Message = ({
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [show, duration]);
-
-  const handleClose = () => {
-    setIsExiting(true);
-    
-    // Small delay to allow exit animation to play
-    setTimeout(() => {
-      if (onClose) onClose();
-    }, 300);
-  };
+  }, [show, duration, handleClose]);
 
   const messageIcon = () => {
     switch (type) {
@@ -62,6 +62,11 @@ const Message = ({
     warning: 'text-yellow-500',
     info: 'text-blue-500'
   };
+
+  // Don't render anything if not showing
+  if (!show) {
+    return null;
+  }
 
   return (
     <div 

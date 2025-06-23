@@ -1,3 +1,4 @@
+// src/contexts/WishlistContext.jsx
 import React, { createContext, useState, useEffect, useCallback, useContext } from 'react';
 import { useMessage } from './MessageContext';
 
@@ -43,31 +44,34 @@ export const WishlistProvider = ({ children }) => {
       return;
     }
     
-    setWishlist(prevWishlist => {
-      // Check if product already exists in wishlist
-      const exists = prevWishlist.some(item => item.id === product.id);
-      
-      if (exists) {
-        // Product already in wishlist, show notification
+    // Check if product already exists in wishlist
+    const exists = wishlist.some(item => item.id === product.id);
+    
+    if (exists) {
+      // Product already in wishlist, show notification
+      setTimeout(() => {
         info(`${product.name} is already in your wishlist!`);
-        return prevWishlist;
-      } else {
-        // Product doesn't exist, add new item
+      }, 0);
+    } else {
+      // Product doesn't exist, add new item
+      setWishlist(prevWishlist => [...prevWishlist, product]);
+      setTimeout(() => {
         success(`Added ${product.name} to wishlist!`);
-        return [...prevWishlist, product];
-      }
-    });
-  }, [success, info]);
+      }, 0);
+    }
+  }, [wishlist, success, info]);
 
   const removeFromWishlist = useCallback((productId) => {
-    setWishlist(prevWishlist => {
-      const product = prevWishlist.find(item => item.id === productId);
-      if (product) {
-        warning(`Removed ${product.name} from wishlist`);
-      }
-      return prevWishlist.filter(item => item.id !== productId);
-    });
-  }, [warning]);
+    const productToRemove = wishlist.find(item => item.id === productId);
+    
+    setWishlist(prevWishlist => prevWishlist.filter(item => item.id !== productId));
+    
+    if (productToRemove) {
+      setTimeout(() => {
+        warning(`Removed ${productToRemove.name} from wishlist`);
+      }, 0);
+    }
+  }, [wishlist, warning]);
 
   const isInWishlist = useCallback((productId) => {
     return wishlist.some(item => item.id === productId);
@@ -75,7 +79,9 @@ export const WishlistProvider = ({ children }) => {
 
   const clearWishlist = useCallback(() => {
     setWishlist([]);
-    info('Wishlist has been cleared');
+    setTimeout(() => {
+      info('Wishlist has been cleared');
+    }, 0);
   }, [info]);
 
   // Toggle product in wishlist (add if not present, remove if present)

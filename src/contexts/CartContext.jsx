@@ -63,27 +63,37 @@ export const CartProvider = ({ children }) => {
         const updatedCart = [...prevCart];
         updatedCart[existingItemIndex].quantity += quantity;
         
-        // Show notification
-        success(`Updated quantity of ${product.name} in cart!`);
-        
+        // Show notification - moved to useEffect below
         return updatedCart;
       } else {
         // Product doesn't exist, add new item
-        success(`Added ${product.name} to cart!`);
         return [...prevCart, { ...product, quantity }];
       }
     });
-  }, [success]);
+    
+    // Show notifications after state update
+    setTimeout(() => {
+      const existingItem = cart.find(item => item.id === product.id);
+      if (existingItem) {
+        success(`Updated quantity of ${product.name} in cart!`);
+      } else {
+        success(`Added ${product.name} to cart!`);
+      }
+    }, 0);
+  }, [cart, success]);
 
   const removeFromCart = useCallback((productId) => {
-    setCart(prevCart => {
-      const product = prevCart.find(item => item.id === productId);
-      if (product) {
-        warning(`Removed ${product.name} from cart`);
-      }
-      return prevCart.filter(item => item.id !== productId);
-    });
-  }, [warning]);
+    const productToRemove = cart.find(item => item.id === productId);
+    
+    setCart(prevCart => prevCart.filter(item => item.id !== productId));
+    
+    // Show notification after state update
+    if (productToRemove) {
+      setTimeout(() => {
+        warning(`Removed ${productToRemove.name} from cart`);
+      }, 0);
+    }
+  }, [cart, warning]);
 
   const updateQuantity = useCallback((productId, quantity) => {
     if (quantity <= 0) {
@@ -91,23 +101,27 @@ export const CartProvider = ({ children }) => {
       return;
     }
     
-    setCart(prevCart => {
-      const updatedCart = prevCart.map(item =>
+    const product = cart.find(item => item.id === productId);
+    
+    setCart(prevCart => 
+      prevCart.map(item =>
         item.id === productId ? { ...item, quantity } : item
-      );
-      
-      const product = prevCart.find(item => item.id === productId);
-      if (product) {
+      )
+    );
+    
+    // Show notification after state update
+    if (product) {
+      setTimeout(() => {
         success(`Updated ${product.name} quantity to ${quantity}`);
-      }
-      
-      return updatedCart;
-    });
-  }, [removeFromCart, success]);
+      }, 0);
+    }
+  }, [cart, removeFromCart, success]);
 
   const clearCart = useCallback(() => {
     setCart([]);
-    info('Cart has been cleared');
+    setTimeout(() => {
+      info('Cart has been cleared');
+    }, 0);
   }, [info]);
 
   // Export both cart data and cart manipulation functions
