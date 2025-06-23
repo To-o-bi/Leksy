@@ -4,7 +4,15 @@ import { useCart } from '../../hooks/useCart';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import Button from '../../components/common/Button';
 import Notification from '../../components/common/Notification';
-import { orderService } from '../../api/services';
+import { 
+  formatPrice, 
+  validateCheckoutForm, 
+  initiateCheckout, 
+  storeOrderDetails, 
+  nigerianStates, 
+  calculateShipping, 
+  getSuccessRedirectUrl 
+} from '../../api/CheckoutService';
 
 const CheckoutPage = () => {
   const { cart, totalPrice, clearCart } = useCart();
@@ -12,6 +20,8 @@ const CheckoutPage = () => {
   const [notification, setNotification] = useState(null);
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
   const [deliveryMethod, setDeliveryMethod] = useState('address');
+  
+  // Form state matches API requirements
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -22,12 +32,13 @@ const CheckoutPage = () => {
     notes: '',
     agreeToTerms: false
   });
+  
   const [formErrors, setFormErrors] = useState({});
-  const shipping = deliveryMethod === 'pickup' ? 0 : 5000; // Fixed shipping cost in Naira
+  const shipping = calculateShipping(deliveryMethod);
   const finalTotal = totalPrice + shipping;
+  const SUCCESS_REDIRECT_URL = getSuccessRedirectUrl();
 
   useEffect(() => {
-    // Redirect to cart if cart is empty
     if (cart.length === 0) {
       navigate('/cart');
     }
@@ -40,7 +51,6 @@ const CheckoutPage = () => {
       [name]: type === 'checkbox' ? checked : value
     });
     
-    // Clear error for this field when user starts typing
     if (formErrors[name]) {
       setFormErrors({
         ...formErrors,
@@ -51,7 +61,6 @@ const CheckoutPage = () => {
 
   const handleDeliveryMethodChange = (method) => {
     setDeliveryMethod(method);
-    // Clear address-related errors if switching to pickup
     if (method === 'pickup') {
       const newErrors = { ...formErrors };
       delete newErrors.state;
@@ -62,30 +71,9 @@ const CheckoutPage = () => {
   };
 
   const validateForm = () => {
-    const errors = {};
-    
-    if (!formData.name.trim()) errors.name = 'Name is required';
-    if (!formData.email.trim()) errors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) errors.email = 'Email is invalid';
-    if (!formData.phone.trim()) errors.phone = 'Phone number is required';
-    
-    if (deliveryMethod === 'address') {
-      if (!formData.state.trim()) errors.state = 'State is required';
-      if (!formData.city.trim()) errors.city = 'City is required';
-      if (!formData.street_address.trim()) errors.street_address = 'Street address is required';
-    }
-    
-    if (!formData.agreeToTerms) errors.agreeToTerms = 'You must agree to the terms and conditions';
-    
+    const errors = validateCheckoutForm(formData, deliveryMethod);
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
-  };
-
-  const formatPrice = (price) => {
-    return `₦${parseFloat(price).toLocaleString('en-NG', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })}`;
   };
 
   const handleSubmit = async (e) => {
@@ -102,103 +90,48 @@ const CheckoutPage = () => {
     try {
       setIsProcessingOrder(true);
       
-      // Prepare order data
-      const orderData = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        delivery_method: deliveryMethod,
-        cart: cart.map(item => ({
-          product_id: item.id,
-          quantity: item.quantity,
-          price: item.price,
-          variant_id: item.variant?.id || null
-        })),
-        notes: formData.notes
-      };
-
-      // Add address fields if delivery method is address
-      if (deliveryMethod === 'address') {
-        orderData.state = formData.state;
-        orderData.city = formData.city;
-        orderData.street_address = formData.street_address;
-      }
-
-      console.log('Creating order with data:', orderData);
+      const result = await initiateCheckout(formData, deliveryMethod, cart, SUCCESS_REDIRECT_URL);
       
-      // Create order with your backend
-      const response = await orderService.initiateCheckout(orderData);
-      
-      if (response && (response.success || response.order_id || response.id)) {
-        // Clear cart and show success
-        clearCart();
-        
-        const orderId = response.order_id || response.id || `ORD_${Date.now()}`;
-        
+      if (result.code === 200 && result.authorization_url) {
+        // Store order details in memory for the success page
+        storeOrderDetails(formData, deliveryMethod, cart, totalPrice, shipping, finalTotal);
+
         setNotification({
           type: 'success',
-          message: `Order #${orderId} has been placed successfully!`
+          message: 'Redirecting to payment gateway...'
         });
 
-        // Navigate to confirmation page
+        // Clear cart before redirecting to payment
+        clearCart();
+
+        // Small delay to show the success message
         setTimeout(() => {
-          navigate('/checkout/confirmation', {
-            state: {
-              orderData: response,
-              orderId: orderId,
-              customerInfo: {
-                name: formData.name,
-                email: formData.email,
-                phone: formData.phone
-              },
-              deliveryInfo: {
-                method: deliveryMethod,
-                address: deliveryMethod === 'address' ? formData.street_address : 'Store Pickup',
-                city: formData.city,
-                state: formData.state
-              },
-              orderSummary: {
-                items: cart,
-                subtotal: totalPrice,
-                shipping: shipping,
-                total: finalTotal
-              }
-            }
-          });
-        }, 2000);
+          window.location.href = result.authorization_url;
+        }, 1000);
+        
       } else {
-        throw new Error('Order creation failed');
+        throw new Error(result.message || 'Failed to initiate checkout');
       }
 
     } catch (error) {
-      console.error('Order creation error:', error);
+      console.error('Checkout initiation error:', error);
       setNotification({
         type: 'error',
-        message: error.message || 'Failed to create order. Please try again.'
+        message: error.message || 'Failed to initiate checkout. Please try again.'
       });
     } finally {
       setIsProcessingOrder(false);
     }
   };
 
-  // Auto-dismiss notifications after 5 seconds
   useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => {
         setNotification(null);
       }, 5000);
-      
       return () => clearTimeout(timer);
     }
   }, [notification]);
-
-  const stateOptions = [
-    'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno', 
-    'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'FCT', 'Gombe', 
-    'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 
-    'Lagos', 'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 
-    'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara'
-  ];
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -307,6 +240,7 @@ const CheckoutPage = () => {
                     }`}
                     placeholder="Your full name"
                     disabled={isProcessingOrder}
+                    required
                   />
                   {formErrors.name && (
                     <p className="mt-1 text-sm text-red-500">{formErrors.name}</p>
@@ -328,6 +262,7 @@ const CheckoutPage = () => {
                     }`}
                     placeholder="your@email.com"
                     disabled={isProcessingOrder}
+                    required
                   />
                   {formErrors.email && (
                     <p className="mt-1 text-sm text-red-500">{formErrors.email}</p>
@@ -349,6 +284,7 @@ const CheckoutPage = () => {
                     }`}
                     placeholder="+234 8012345678"
                     disabled={isProcessingOrder}
+                    required
                   />
                   {formErrors.phone && (
                     <p className="mt-1 text-sm text-red-500">{formErrors.phone}</p>
@@ -376,9 +312,10 @@ const CheckoutPage = () => {
                         formErrors.state ? 'border-red-500' : 'border-gray-300'
                       }`}
                       disabled={isProcessingOrder}
+                      required
                     >
                       <option value="">Select State</option>
-                      {stateOptions.map(state => (
+                      {nigerianStates.map(state => (
                         <option key={state} value={state}>{state}</option>
                       ))}
                     </select>
@@ -402,6 +339,7 @@ const CheckoutPage = () => {
                       }`}
                       placeholder="Your city"
                       disabled={isProcessingOrder}
+                      required
                     />
                     {formErrors.city && (
                       <p className="mt-1 text-sm text-red-500">{formErrors.city}</p>
@@ -424,6 +362,7 @@ const CheckoutPage = () => {
                     }`}
                     placeholder="Your full address"
                     disabled={isProcessingOrder}
+                    required
                   />
                   {formErrors.street_address && (
                     <p className="mt-1 text-sm text-red-500">{formErrors.street_address}</p>
@@ -527,6 +466,7 @@ const CheckoutPage = () => {
                     formErrors.agreeToTerms ? 'border-red-500' : ''
                   }`}
                   disabled={isProcessingOrder}
+                  required
                 />
                 <label htmlFor="agreeToTerms" className="text-sm text-gray-600">
                   I have read and agree to the website{' '}
@@ -556,10 +496,10 @@ const CheckoutPage = () => {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Processing Order...
+                    Initiating Payment...
                   </div>
                 ) : (
-                  `Place Order - ${formatPrice(finalTotal)}`
+                  `Proceed to Payment - ${formatPrice(finalTotal)}`
                 )}
               </Button>
             </div>

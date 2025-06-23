@@ -24,7 +24,7 @@ const ContactPage = lazy(() => import('../pages/public/ContactPage'));
 const CheckoutPage = lazy(() => import('../pages/public/CheckoutPage'));
 const WishlistPage = lazy(() => import('../pages/public/WishlistPage'));
 const ConsultationPage = lazy(() => import('../pages/public/ConsultationPage'));
-const CheckoutComfirmationPage = lazy(() => import('../pages/public/CheckoutConfirmationPage'));
+const CheckoutSuccessPage = lazy(() => import('../pages/public/CheckoutSuccessPage'));
 
 // Admin pages
 const DashboardPage = lazy(() => import('../admin/pages/DashboardPage'));
@@ -73,7 +73,7 @@ const AppRoutes = () => {
           <Route path="/cart" element={<CartPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
-           <Route path="/checkout/confirm" element={<CheckoutComfirmationPage />} />
+           <Route path="/checkout/checkout-success" element={<CheckoutSuccessPage />} />
           <Route path="/wishlist" element={<WishlistPage />} />
           <Route path="/consultation" element={<ConsultationPage />} />
         </Route>
