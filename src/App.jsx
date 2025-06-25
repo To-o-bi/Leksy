@@ -15,8 +15,8 @@ const App = () => {
         <BrowserRouter>
           <ProductProvider>
             <CartProvider>
-              <WishlistProvider>
-                <AppRoutes />
+              <WishlistProvider>                
+                <AppRoutes />                
               </WishlistProvider>       
             </CartProvider>
           </ProductProvider>
