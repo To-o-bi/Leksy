@@ -284,6 +284,22 @@ const DeliveryFeeAdmin = () => {
         </div>
       </div>
 
+      {/* Instructions */}
+      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-blue-800">
+            <p className="font-medium mb-1">How to use:</p>
+            <ul className="list-disc list-inside space-y-1 text-blue-700">
+              <li>Click the edit icon to modify a delivery fee for any state</li>
+              <li>You can edit multiple states at once and save all changes together</li>
+              <li>Use the search box to quickly find specific states</li>
+              <li>Changes will be immediately reflected on the checkout page</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
       {/* Delivery Fees Table */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
@@ -295,7 +311,7 @@ const DeliveryFeeAdmin = () => {
               </span>
             )}
           </h2>
-        </div>
+        </div>        
 
         {loading ? (
           <div className="p-8 text-center">
@@ -392,22 +408,7 @@ const DeliveryFeeAdmin = () => {
           </div>
         )}
       </div>
-
-      {/* Instructions */}
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-blue-800">
-            <p className="font-medium mb-1">How to use:</p>
-            <ul className="list-disc list-inside space-y-1 text-blue-700">
-              <li>Click the edit icon to modify a delivery fee for any state</li>
-              <li>You can edit multiple states at once and save all changes together</li>
-              <li>Use the search box to quickly find specific states</li>
-              <li>Changes will be immediately reflected on the checkout page</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+      
     </div>
   );
 };
