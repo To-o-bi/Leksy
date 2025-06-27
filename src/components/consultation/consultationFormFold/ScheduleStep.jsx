@@ -1,5 +1,4 @@
-// src/components/consultation/ScheduleStep.js
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const timeSlotMapping = {
   '2:00 PM': '2:00 PM - 3:00 PM',
@@ -9,6 +8,7 @@ const timeSlotMapping = {
 };
 
 const timeSlots = Object.keys(timeSlotMapping);
+const validTimeRanges = Object.values(timeSlotMapping);
 
 const ScheduleStep = ({ 
   register, 
@@ -17,19 +17,19 @@ const ScheduleStep = ({
   bookedTimes, 
   submitError, 
   isSubmitting,
-  setValue 
+  setValue,
 }) => {
   const consultationDate = watch('consultationDate');
   const selectedTimeSlot = watch('timeSlot');
   const selectedFormat = watch('consultationFormat');
   const termsAgreed = watch('termsAgreed');
+  const [dateError, setDateError] = useState('');
   
   const isWeekend = (date) => {
     const day = new Date(date).getDay();
     return day === 0 || day === 6;
   };
 
-  // Get next available weekday
   const getNextWeekday = () => {
     const today = new Date();
     let nextDay = new Date(today);
@@ -42,7 +42,6 @@ const ScheduleStep = ({
     return nextDay.toISOString().split('T')[0];
   };
 
-  // Clear time slot if date changes to weekend
   useEffect(() => {
     if (consultationDate && isWeekend(consultationDate)) {
       setValue('consultationDate', '');
@@ -50,20 +49,29 @@ const ScheduleStep = ({
     }
   }, [consultationDate, setValue]);
 
-  // Generate disabled dates for the date input (weekends)
-  const getDisabledDates = () => {
-    const disabledDates = [];
-    const today = new Date();
-    const endDate = new Date();
-    endDate.setMonth(today.getMonth() + 3); // 3 months ahead
-    
-    for (let d = new Date(today); d <= endDate; d.setDate(d.getDate() + 1)) {
-      if (isWeekend(d.toISOString().split('T')[0])) {
-        disabledDates.push(d.toISOString().split('T')[0]);
+  // Fixed useEffect for checking booked times
+  useEffect(() => {
+    if (consultationDate && !isWeekend(consultationDate)) {
+      // Check if all time slots are booked for this date
+      const allBooked = validTimeRanges.every(validTime => 
+        bookedTimes.some(booked => 
+          booked.date === consultationDate && booked.time_range === validTime
+        )
+      );
+      
+      if (allBooked && bookedTimes.length > 0) {
+        setDateError('All time slots are booked for this date. Please choose another date.');
+        // Clear the selected time slot if it exists
+        if (selectedTimeSlot) {
+          setValue('timeSlot', '');
+        }
+      } else {
+        setDateError(''); // Clear error when slots are available
       }
+    } else {
+      setDateError(''); // Clear error when no date selected or weekend
     }
-    return disabledDates;
-  };
+  }, [consultationDate, bookedTimes, selectedTimeSlot, setValue]);
 
   return (
     <div className="space-y-6">
@@ -103,7 +111,6 @@ const ScheduleStep = ({
               : 'border-gray-300 hover:border-gray-400'
           }`}
           onInput={(e) => {
-            // Additional client-side validation to prevent weekend selection
             if (e.target.value && isWeekend(e.target.value)) {
               e.target.setCustomValidity('Consultations are not available on weekends');
               e.target.reportValidity();
@@ -116,21 +123,50 @@ const ScheduleStep = ({
             }
           }}
         />
+        
         {errors.consultationDate && (
           <span className="text-red-500 text-sm mt-1 block">{errors.consultationDate.message}</span>
         )}
         
-        {/* Weekend warning */}
-        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-          <div className="flex items-center">
-            <svg className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="text-xs text-blue-700">
-              Note: Consultations are only available Monday through Friday. Weekend dates are not selectable.
-            </span>
+        {/* Show date error for fully booked dates */}
+        {dateError && !errors.consultationDate && (
+          <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-md">
+            <div className="flex items-center">
+              <svg className="w-4 h-4 text-red-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-sm text-red-700">{dateError}</span>
+            </div>
           </div>
-        </div>
+        )}
+        
+        {/* Show info message only when no errors and date is selected */}
+        {!dateError && !errors.consultationDate && consultationDate && (
+          <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
+            <div className="flex items-center">
+              <svg className="w-4 h-4 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-xs text-green-700">
+                Great! This date has available time slots. Please select your preferred time below.
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Show general info when no date is selected */}
+        {!consultationDate && !errors.consultationDate && (
+          <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <div className="flex items-center">
+              <svg className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-xs text-blue-700">
+                Note: Consultations are only available Monday through Friday. Weekend dates are not selectable.
+              </span>
+            </div>
+          </div>
+        )}
       </div>
       
       <div>
@@ -141,8 +177,13 @@ const ScheduleStep = ({
               Please select a date first
             </span>
           )}
+          {dateError && (
+            <span className="text-xs text-red-500 block mt-1">
+              Date fully booked - please select another date
+            </span>
+          )}
         </label>
-        <div className={`grid grid-cols-2 md:grid-cols-4 gap-3 ${!consultationDate ? 'opacity-50 pointer-events-none' : ''}`}>
+        <div className={`grid grid-cols-2 md:grid-cols-4 gap-3 ${!consultationDate || dateError ? 'opacity-50 pointer-events-none' : ''}`}>
           {timeSlots.map((time) => {
             const apiTimeRange = timeSlotMapping[time];
             const isBooked = bookedTimes.some(
@@ -150,7 +191,7 @@ const ScheduleStep = ({
               booked.time_range === apiTimeRange
             );
             const isSelected = selectedTimeSlot === time;
-            const isDisabled = !consultationDate || isBooked;
+            const isDisabled = !consultationDate || isBooked || dateError;
             
             return (
               <label 
@@ -171,6 +212,9 @@ const ScheduleStep = ({
                       if (!consultationDate) {
                         return 'Please select a date first';
                       }
+                      if (dateError) {
+                        return 'Please select a different date with available slots';
+                      }
                       const apiTimeRange = timeSlotMapping[value];
                       const isBooked = bookedTimes.some(
                         booked => booked.date === consultationDate && 
@@ -187,8 +231,9 @@ const ScheduleStep = ({
                   {time}
                   {isBooked && <span className="text-xs text-red-500 block">Booked</span>}
                   {!consultationDate && <span className="text-xs text-gray-400 block">Select date first</span>}
+                  {dateError && <span className="text-xs text-red-400 block">Date unavailable</span>}
                 </span>
-                {isSelected && !isBooked && consultationDate && (
+                {isSelected && !isBooked && consultationDate && !dateError && (
                   <div className="absolute top-1 right-1">
                     <svg className="w-4 h-4 text-pink-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -309,7 +354,7 @@ const ScheduleStep = ({
         <span className="text-red-500 text-sm block">{errors.termsAgreed.message}</span>
       )}
 
-      {submitError && (
+      {submitError && !submitError.includes('date') && !submitError.includes('Date') && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 animate-pulse">
           <div className="flex items-center">
             <svg className="w-5 h-5 text-red-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -320,8 +365,7 @@ const ScheduleStep = ({
         </div>
       )}
 
-      {/* Selection Summary */}
-      {(consultationDate || selectedTimeSlot || selectedFormat) && (
+      {(consultationDate || selectedTimeSlot || selectedFormat) && !dateError && (
         <div className="bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 rounded-lg p-4 mt-6">
           <h3 className="text-sm font-medium text-pink-800 mb-2">Your Selection Summary:</h3>
           <div className="space-y-1 text-sm text-pink-700">

@@ -1,4 +1,3 @@
-// src/components/consultation/ConsultationForm.js
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { initiateConsultation, fetchBookedTimes } from '../../../api/consultationService';
@@ -7,7 +6,6 @@ import SkinConcernsStep from './SkinConcernsStep';
 import ScheduleStep from './ScheduleStep';
 import ConfirmationStep from './ConfirmationStep';
 
-// Define time slot mapping and valid time ranges
 const timeSlotMapping = {
   '2:00 PM': '2:00 PM - 3:00 PM',
   '3:00 PM': '3:00 PM - 4:00 PM',
@@ -32,7 +30,6 @@ const ConsultationForm = () => {
     return day === 0 || day === 6;
   };
 
-  // Get the current domain for success redirect URL
   const getSuccessRedirectURL = () => {
     const protocol = window.location.protocol;
     const host = window.location.host;
@@ -45,42 +42,30 @@ const ConsultationForm = () => {
         .then(data => {
           if (data.code === 200) {
             setBookedTimes(data.booked_times);
-            
-            const allBooked = validTimeRanges.every(validTime => 
-              data.booked_times.some(booked => booked.time_range === validTime)
-            );
-            
-            if (allBooked) {
-              setValue('consultationDate', '');
-              setSubmitError('All time slots are booked for this date. Please choose another date.');
-            } else {
-              setSubmitError(''); // Clear error if not all slots are booked
-            }
           }
         })
         .catch(error => {
           console.error('Error fetching booked times:', error);
-          setSubmitError('Error checking available time slots. Please try again.');
+          setBookedTimes([]); // Reset on error
         });
+    } else {
+      setBookedTimes([]); // Clear booked times when no valid date
     }
-  }, [consultationDate, setValue]);
+  }, [consultationDate]);
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     setSubmitError('');
 
     try {
-      // Validate required fields before submission
       if (!data.consultationDate || !data.timeSlot) {
         throw new Error('Please select a consultation date and time slot');
       }
 
-      // Ensure time slot is valid
       if (!timeSlotMapping[data.timeSlot]) {
         throw new Error('Invalid time slot selected');
       }
 
-      // Check if selected time is already booked
       const selectedTimeRange = timeSlotMapping[data.timeSlot];
       const isTimeBooked = bookedTimes.some(booked => 
         booked.date === data.consultationDate && booked.time_range === selectedTimeRange
@@ -106,12 +91,9 @@ const ConsultationForm = () => {
         success_redirect: getSuccessRedirectURL()
       };
 
-      console.log('Submitting consultation data:', consultationData);
-
       const result = await initiateConsultation(consultationData);
       
       if (result.code === 200 && result.authorization_url) {
-        // Store some data in sessionStorage for the success page (optional)
         sessionStorage.setItem('consultationBooking', JSON.stringify({
           name: consultationData.name,
           email: consultationData.email,
@@ -121,7 +103,6 @@ const ConsultationForm = () => {
           amount: result.amount_calculated
         }));
 
-        // Redirect to payment gateway
         window.location.href = result.authorization_url;
       } else {
         throw new Error(result.message || 'Consultation booking failed');
@@ -135,7 +116,9 @@ const ConsultationForm = () => {
   };
 
   const nextStep = () => {
-    // Basic validation before moving to next step
+    // Clear any previous submit errors when moving between steps
+    setSubmitError('');
+    
     if (step === 1) {
       const firstName = watch('firstName');
       const lastName = watch('lastName');
@@ -146,7 +129,6 @@ const ConsultationForm = () => {
         setSubmitError('Please fill in all required fields before proceeding.');
         return;
       }
-      setSubmitError('');
     }
     
     if (step === 2) {
@@ -157,14 +139,13 @@ const ConsultationForm = () => {
         setSubmitError('Please select your skin type and concerns before proceeding.');
         return;
       }
-      setSubmitError('');
     }
     
     setStep(step + 1);
   };
 
   const prevStep = () => {
-    setSubmitError(''); // Clear any errors when going back
+    setSubmitError('');
     setStep(step - 1);
   };
 
@@ -206,8 +187,8 @@ const ConsultationForm = () => {
           />
         )}
 
-        {/* Error Display */}
-        {submitError && (
+        {/* Only show submit error at the bottom if it's NOT a date-related error (those are handled in ScheduleStep) */}
+        {submitError && !submitError.toLowerCase().includes('date') && !submitError.toLowerCase().includes('time slot') && step !== 3 && (
           <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
             <div className="flex items-center">
               <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

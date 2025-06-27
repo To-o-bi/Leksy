@@ -142,7 +142,7 @@ const ConsultationSuccess = () => {
                   <li>• Please have your current skincare products ready for the consultation</li>
                   <li>• Make sure you have a stable internet connection (for video calls)</li>
                   <li>• Prepare any specific questions about your skin concerns</li>
-                  <li>• Check your email for the consultation link (for video calls)</li>
+                  <li>• Check your email for the consultation link</li>
                 </ul>
               </div>
             </div>
@@ -165,7 +165,7 @@ const ConsultationSuccess = () => {
                 Email Support
               </a>
               <a 
-                href="https://wa.me/your-whatsapp-number" 
+                href="http://wa.me/2349014425540" 
                 className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200"
               >
                 <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
