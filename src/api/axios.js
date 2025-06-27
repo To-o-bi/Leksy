@@ -1,3 +1,4 @@
+// Enhanced API Client with better token management
 import axios from 'axios';
 import { API_CONFIG } from './config.js';
 
@@ -10,6 +11,7 @@ class ApiClient {
     });
     
     this.requestQueue = new Map();
+    this.tokenRefreshPromise = null;
     this.setupInterceptors();
   }
 
@@ -21,7 +23,7 @@ class ApiClient {
         
         if (isAdminRoute && token) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log('Adding auth header for admin route:', config.url, 'Token:', token ? 'Present' : 'Missing');
+          console.log('Adding auth header for admin route:', config.url);
         }
         
         return config;
@@ -31,7 +33,9 @@ class ApiClient {
 
     this.client.interceptors.response.use(
       (response) => {
+        // Always update token if provided in response
         if (response.data?.token) {
+          console.log('Updating token from API response');
           this.setToken(response.data.token);
         }
         return response;
@@ -39,15 +43,22 @@ class ApiClient {
       async (error) => {
         const { config, response } = error;
         
+        // Handle 401 errors (token expired/invalid)
         if (response?.status === 401) {
-          this.clearAuth();
-          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-            window.location.href = '/login';
+          console.log('401 error detected - token expired or invalid');
+          
+          // Don't retry login requests
+          if (config.url?.includes('/admin/login')) {
+            return Promise.reject(this.formatError(error));
           }
+          
+          // Clear auth and redirect to login
+          this.clearAuth();
+          this.handleAuthExpired();
           return Promise.reject(this.formatError(error));
         }
 
-        // Retry logic
+        // Retry logic for network errors
         if (this.shouldRetry(error) && config && !config._retry) {
           config._retryCount = (config._retryCount || 0) + 1;
           
@@ -61,6 +72,23 @@ class ApiClient {
         return Promise.reject(this.formatError(error));
       }
     );
+  }
+
+  handleAuthExpired() {
+    console.log('Authentication expired - clearing session');
+    
+    // Emit custom event for components to listen to
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('auth:expired'));
+      
+      // Only redirect if not already on login page
+      if (!window.location.pathname.includes('/login')) {
+        // Small delay to allow components to handle the event
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 100);
+      }
+    }
   }
 
   shouldRetry(error) {
@@ -101,33 +129,121 @@ class ApiClient {
 
   getToken() {
     try {
-      // Try cookie first
-      const match = document.cookie.match(/auth=([^;]+)/);
-      if (match) {
-        const decoded = atob(match[1]);
-        console.log('Token from cookie:', decoded ? 'Present' : 'Missing');
-        return decoded;
+      // Check if token is expired before returning
+      const tokenData = this.getTokenWithExpiry();
+      if (!tokenData || this.isTokenExpired(tokenData)) {
+        console.log('Token is expired or missing');
+        this.clearAuth();
+        return null;
       }
       
-      // Fallback to localStorage
-      const token = localStorage.getItem('auth_token');
-      console.log('Token from localStorage:', token ? 'Present' : 'Missing');
-      return token;
+      return tokenData.token;
     } catch (error) {
       console.error('Error getting token:', error);
+      this.clearAuth();
       return null;
     }
   }
 
-  setToken(token) {
-    const encoded = btoa(token);
-    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toUTCString();
+  getTokenWithExpiry() {
+    try {
+      // Try cookie first
+      const match = document.cookie.match(/auth=([^;]+)/);
+      if (match) {
+        try {
+          const decoded = atob(match[1]);
+          return JSON.parse(decoded);
+        } catch {
+          // If it's not JSON, treat as legacy token
+          return {
+            token: atob(match[1]),
+            expiresAt: Date.now() + (23 * 60 * 60 * 1000) // 23 hours default
+          };
+        }
+      }
+      
+      // Fallback to localStorage
+      const tokenData = localStorage.getItem('auth_token_data');
+      if (tokenData) {
+        return JSON.parse(tokenData);
+      }
+      
+      // Legacy fallback
+      const legacyToken = localStorage.getItem('auth_token');
+      if (legacyToken) {
+        return {
+          token: legacyToken,
+          expiresAt: Date.now() + (23 * 60 * 60 * 1000) // 23 hours default
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error parsing token data:', error);
+      return null;
+    }
+  }
+
+  isTokenExpired(tokenData) {
+    if (!tokenData || !tokenData.expiresAt) {
+      return true;
+    }
+    
+    // Add 5 minute buffer before actual expiry
+    const bufferTime = 5 * 60 * 1000; // 5 minutes
+    return Date.now() >= (tokenData.expiresAt - bufferTime);
+  }
+
+  setToken(token, expiryHours = 24) {
+    const tokenData = {
+      token: token,
+      expiresAt: Date.now() + (expiryHours * 60 * 60 * 1000),
+      createdAt: Date.now()
+    };
+    
+    // Store in cookie (encoded)
+    const encoded = btoa(JSON.stringify(tokenData));
+    const expires = new Date(tokenData.expiresAt).toUTCString();
     document.cookie = `auth=${encoded}; path=/; expires=${expires}; SameSite=Strict; Secure`;
+    
+    // Store in localStorage as backup
+    localStorage.setItem('auth_token_data', JSON.stringify(tokenData));
+    
+    console.log('Token stored with expiry:', new Date(tokenData.expiresAt).toLocaleString());
   }
 
   clearAuth() {
+    // Clear cookie
     document.cookie = 'auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    
+    // Clear localStorage
     localStorage.removeItem('user');
+    localStorage.removeItem('auth_token_data');
+    localStorage.removeItem('auth_token'); // Legacy cleanup
+    
+    console.log('Auth data cleared');
+  }
+
+  // Check if current token is about to expire
+  isTokenExpiringSoon(minutesThreshold = 10) {
+    const tokenData = this.getTokenWithExpiry();
+    if (!tokenData || !tokenData.expiresAt) {
+      return true;
+    }
+    
+    const thresholdTime = minutesThreshold * 60 * 1000;
+    return Date.now() >= (tokenData.expiresAt - thresholdTime);
+  }
+
+  // Get remaining token time in minutes
+  getTokenRemainingTime() {
+    const tokenData = this.getTokenWithExpiry();
+    if (!tokenData || !tokenData.expiresAt) {
+      return 0;
+    }
+    
+    const remaining = tokenData.expiresAt - Date.now();
+    return Math.max(0, Math.floor(remaining / (60 * 1000))); // in minutes
   }
 
   async get(url, params = {}) {
