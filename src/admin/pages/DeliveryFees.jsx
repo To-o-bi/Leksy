@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Edit2, Save, X, Truck, MapPin, AlertCircle, CheckCircle } from 'lucide-react';
-import api from '../../api/axios'; 
+import api from '../../api/axios';
 
 const DeliveryFeeAdmin = () => {
   const [deliveryFees, setDeliveryFees] = useState([]);
@@ -84,22 +84,22 @@ const DeliveryFeeAdmin = () => {
       const data = response.data;
       
       if (data.code === 200) {
-        // Update local state with the response data if available
-        if (data.delivery_fees) {
-          setDeliveryFees(data.delivery_fees);
-        } else {
-          // Fallback: update local state manually
-          setDeliveryFees(prev => 
-            prev.map(fee => 
-              fee.state === state 
-                ? { ...fee, delivery_fee: parseInt(newFee) }
-                : fee
-            )
-          );
-        }
+        // Force a complete re-fetch to ensure data consistency
+        await fetchDeliveryFees();
         
-        // Clear editing state
-        handleCancel(state);
+        // Clear editing state after successful update
+        setEditingStates(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(state);
+          return newSet;
+        });
+        
+        setTempValues(prev => {
+          const newValues = { ...prev };
+          delete newValues[state];
+          return newValues;
+        });
+        
         showNotification('success', `Updated delivery fee for ${state} successfully`);
       } else {
         throw new Error(data.message || 'Failed to update delivery fee');
@@ -127,21 +127,13 @@ const DeliveryFeeAdmin = () => {
       const data = response.data;
       
       if (data.code === 200) {
-        // Use the updated delivery fees from the API response
-        if (data.delivery_fees) {
-          setDeliveryFees(data.delivery_fees);
-        } else {
-          // Fallback: update local state manually if API doesn't return updated data
-          setDeliveryFees(prev => 
-            prev.map(fee => 
-              tempValues[fee.state] !== undefined
-                ? { ...fee, delivery_fee: parseInt(tempValues[fee.state]) }
-                : fee
-            )
-          );
-        }
+        // Force a complete re-fetch to ensure data consistency
+        await fetchDeliveryFees();
+        
+        // Clear all editing states
         setEditingStates(new Set());
         setTempValues({});
+        
         showNotification('success', 'All delivery fees updated successfully');
       } else {
         throw new Error(data.message || 'Failed to update delivery fees');
@@ -167,6 +159,80 @@ const DeliveryFeeAdmin = () => {
   );
 
   const totalStatesEditing = editingStates.size;
+
+  // Memoized row component to prevent unnecessary re-renders
+  const DeliveryFeeRow = useCallback(({ fee }) => {
+    const isEditing = editingStates.has(fee.state);
+    const tempValue = tempValues[fee.state];
+    
+    return (
+      <tr key={fee.state} className="hover:bg-gray-50">
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="flex items-center">
+            <div className="p-1 bg-gray-100 rounded mr-3">
+              <MapPin className="w-4 h-4 text-gray-600" />
+            </div>
+            <div className="text-sm font-medium text-gray-900">
+              {fee.state}
+            </div>
+          </div>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          {isEditing ? (
+            <div className="flex items-center">
+              <span className="text-gray-500 mr-1">₦</span>
+              <input
+                type="number"
+                value={tempValue || ''}
+                onChange={(e) => setTempValues(prev => ({
+                  ...prev,
+                  [fee.state]: Number(e.target.value) || 0
+                }))}
+                className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                min="0"
+                step="100"
+                autoFocus
+              />
+            </div>
+          ) : (
+            <div className="text-sm text-gray-900 font-medium">
+              {formatPrice(fee.delivery_fee)}
+            </div>
+          )}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          {isEditing ? (
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => handleSave(fee.state)}
+                disabled={saving}
+                className="text-green-600 hover:text-green-700 disabled:opacity-50"
+                title="Save changes"
+              >
+                <Save className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleCancel(fee.state)}
+                disabled={saving}
+                className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                title="Cancel changes"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => handleEdit(fee.state)}
+              className="text-pink-600 hover:text-pink-700"
+              title="Edit delivery fee"
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
+          )}
+        </td>
+      </tr>
+    );
+  }, [editingStates, tempValues, saving, handleSave, handleCancel, handleEdit]);
 
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen">
@@ -340,68 +406,8 @@ const DeliveryFeeAdmin = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredFees.map((fee) => (
-                  <tr key={fee.state} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="p-1 bg-gray-100 rounded mr-3">
-                          <MapPin className="w-4 h-4 text-gray-600" />
-                        </div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {fee.state}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {editingStates.has(fee.state) ? (
-                        <div className="flex items-center">
-                          <span className="text-gray-500 mr-1">₦</span>
-                          <input
-                            type="number"
-                            value={tempValues[fee.state] || ''}
-                            onChange={(e) => setTempValues(prev => ({
-                              ...prev,
-                              [fee.state]: parseInt(e.target.value) || 0
-                            }))}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-                            min="0"
-                            step="100"
-                          />
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-900 font-medium">
-                          {formatPrice(fee.delivery_fee)}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {editingStates.has(fee.state) ? (
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => handleSave(fee.state)}
-                            disabled={saving}
-                            className="text-green-600 hover:text-green-700 disabled:opacity-50"
-                          >
-                            <Save className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleCancel(fee.state)}
-                            disabled={saving}
-                            className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => handleEdit(fee.state)}
-                          className="text-pink-600 hover:text-pink-700"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                {filteredFees.map(fee => (
+                  <DeliveryFeeRow key={fee.state} fee={fee} />
                 ))}
               </tbody>
             </table>
