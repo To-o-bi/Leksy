@@ -1,6 +1,6 @@
 import React from 'react'
 
-const FAQ = () => {
+const Faq = () => {
   return (
     <div className="bg-gray-50 py-16">
         <div className="container mx-auto px-4">
@@ -34,7 +34,7 @@ const FAQ = () => {
                   </span>
                 </summary>
                 <div className="px-6 pb-6 text-gray-600">
-                Click on the “Book a Consultation” button on our homepage. You can choose your preferred date, time, and consultation type. Payments are made securely online during booking.
+                Click on the "Book a Consultation" button on our homepage. You can choose your preferred date, time, and consultation type. Payments are made securely online during booking.
                 </div>
               </details>
             </div>
@@ -50,7 +50,7 @@ const FAQ = () => {
                   </span>
                 </summary>
                 <div className="px-6 pb-6 text-gray-600">
-                  Yes, there is a consultation fee of ₦5,000, which is fully redeemable against product purchases made within 30 days of your consultation. This ensures our specialists can dedicate quality time to addressing your specific needs.
+                  Yes, there is a consultation fee. Video consultations are ₦35,000 and WhatsApp consultations are ₦15,000. This ensures our specialists can dedicate quality time to addressing your specific needs.
                 </div>
               </details>
             </div>
@@ -70,7 +70,7 @@ const FAQ = () => {
                 </div>
               </details>
             </div>
-
+            
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <details className="group">
                 <summary className="flex items-center justify-between cursor-pointer p-6">
@@ -86,7 +86,7 @@ const FAQ = () => {
                 </div>
               </details>
             </div>
-
+            
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <details className="group">
                 <summary className="flex items-center justify-between cursor-pointer p-6">
@@ -102,7 +102,7 @@ const FAQ = () => {
                 </div>
               </details>
             </div>
-
+            
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <details className="group">
                 <summary className="flex items-center justify-between cursor-pointer p-6">
@@ -118,7 +118,7 @@ const FAQ = () => {
                 </div>
               </details>
             </div>
-
+            
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <details className="group">
                 <summary className="flex items-center justify-between cursor-pointer p-6">
@@ -134,6 +134,7 @@ const FAQ = () => {
                 </div>
               </details>
             </div>
+            
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <details className="group">
                 <summary className="flex items-center justify-between cursor-pointer p-6">
@@ -155,4 +156,4 @@ const FAQ = () => {
   )
 }
 
-export default FAQ
+export default Faq

@@ -41,9 +41,11 @@ const BestSellers = () => {
       return;
     }
     
-    // For now, just take the first 8 products as "best sellers"
-    // You can modify this logic later based on your needs
-    const selectedProducts = productsList.slice(0, 8);
+    // Filter out products without valid IDs and take first 8
+    const validProducts = productsList.filter(product => 
+      product && (product.id || product.product_id)
+    );
+    const selectedProducts = validProducts.slice(0, 8);
     setBestSellers(selectedProducts);
   }, [productsList]);
 
@@ -121,6 +123,11 @@ const BestSellers = () => {
     setIsDragging(false);
   };
 
+  // Helper function to get unique product ID
+  const getProductId = (product, index) => {
+    return product.id || product.product_id || `product-${index}`;
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -133,7 +140,7 @@ const BestSellers = () => {
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[...Array(4)].map((_, index) => (
-              <div key={index} className="bg-white rounded-lg shadow-md overflow-hidden animate-pulse">
+              <div key={`skeleton-${index}`} className="bg-white rounded-lg shadow-md overflow-hidden animate-pulse">
                 <div className="h-48 bg-gray-200"></div>
                 <div className="p-4">
                   <div className="h-4 bg-gray-200 rounded mb-2"></div>
@@ -248,16 +255,19 @@ const BestSellers = () => {
               msOverflowStyle: 'none'
             }}
           >
-            {bestSellers.map((product) => (
-              <div 
-                key={product.id} 
-                className={`flex-shrink-0 ${
-                  isMobile ? 'w-1/2 px-2' : 'w-1/4 px-3'
-                }`}
-              >
-                <ProductCard product={product} />
-              </div>
-            ))}
+            {bestSellers.map((product, index) => {
+              const productId = getProductId(product, index);
+              return (
+                <div 
+                  key={`bestseller-${productId}`}
+                  className={`flex-shrink-0 ${
+                    isMobile ? 'w-1/2 px-2' : 'w-1/4 px-3'
+                  }`}
+                >
+                  <ProductCard product={product} />
+                </div>
+              );
+            })}
           </div>
           
           {/* Right arrow - only show if more than one slide */}
@@ -280,7 +290,7 @@ const BestSellers = () => {
             <div className="flex space-x-2">
               {Array.from({ length: totalSlides }, (_, index) => (
                 <button
-                  key={index}
+                  key={`pagination-dot-${index}`}
                   onClick={() => scrollToSlide(index)}
                   className={`h-1 transition-all duration-300 rounded-full ${
                     index === activeIndex ? 'w-8 bg-pink-500' : 'w-4 bg-gray-300'

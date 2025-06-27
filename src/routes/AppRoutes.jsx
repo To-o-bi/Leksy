@@ -24,6 +24,7 @@ const ContactPage = lazy(() => import('../pages/public/ContactPage'));
 const CheckoutPage = lazy(() => import('../pages/public/CheckoutPage'));
 const WishlistPage = lazy(() => import('../pages/public/WishlistPage'));
 const ConsultationPage = lazy(() => import('../pages/public/ConsultationPage'));
+const ConsultationSuccessPage = lazy(() => import('../components/consultation/ConsultationSuccess'));
 const CheckoutSuccessPage = lazy(() => import('../pages/public/CheckoutSuccessPage'));
 
 // Admin pages
@@ -75,9 +76,10 @@ const AppRoutes = () => {
           <Route path="/cart" element={<CartPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
-           <Route path="/checkout/checkout-success" element={<CheckoutSuccessPage />} />
+          <Route path="/checkout/checkout-success" element={<CheckoutSuccessPage />} />
           <Route path="/wishlist" element={<WishlistPage />} />
           <Route path="/consultation" element={<ConsultationPage />} />
+          <Route path="/consultation/success" element={<ConsultationSuccessPage />} />
         </Route>
         
         {/* Protected Admin Routes - now using ProtectedRoute that includes AdminLayout */}

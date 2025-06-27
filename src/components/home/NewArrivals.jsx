@@ -38,6 +38,7 @@ const NewArrivals = () => {
     
     // Get the most recent products (last 8 products or products marked as new)
     const sortedProducts = [...productsList]
+      .filter(product => product && (product.id !== undefined && product.id !== null)) // Filter out products without valid IDs
       .sort((a, b) => {
         // Sort by creation date if available, otherwise by ID
         const dateA = new Date(a.created_at || a.id);
@@ -48,9 +49,11 @@ const NewArrivals = () => {
 
     // Keep the original product format for ProductCard component
     // Just add isNew flag to mark as new arrival
-    const formattedProducts = sortedProducts.map(product => ({
+    const formattedProducts = sortedProducts.map((product, index) => ({
       ...product, // Keep all original product properties
-      isNew: true // Mark as new arrival
+      isNew: true, // Mark as new arrival
+      // Ensure each product has a unique identifier
+      uniqueId: product.id || `new-arrival-${index}`
     }));
 
     setNewArrivals(formattedProducts);
@@ -83,7 +86,7 @@ const NewArrivals = () => {
           
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, index) => (
-              <div key={index} className="bg-white rounded-lg shadow-md overflow-hidden animate-pulse">
+              <div key={`new-arrivals-skeleton-${index}`} className="bg-white rounded-lg shadow-md overflow-hidden animate-pulse">
                 <div className="h-48 bg-gray-200"></div>
                 <div className="p-4">
                   <div className="h-4 bg-gray-200 rounded mb-2"></div>
@@ -175,8 +178,11 @@ const NewArrivals = () => {
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {newArrivals.map((product) => (
-            <ProductCard key={product.id} product={product} />
+          {newArrivals.map((product, index) => (
+            <ProductCard 
+              key={`new-arrival-${product.uniqueId || product.id || index}`} 
+              product={product} 
+            />
           ))}
         </div>
 

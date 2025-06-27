@@ -1,6 +1,6 @@
 import React from 'react'
 
-const HowItworks = () => {
+const HowItWorks = () => {
   return (
     <div className="container mx-auto px-4 py-16">
         <h2 className="text-3xl font-bold text-center mb-16">How It Works</h2>
@@ -41,7 +41,8 @@ const HowItworks = () => {
           </div>
         </div>
       </div>
+
   )
 }
 
-export default HowItworks
+export default HowItWorks
