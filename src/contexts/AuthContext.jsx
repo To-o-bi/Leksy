@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, createContext, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useContext, createContext, useCallback, useRef, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { authService, api } from '../api';
 
 const AuthContext = createContext();
@@ -15,6 +16,9 @@ export const useAuth = () => {
 };
 
 function useProvideAuth() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -23,16 +27,89 @@ function useProvideAuth() {
   
   const tokenCheckInterval = useRef(null);
   const warningShown = useRef(false);
+  const redirectTimeoutRef = useRef(null);
+  const isInitialized = useRef(false);
 
-  const getStoredUser = () => {
+  // Check if current route requires authentication
+  const isProtectedRoute = useCallback(() => {
+    const protectedPaths = ['/admin', '/dashboard', '/profile'];
+    return protectedPaths.some(path => location.pathname.startsWith(path));
+  }, [location.pathname]);
+
+  // Check if current route is a login page
+  const isLoginPage = useCallback(() => {
+    const loginPaths = ['/login', '/admin/login', '/signin', '/auth/login'];
+    return loginPaths.includes(location.pathname);
+  }, [location.pathname]);
+
+  // Navigate to login with proper redirect handling
+  const navigateToLogin = useCallback((reason = 'Authentication required') => {
+    if (isLoginPage()) {
+      console.log('Already on login page, skipping navigation');
+      return;
+    }
+
+    console.log(`🔄 Redirecting to login: ${reason}`);
+    
+    // Clear any existing redirect timeout
+    if (redirectTimeoutRef.current) {
+      clearTimeout(redirectTimeoutRef.current);
+      redirectTimeoutRef.current = null;
+    }
+
+    // Store current location for redirect after login (only for protected routes)
+    const currentPath = location.pathname;
+    const shouldSaveRedirect = isProtectedRoute() && currentPath !== '/' && currentPath !== '/admin/login';
+    
+    if (shouldSaveRedirect) {
+      sessionStorage.setItem('redirectAfterLogin', currentPath);
+    }
+
+    // Add small delay to allow for cleanup
+    redirectTimeoutRef.current = setTimeout(() => {
+      try {
+        navigate('/admin/login', { 
+          replace: true,
+          state: { 
+            from: shouldSaveRedirect ? currentPath : null,
+            reason 
+          }
+        });
+      } catch (error) {
+        console.error('Navigation error:', error);
+        // Fallback to hard redirect
+        window.location.href = `/admin/login?reason=${encodeURIComponent(reason)}`;
+      }
+    }, 100);
+  }, [navigate, location.pathname, isLoginPage, isProtectedRoute]);
+
+  // Navigate to dashboard or saved redirect path after login
+  const navigateAfterLogin = useCallback(() => {
+    const savedRedirect = sessionStorage.getItem('redirectAfterLogin');
+    sessionStorage.removeItem('redirectAfterLogin');
+    
+    const targetPath = savedRedirect || '/admin/products'; // Default dashboard path
+    
+    console.log(`✅ Login successful, redirecting to: ${targetPath}`);
+    
+    try {
+      navigate(targetPath, { replace: true });
+    } catch (error) {
+      console.error('Post-login navigation error:', error);
+      navigate('/admin/products', { replace: true });
+    }
+  }, [navigate]);
+
+  const getStoredUser = useCallback(() => {
     try {
       const userData = localStorage.getItem('user');
       return userData ? JSON.parse(userData) : null;
-    } catch {
+    } catch (error) {
+      console.error('Error parsing stored user data:', error);
       localStorage.removeItem('user');
       return null;
     }
-  };
+  }, []);
 
   const clearAuthData = useCallback(() => {
     api.clearAuth();
@@ -44,6 +121,11 @@ function useProvideAuth() {
     if (tokenCheckInterval.current) {
       clearInterval(tokenCheckInterval.current);
       tokenCheckInterval.current = null;
+    }
+
+    if (redirectTimeoutRef.current) {
+      clearTimeout(redirectTimeoutRef.current);
+      redirectTimeoutRef.current = null;
     }
   }, []);
 
@@ -57,8 +139,8 @@ function useProvideAuth() {
       const remainingTime = api.getTokenRemainingTime();
       setTokenExpiry(remainingTime);
       
-      // Show warning when 10 minutes or less remaining
-      if (remainingTime <= 10 && remainingTime > 0 && !warningShown.current) {
+      // Show warning when 1 hour (60 minutes) or less remaining
+      if (remainingTime <= 60 && remainingTime > 0 && !warningShown.current) {
         setShowExpiryWarning(true);
         warningShown.current = true;
         console.log(`⚠️ Token expires in ${remainingTime} minutes`);
@@ -67,10 +149,10 @@ function useProvideAuth() {
       // Auto-logout when token expires
       if (remainingTime <= 0) {
         console.log('🔒 Token expired - auto logout');
-        logout();
+        logout('Token expired');
       }
     }, 60000); // Check every minute
-  }, []);
+  }, []); // Remove dependency on navigateToLogin to prevent recreation
 
   const stopTokenMonitoring = useCallback(() => {
     if (tokenCheckInterval.current) {
@@ -79,8 +161,12 @@ function useProvideAuth() {
     }
   }, []);
 
+  // Initialize auth state
   useEffect(() => {
-    const initializeAuth = () => {
+    const initializeAuth = async () => {
+      if (isInitialized.current) return;
+      isInitialized.current = true;
+
       try {
         const hasToken = !!api.getToken();
         const userData = getStoredUser();
@@ -89,7 +175,8 @@ function useProvideAuth() {
         console.log('Auth initialization:', { 
           hasToken, 
           hasUserData: !!userData,
-          tokenRemainingMinutes: remainingTime
+          tokenRemainingMinutes: remainingTime,
+          currentPath: location.pathname
         });
         
         if (hasToken && userData && remainingTime > 0) {
@@ -98,43 +185,70 @@ function useProvideAuth() {
           startTokenMonitoring();
           console.log('User authenticated:', userData.name || userData.username);
         } else {
+          // Log specific issues
           if (hasToken && !userData) {
             console.log('Token exists but no user data, clearing auth');
           } else if (!hasToken && userData) {
             console.log('User data exists but no valid token, clearing user data');
           } else if (remainingTime <= 0) {
             console.log('Token expired, clearing auth');
+          } else {
+            console.log('No authentication data found');
           }
+          
           clearAuthData();
           setUser(null);
+          
+          // Only redirect if on a protected route and not already redirecting
+          if (isProtectedRoute() && !isLoginPage()) {
+            navigateToLogin('Authentication required');
+          }
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
         clearAuthData();
         setUser(null);
+        
+        // Navigate to login if on a protected route
+        if (isProtectedRoute() && !isLoginPage()) {
+          navigateToLogin('Authentication error');
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
-    // Listen for auth expiry events from API client
-    const handleAuthExpired = () => {
-      console.log('🔒 Auth expired event received');
+    initializeAuth();
+  }, [clearAuthData, startTokenMonitoring, getStoredUser, isProtectedRoute, isLoginPage, navigateToLogin, location.pathname]);
+
+  // Listen for auth expiry events from API client
+  useEffect(() => {
+    const handleAuthExpired = (event) => {
+      console.log('🔒 Auth expired event received:', event.detail?.reason || 'Unknown reason');
       setUser(null);
       clearAuthData();
       setError('Your session has expired. Please login again.');
+      
+      // Only navigate if not already on login page
+      if (!isLoginPage()) {
+        navigateToLogin(event.detail?.reason || 'Session expired');
+      }
     };
 
     window.addEventListener('auth:expired', handleAuthExpired);
-    initializeAuth();
 
     return () => {
       window.removeEventListener('auth:expired', handleAuthExpired);
       stopTokenMonitoring();
+      
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+        redirectTimeoutRef.current = null;
+      }
     };
-  }, [clearAuthData, startTokenMonitoring, stopTokenMonitoring]);
+  }, [clearAuthData, isLoginPage, navigateToLogin, stopTokenMonitoring]);
 
-  const login = async (username, password) => {
+  const login = useCallback(async (username, password) => {
     if (!username?.trim() || !password?.trim()) {
       throw new Error('Username and password are required');
     }
@@ -169,6 +283,12 @@ function useProvideAuth() {
       
       // Set token first, then user data
       api.setToken(result.token);
+      
+      // Set refresh token if provided
+      if (result.refreshToken) {
+        api.setRefreshToken(result.refreshToken);
+      }
+      
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
       
@@ -180,15 +300,28 @@ function useProvideAuth() {
       console.log('Login successful for:', userData.name || userData.username);
       console.log('Token expires in:', remainingTime, 'minutes');
       
+      // Navigate to appropriate page after successful login
+      navigateAfterLogin();
+      
       return result;
       
     } catch (err) {
       console.error('Login error:', err.message);
-      const errorMessage = err.message.includes('Network') 
-        ? 'Network error. Check your connection.'
-        : err.message.includes('timeout')
-        ? 'Request timed out. Try again.'
-        : err.message || 'Login failed';
+      
+      // Enhanced error handling
+      let errorMessage = 'Login failed';
+      
+      if (err.message.includes('Network') || err.message.includes('network')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (err.message.includes('timeout') || err.message.includes('Timeout')) {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (err.message.includes('Invalid') || err.message.includes('Unauthorized')) {
+        errorMessage = 'Invalid username or password.';
+      } else if (err.message.includes('Too many')) {
+        errorMessage = 'Too many login attempts. Please try again later.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
       
       setError(errorMessage);
       setUser(null);
@@ -197,12 +330,14 @@ function useProvideAuth() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [clearAuthData, startTokenMonitoring, navigateAfterLogin]);
 
-  const logout = async (navigate) => {
+  const logout = useCallback(async (reason = 'User logout', shouldNavigate = true) => {
+    console.log(`🚪 Logging out: ${reason}`);
     setIsLoading(true);
     
     try {
+      // Call logout API (fire and forget)
       await authService.logout();
     } catch (error) {
       console.log('Logout API call failed (continuing with local cleanup):', error.message);
@@ -213,19 +348,20 @@ function useProvideAuth() {
     setError(null);
     setIsLoading(false);
     
-    if (navigate) {
-      navigate('/login', { replace: true });
+    if (shouldNavigate && !isLoginPage()) {
+      navigateToLogin(reason);
     }
-  };
+  }, [clearAuthData, navigateToLogin, isLoginPage]);
 
   const extendSession = useCallback(async () => {
     if (!user) return false;
     
     try {
       setIsLoading(true);
-      // Make a simple API call to refresh the token
-      // You might want to create a dedicated refresh endpoint
-      const response = await api.get('/admin/ping'); // Adjust endpoint as needed
+      
+      // Try to get a new token through any API call that returns a token
+      // This could be a dedicated refresh endpoint or any authenticated endpoint
+      const response = await api.get('/admin/auth/verify'); // Adjust endpoint as needed
       
       if (response.data?.token) {
         api.setToken(response.data.token);
@@ -240,33 +376,48 @@ function useProvideAuth() {
       return false;
     } catch (error) {
       console.error('Failed to extend session:', error);
+      
+      // If session extension fails due to auth error, logout
+      if (error?.status === 401 || error?.message?.includes('Authentication')) {
+        logout('Session extension failed', true);
+      }
+      
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, logout]);
 
   const dismissExpiryWarning = useCallback(() => {
     setShowExpiryWarning(false);
+    warningShown.current = false; // Reset warning flag
   }, []);
 
-  const updateUser = (updates) => {
+  const updateUser = useCallback((updates) => {
+    if (!user) return;
+    
     const newUserData = { ...user, ...updates };
     localStorage.setItem('user', JSON.stringify(newUserData));
     setUser(newUserData);
-  };
+    console.log('User data updated:', updates);
+  }, [user]);
 
-  const handleAuthError = (error) => {
+  const handleAuthError = useCallback((error) => {
     if (error?.status === 401 || error?.message?.includes('Authentication')) {
-      logout();
+      console.log('🚨 Authentication error detected, logging out');
+      logout('Authentication failed', true);
       return true;
     }
     return false;
-  };
+  }, [logout]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
   // Get formatted time remaining
-  const getFormattedTimeRemaining = () => {
-    if (!tokenExpiry) return 'Unknown';
+  const getFormattedTimeRemaining = useCallback(() => {
+    if (!tokenExpiry || tokenExpiry <= 0) return 'Expired';
     
     const hours = Math.floor(tokenExpiry / 60);
     const minutes = tokenExpiry % 60;
@@ -275,26 +426,63 @@ function useProvideAuth() {
       return `${hours}h ${minutes}m`;
     }
     return `${minutes}m`;
-  };
+  }, [tokenExpiry]);
 
-  return {
-    user,
-    isLoading,
-    error,
-    tokenExpiry,
-    showExpiryWarning,
-    isAuthenticated: Boolean(user && api.getToken()),
-    isAdmin: Boolean(user?.role === 'admin' || user?.role === 'superadmin'),
-    isTokenExpiringSoon: api.isTokenExpiringSoon(),
+  // Memoize the computed values to avoid recalculation on every render
+  const authValues = useMemo(() => {
+    const hasValidToken = !!api.getToken();
+    const isUserAuthenticated = Boolean(user && hasValidToken);
+    const isUserAdmin = Boolean(user?.role === 'admin' || user?.role === 'superadmin');
+    const isTokenSoonToExpire = hasValidToken ? api.isTokenExpiringSoon() : false;
+    
+    return {
+      // State
+      user,
+      isLoading,
+      error,
+      tokenExpiry,
+      showExpiryWarning,
+      
+      // Computed values
+      isAuthenticated: isUserAuthenticated,
+      isAdmin: isUserAdmin,
+      isTokenExpiringSoon: isTokenSoonToExpire,
+      isProtectedRoute: isProtectedRoute(),
+      isLoginPage: isLoginPage(),
+      
+      // Functions
+      getFormattedTimeRemaining,
+      login,
+      logout,
+      updateUser,
+      extendSession,
+      dismissExpiryWarning,
+      clearError,
+      handleAuthError,
+      navigateToLogin,
+      navigateAfterLogin
+    };
+  }, [
+    user, 
+    isLoading, 
+    error, 
+    tokenExpiry, 
+    showExpiryWarning, 
+    isProtectedRoute,
+    isLoginPage,
     getFormattedTimeRemaining,
     login,
     logout,
     updateUser,
     extendSession,
     dismissExpiryWarning,
-    clearError: () => setError(null),
-    handleAuthError
-  };
+    clearError,
+    handleAuthError,
+    navigateToLogin,
+    navigateAfterLogin
+  ]);
+
+  return authValues;
 }
 
 export default AuthProvider;

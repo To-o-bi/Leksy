@@ -1,7 +1,41 @@
-// src/api/services.js
+// src/api/services.js - FIXED VERSION
 import api from './axios.js';
 import { ENDPOINTS, CATEGORIES, API_CONFIG } from './config.js';
-// import { validateForm, validators } from './validation.js';
+
+// Utility functions
+const isBrowser = () => typeof window !== 'undefined';
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+// Safe localStorage wrapper
+const storage = {
+  getItem(key) {
+    if (!isBrowser()) return null;
+    try {
+      return localStorage.getItem(key);
+    } catch (error) {
+      console.error(`Error reading localStorage key "${key}":`, error);
+      return null;
+    }
+  },
+  
+  setItem(key, value) {
+    if (!isBrowser()) return;
+    try {
+      localStorage.setItem(key, value);
+    } catch (error) {
+      console.error(`Error writing localStorage key "${key}":`, error);
+    }
+  },
+  
+  removeItem(key) {
+    if (!isBrowser()) return;
+    try {
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.error(`Error removing localStorage key "${key}":`, error);
+    }
+  }
+};
 
 export const authService = {
   async login(username, password) {
@@ -10,46 +44,76 @@ export const authService = {
     }
 
     const formData = new FormData();
-    formData.append('username', username);
+    formData.append('username', username.trim());
     formData.append('password', password);
 
-    const response = await api.post('/admin/login', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    try {
+      const response = await api.post('/admin/login', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
 
-    if (response.data?.code === 200) {
-      if (response.data.token) api.setToken(response.data.token);
-      if (response.data.user) localStorage.setItem('user', JSON.stringify(response.data.user));
-      return response.data;
+      if (response.data?.code === 200) {
+        // Set token first
+        if (response.data.token) {
+          api.setToken(response.data.token);
+        }
+        
+        // Then set user data
+        if (response.data.user) {
+          storage.setItem('user', JSON.stringify(response.data.user));
+        }
+        
+        return response.data;
+      }
+
+      throw new Error(response.data?.message || 'Login failed');
+    } catch (error) {
+      // Clear any partial auth state on login failure
+      this.clearAuth();
+      throw error;
     }
-
-    throw new Error(response.data?.message || 'Login failed');
   },
 
   async logout() {
     try {
+      // Attempt graceful logout
       await api.post(ENDPOINTS.ADMIN_LOGOUT);
+    } catch (error) {
+      console.warn('Logout API call failed:', error.message);
+      // Continue with local cleanup even if API fails
     } finally {
-      api.clearAuth();
-      localStorage.removeItem('user');
+      this.clearAuth();
     }
   },
 
   clearAuth() {
     api.clearAuth();
-    localStorage.removeItem('user');
+    storage.removeItem('user');
   },
 
   isAuthenticated() {
-    return !!api.getToken() && !!localStorage.getItem('user');
+    const hasToken = !!api.getToken();
+    const hasUser = !!storage.getItem('user');
+    
+    // If we have a token but no user data, or vice versa, clear both
+    if (hasToken !== hasUser) {
+      console.warn('Auth state mismatch detected, clearing auth');
+      this.clearAuth();
+      return false;
+    }
+    
+    return hasToken && hasUser;
   },
 
   getAuthUser() {
     try {
-      const userData = localStorage.getItem('user');
-      return userData ? JSON.parse(userData) : null;
-    } catch {
-      localStorage.removeItem('user');
+      const userData = storage.getItem('user');
+      if (!userData) return null;
+      
+      return JSON.parse(userData);
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      storage.removeItem('user');
       return null;
     }
   }
@@ -68,28 +132,87 @@ export const productService = {
   },
 
   async fetchProduct(productId) {
+    if (!productId) throw new Error('Product ID is required');
+    
     const response = await api.get(ENDPOINTS.FETCH_PRODUCT, { product_id: productId });
     return response.data;
   },
 
   async addProduct(productData) {
-    if (!productData.name?.trim()) throw new Error('Product name is required');
-    if (!productData.price || parseFloat(productData.price) <= 0) throw new Error('Valid price is required');
-    if (!productData.description?.trim()) throw new Error('Description is required');
-    if (!productData.quantity || parseInt(productData.quantity) < 0) throw new Error('Valid quantity is required');
-    if (!productData.category || !CATEGORIES.includes(productData.category)) throw new Error('Valid category is required');
+    // Validation
+    this._validateProductData(productData);
 
-    if (!productData.concern_options || productData.concern_options.length === 0) {
-      throw new Error('At least one concern option is required');
+    const formData = this._buildProductFormData(productData);
+    const response = await api.postFormData(ENDPOINTS.ADD_PRODUCT, formData);
+    return response.data;
+  },
+
+  async updateProduct(productId, productData) {
+    if (!productId) throw new Error('Product ID is required');
+    
+    const formData = new FormData();
+    formData.append('product_id', productId);
+
+    // Add updated fields
+    if (productData.name) formData.append('name', productData.name.trim());
+    if (productData.price) formData.append('price', productData.price.toString());
+    if (productData.description) formData.append('description', productData.description.trim());
+    if (productData.quantity !== undefined) formData.append('quantity', productData.quantity.toString());
+    if (productData.category) formData.append('category', productData.category);
+    if (productData.slashed_price) formData.append('slashed_price', productData.slashed_price.toString());
+    
+    if (productData.concern_options) {
+      const concerns = Array.isArray(productData.concern_options) 
+        ? productData.concern_options.join(',') 
+        : productData.concern_options.toString();
+      formData.append('concern_options', concerns);
     }
 
+    // Handle image uploads
     if (productData.images?.length) {
       productData.images.forEach(image => {
-        if (!image.type?.startsWith('image/')) throw new Error('Only image files allowed');
-        if (image.size > 2 * 1024 * 1024) throw new Error('Image must be less than 2MB');
+        formData.append('images[]', image);
       });
     }
 
+    const response = await api.postFormData(ENDPOINTS.UPDATE_PRODUCT, formData);
+    return response.data;
+  },
+
+  async deleteProduct(productId) {
+    if (!productId) throw new Error('Product ID is required');
+    
+    try {
+      const formData = new FormData();
+      formData.append('product_id', productId);
+      
+      const response = await api.postFormData(ENDPOINTS.DELETE_PRODUCT, formData);
+      return response.data;
+    } catch (error) {
+      console.error('Delete product error:', error);
+      throw new Error(error.response?.data?.message || 'Failed to delete product');
+    }
+  },
+
+  // Helper methods
+  _validateProductData(productData) {
+    if (!productData.name?.trim()) throw new Error('Product name is required');
+    if (!productData.price || parseFloat(productData.price) <= 0) throw new Error('Valid price is required');
+    if (!productData.description?.trim()) throw new Error('Description is required');
+    if (productData.quantity === undefined || parseInt(productData.quantity) < 0) throw new Error('Valid quantity is required');
+    if (!productData.category || !CATEGORIES.includes(productData.category)) throw new Error('Valid category is required');
+    if (!productData.concern_options || productData.concern_options.length === 0) throw new Error('At least one concern option is required');
+
+    // Validate images
+    if (productData.images?.length) {
+      productData.images.forEach((image, index) => {
+        if (!image.type?.startsWith('image/')) throw new Error(`File ${index + 1} must be an image`);
+        if (image.size > 2 * 1024 * 1024) throw new Error(`Image ${index + 1} must be less than 2MB`);
+      });
+    }
+  },
+
+  _buildProductFormData(productData) {
     const formData = new FormData();
     formData.append('name', productData.name.trim());
     formData.append('price', productData.price.toString());
@@ -97,11 +220,10 @@ export const productService = {
     formData.append('quantity', productData.quantity.toString());
     formData.append('category', productData.category);
 
-    if (Array.isArray(productData.concern_options)) {
-      formData.append('concern_options', productData.concern_options.join(','));
-    } else {
-      formData.append('concern_options', productData.concern_options.toString());
-    }
+    const concerns = Array.isArray(productData.concern_options) 
+      ? productData.concern_options.join(',') 
+      : productData.concern_options.toString();
+    formData.append('concern_options', concerns);
 
     if (productData.slashed_price) {
       formData.append('slashed_price', productData.slashed_price.toString());
@@ -113,86 +235,19 @@ export const productService = {
       });
     }
 
-    const response = await api.postFormData(ENDPOINTS.ADD_PRODUCT, formData);
-    return response.data;
-  },
-
-    async updateProduct(productId, productData) {
-  // Always include product_id in the params
-  const params = new URLSearchParams();
-  params.append('product_id', productId);
-
-  // Add other fields if they exist in productData
-  if (productData.name) params.append('name', productData.name);
-  if (productData.price) params.append('price', productData.price);
-  if (productData.description) params.append('description', productData.description);
-  if (productData.quantity) params.append('quantity', productData.quantity);
-  if (productData.category) params.append('category', productData.category);
-  if (productData.slashed_price) params.append('slashed_price', productData.slashed_price);
-  
-  if (productData.concern_options) {
-    params.append('concern_options', 
-      Array.isArray(productData.concern_options) 
-        ? productData.concern_options.join(',') 
-        : productData.concern_options.toString()
-    );
-  }
-
-  // Handle image uploads separately
-  if (productData.images?.length) {
-    const formData = new FormData();
-    // Add all params to formData
-    params.forEach((value, key) => {
-      formData.append(key, value);
-    });
-    // Add images
-    productData.images.forEach(image => {
-      formData.append('images', image);
-    });
-    
-    const response = await api.postFormData(ENDPOINTS.UPDATE_PRODUCT, formData);
-    return response.data;
-  }
-
-  // For non-image updates
-  const response = await api.post(ENDPOINTS.UPDATE_PRODUCT, params, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    }
-  });
-  return response.data;
-},
-
-    async deleteProduct(productId) {
-    try {
-      // Try FormData approach (similar to login and other endpoints)
-      const formData = new FormData();
-      formData.append('product_id', productId);
-      
-      const response = await api.postFormData(ENDPOINTS.DELETE_PRODUCT, formData);
-      
-      // Log the response to debug
-      console.log('Delete API response:', response);
-      console.log('Response data:', response.data);
-      
-      // Return the full response data structure that your frontend expects
-      return response.data || response;
-    } catch (error) {
-      console.error('Delete product API error:', error);
-      // Re-throw the error so your frontend can handle it
-      throw error;
-    }
+    return formData;
   }
 };
 
 export const contactService = {
   async submit(contactData) {
+    // Validation
     if (!contactData.name?.trim()) throw new Error('Name is required');
     if (!contactData.email?.trim()) throw new Error('Email is required');
     if (!contactData.phone?.trim()) throw new Error('Phone is required');
     if (!contactData.subject?.trim()) throw new Error('Subject is required');
     if (!contactData.message?.trim()) throw new Error('Message is required');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactData.email)) throw new Error('Invalid email format');
+    if (!isValidEmail(contactData.email)) throw new Error('Invalid email format');
 
     const formData = new FormData();
     formData.append('name', contactData.name.trim());
@@ -208,44 +263,39 @@ export const contactService = {
   async fetchSubmissions(filters = {}) {
     try {
       const response = await api.get(ENDPOINTS.FETCH_CONTACT_SUBMISSIONS, filters);
-      console.log('Contact API response:', response);
-      return response.data || response;
+      return response.data;
     } catch (error) {
       console.error('Contact fetch error:', error);
-      throw error;
+      throw new Error(error.response?.data?.message || 'Failed to fetch contact submissions');
     }
   }
 };
 
 export const orderService = {
   async initiateCheckout(checkoutData) {
-    if (!checkoutData.phone?.trim()) throw new Error('Phone is required');
-    if (!checkoutData.delivery_method) throw new Error('Delivery method is required');
-    if (!['pickup', 'address'].includes(checkoutData.delivery_method)) throw new Error('Invalid delivery method');
-    if (!checkoutData.cart?.length) throw new Error('Cart cannot be empty');
-
-    if (checkoutData.delivery_method === 'address') {
-      if (!checkoutData.state?.trim()) throw new Error('State is required');
-      if (!checkoutData.city?.trim()) throw new Error('City is required');
-      if (!checkoutData.street_address?.trim()) throw new Error('Street address is required');
-    }
+    // Validation
+    this._validateCheckoutData(checkoutData);
 
     const params = {
-      name: checkoutData.name || '',
-      email: checkoutData.email || '',
-      phone: checkoutData.phone,
+      name: checkoutData.name?.trim() || '',
+      email: checkoutData.email?.trim() || '',
+      phone: checkoutData.phone.trim(),
       delivery_method: checkoutData.delivery_method,
       cart: JSON.stringify(checkoutData.cart)
     };
 
+    // Add address fields if needed
     if (checkoutData.delivery_method === 'address') {
-      params.state = checkoutData.state;
-      params.city = checkoutData.city;
-      params.street_address = checkoutData.street_address;
+      params.state = checkoutData.state.trim();
+      params.city = checkoutData.city.trim();
+      params.street_address = checkoutData.street_address.trim();
     }
 
+    // Add success redirect URL (safe for SSR)
     if (checkoutData.success_redirect) {
       params.success_redirect = checkoutData.success_redirect;
+    } else if (isBrowser()) {
+      params.success_redirect = `${window.location.origin}/checkout/success`;
     }
 
     const response = await api.post(ENDPOINTS.INITIATE_CHECKOUT, null, { params });
@@ -258,6 +308,8 @@ export const orderService = {
   },
 
   async fetchOrder(orderId) {
+    if (!orderId) throw new Error('Order ID is required');
+    
     const response = await api.get(ENDPOINTS.FETCH_ORDER, { order_id: orderId });
     return response.data;
   },
@@ -265,19 +317,74 @@ export const orderService = {
   async changeDeliveryStatus(orderId, newStatus) {
     const validStatuses = ['unpaid', 'order-received', 'packaged', 'in-transit', 'delivered'];
     if (!validStatuses.includes(newStatus)) throw new Error('Invalid delivery status');
+    if (!orderId) throw new Error('Order ID is required');
 
     const response = await api.get(ENDPOINTS.CHANGE_DELIVERY_STATUS, {
       order_id: orderId,
       new_delivery_status: newStatus
     });
     return response.data;
+  },
+
+  _validateCheckoutData(checkoutData) {
+    if (!checkoutData.phone?.trim()) throw new Error('Phone is required');
+    if (!checkoutData.delivery_method) throw new Error('Delivery method is required');
+    if (!['pickup', 'address'].includes(checkoutData.delivery_method)) throw new Error('Invalid delivery method');
+    if (!checkoutData.cart?.length) throw new Error('Cart cannot be empty');
+
+    if (checkoutData.delivery_method === 'address') {
+      if (!checkoutData.state?.trim()) throw new Error('State is required');
+      if (!checkoutData.city?.trim()) throw new Error('City is required');
+      if (!checkoutData.street_address?.trim()) throw new Error('Street address is required');
+    }
   }
 };
 
 export const consultationService = {
   async initiateConsultation(consultationData) {
-    console.log('🔍 Raw consultation data received:', consultationData);
+    console.log('🔍 Processing consultation data:', consultationData);
 
+    // Clean and validate data
+    const cleanData = this._prepareConsultationData(consultationData);
+    
+    try {
+      // Use FormData approach (most reliable for this API)
+      const formData = new FormData();
+      Object.entries(cleanData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          formData.append(key, value);
+        }
+      });
+      
+      const response = await api.postFormData(ENDPOINTS.INITIATE_CONSULTATION, formData);
+      return response.data;
+    } catch (error) {
+      console.error('Consultation API error:', error);
+      throw new Error(error.response?.data?.message || 'Failed to book consultation');
+    }
+  },
+
+  async fetchBookedTimes(date = null) {
+    const params = {};
+    if (date) params.date = date;
+
+    const response = await api.get(ENDPOINTS.FETCH_BOOKED_TIMES, params);
+    return response.data;
+  },
+
+  async fetchConsultation(consultationId) {
+    if (!consultationId) throw new Error('Consultation ID is required');
+    
+    const response = await api.get(ENDPOINTS.FETCH_CONSULTATION, { consultation_id: consultationId });
+    return response.data;
+  },
+
+  async fetchConsultations(filters = {}) {
+    const response = await api.get(ENDPOINTS.FETCH_CONSULTATIONS, filters);
+    return response.data;
+  },
+
+  _prepareConsultationData(consultationData) {
     const isEmpty = (value) => {
       if (value === null || value === undefined) return true;
       if (typeof value === 'string') return value.trim() === '';
@@ -294,17 +401,18 @@ export const consultationService = {
       skin_type: consultationData.skin_type?.toString().trim(),
       channel: consultationData.channel?.toString().trim(),
       date: consultationData.date?.toString().trim(),
-      time_range: consultationData.time_range?.toString().trim(),
-      success_redirect: consultationData.success_redirect || `${window.location.origin}/consultation/success`
+      time_range: consultationData.time_range?.toString().trim()
     };
 
+    // Handle skin concerns
     let skinConcerns = consultationData.skin_concerns;
     if (Array.isArray(skinConcerns)) {
       cleanData.skin_concerns = skinConcerns.filter(c => !isEmpty(c)).join(',');
-    } else {
-      cleanData.skin_concerns = skinConcerns?.toString().trim();
+    } else if (skinConcerns) {
+      cleanData.skin_concerns = skinConcerns.toString().trim();
     }
 
+    // Optional fields
     if (!isEmpty(consultationData.current_skincare_products)) {
       cleanData.current_skincare_products = consultationData.current_skincare_products.toString().trim();
     }
@@ -313,77 +421,22 @@ export const consultationService = {
       cleanData.additional_details = consultationData.additional_details.toString().trim();
     }
 
-    try {
-      const queryString = new URLSearchParams(cleanData).toString();
-      const url = `${ENDPOINTS.INITIATE_CONSULTATION}?${queryString}`;
-      const response1 = await api.post(url);
-      return response1.data;
-    } catch (error1) {
-      console.log('❌ APPROACH 1 FAILED:', error1.response?.data?.message || error1.message);
+    // Success redirect (safe for SSR)
+    if (consultationData.success_redirect) {
+      cleanData.success_redirect = consultationData.success_redirect;
+    } else if (isBrowser()) {
+      cleanData.success_redirect = `${window.location.origin}/consultation/success`;
     }
 
-    try {
-      const response2 = await api.post(ENDPOINTS.INITIATE_CONSULTATION, cleanData);
-      return response2.data;
-    } catch (error2) {
-      console.log('❌ APPROACH 2 FAILED:', error2.response?.data?.message || error2.message);
-    }
-
-    try {
-      const formData = new FormData();
-      Object.entries(cleanData).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          formData.append(key, value);
-        }
-      });
-      const response3 = await api.postFormData(ENDPOINTS.INITIATE_CONSULTATION, formData);
-      return response3.data;
-    } catch (error3) {
-      console.log('❌ APPROACH 3 FAILED:', error3.response?.data?.message || error3.message);
-    }
-
-    try {
-      const response4 = await api.post(ENDPOINTS.INITIATE_CONSULTATION, null, { params: cleanData });
-      return response4.data;
-    } catch (error4) {
-      console.log('❌ APPROACH 4 FAILED:', error4.response?.data?.message || error4.message);
-    }
-
-    try {
-      const response5 = await api.get(ENDPOINTS.INITIATE_CONSULTATION, cleanData);
-      return response5.data;
-    } catch (error5) {
-      console.log('❌ APPROACH 5 FAILED:', error5.response?.data?.message || error5.message);
-    }
-
-    throw new Error('All API request approaches failed. Check console for detailed error messages.');
-  },
-
-  async fetchBookedTimes(date = null) {
-    const params = {};
-    if (date) params.date = date;
-
-    const response = await api.get(ENDPOINTS.FETCH_BOOKED_TIMES, params);
-    return response.data;
-  },
-
-  async fetchConsultation(consultationId) {
-    const response = await api.get(ENDPOINTS.FETCH_CONSULTATION, { consultation_id: consultationId });
-    return response.data;
-  },
-
-  async fetchConsultations(filters = {}) {
-    const response = await api.get(ENDPOINTS.FETCH_CONSULTATIONS, filters);
-    return response.data;
+    return cleanData;
   }
 };
 
-// Optimized newsletter service (FormData only)
-class NewsletterService {
+export const newsletterService = {
   async addSubscriber(email) {
     try {
       // Validate email
-      if (!email || !email.trim()) {
+      if (!email?.trim()) {
         return {
           success: false,
           message: 'Please enter a valid email address'
@@ -392,24 +445,19 @@ class NewsletterService {
 
       const cleanEmail = email.trim();
       
-      // Basic email validation
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(cleanEmail)) {
+      if (!isValidEmail(cleanEmail)) {
         return {
           success: false,
           message: 'Please enter a valid email address'
         };
       }
 
-      console.log('🔄 Attempting newsletter subscription for:', cleanEmail);
+      console.log('🔄 Adding newsletter subscriber:', cleanEmail);
 
-      // Use FormData (confirmed working approach)
       const formData = new FormData();
       formData.append('email', cleanEmail);
       
       const response = await api.postFormData(ENDPOINTS.ADD_NEWSLETTER_SUBSCRIBER, formData);
-      
-      console.log('✅ Newsletter subscription successful:', response.data);
       
       if (response.data?.code === 200) {
         return {
@@ -436,11 +484,11 @@ class NewsletterService {
         message: errorMessage
       };
     }
-  }
+  },
 
   async removeSubscriber(email) {
     try {
-      if (!email || !email.trim()) {
+      if (!email?.trim()) {
         return {
           success: false,
           message: 'Please enter a valid email address'
@@ -449,18 +497,15 @@ class NewsletterService {
 
       const cleanEmail = email.trim();
       
-      // Basic email validation
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(cleanEmail)) {
+      if (!isValidEmail(cleanEmail)) {
         return {
           success: false,
           message: 'Please enter a valid email address'
         };
       }
 
-      console.log('🔄 Attempting newsletter unsubscription for:', cleanEmail);
+      console.log('🔄 Removing newsletter subscriber:', cleanEmail);
 
-      // Use FormData (consistent with add subscriber)
       const formData = new FormData();
       formData.append('email', cleanEmail);
       
@@ -491,7 +536,7 @@ class NewsletterService {
         message: errorMessage
       };
     }
-  }
+  },
 
   async fetchSubscribers(limit = null) {
     try {
@@ -515,6 +560,4 @@ class NewsletterService {
       };
     }
   }
-}
-
-export const newsletterService = new NewsletterService();
+};

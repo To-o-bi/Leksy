@@ -11,20 +11,22 @@ import AppRoutes from './routes/AppRoutes';
 
 const App = () => {
   return (
-    <AuthProvider>
-      <TokenExpiryWarning />
-      <MessageProvider>
-        <BrowserRouter>
+    <BrowserRouter>
+      {/* AuthProvider MUST be inside BrowserRouter to use navigation hooks */}
+      <AuthProvider>
+        <MessageProvider>
           <ProductProvider>
             <CartProvider>
-              <WishlistProvider>                
+              <WishlistProvider>
+                {/* TokenExpiryWarning should be inside all providers to access auth state */}
+                <TokenExpiryWarning />
                 <AppRoutes />                
               </WishlistProvider>       
             </CartProvider>
           </ProductProvider>
-        </BrowserRouter>
-      </MessageProvider>      
-    </AuthProvider>
+        </MessageProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 };
 

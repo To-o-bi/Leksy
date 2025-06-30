@@ -8,12 +8,14 @@ const EditProductPage = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // State management
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [productNotFound, setProductNotFound] = useState(false);
   const [originalData, setOriginalData] = useState(null);
+  const [errors, setErrors] = useState({});
   
   const [formData, setFormData] = useState({
     name: '',
@@ -27,249 +29,60 @@ const EditProductPage = () => {
   const [newImages, setNewImages] = useState([]);
   const [newImagePreviews, setNewImagePreviews] = useState([]);
   const [existingImages, setExistingImages] = useState([]);
-  const [errors, setErrors] = useState({});
   
-  // Available product categories from API
-  const productCategories = [
-    'serums',
-    'moisturizers',
-    'bathe and body',
-    'sunscreens',
-    'toners',
-    'face cleansers'
+  // Constants
+  const PRODUCT_CATEGORIES = [
+    'serums', 'moisturizers', 'bathe and body', 
+    'sunscreens', 'toners', 'face cleansers'
   ];
   
-  // Fetch product data on component mount
-  useEffect(() => {
-    const fetchProductData = async () => {
-      if (!id) {
-        setProductNotFound(true);
-        setIsLoading(false);
-        return;
-      }
-      
-      setIsLoading(true);
-      try {
-        console.log('Fetching product with ID:', id);
-        
-        const response = await productService.fetchProduct(id);
-        console.log('Product fetch response:', response);
-        
-        if (!response || response.code !== 200 || !response.product) {
-          setProductNotFound(true);
-          return;
-        }
-        
-        const productData = response.product;
-        console.log('Product data:', productData);
-        
-        // Store original data for comparison
-        setOriginalData(productData);
-        
-        // Set form data from API response
-        setFormData({
-          name: productData.name || '',
-          price: productData.price ? productData.price.toString() : '',
-          slashed_price: productData.slashed_price ? productData.slashed_price.toString() : '',
-          category: productData.category || '',
-          quantity: productData.available_qty !== undefined ? productData.available_qty.toString() : '',
-          description: productData.description || '',
-        });
-        
-        // Set existing images
-        setExistingImages(Array.isArray(productData.images) ? productData.images : []);
-        
-      } catch (error) {
-        console.error('Error fetching product:', error);
-        
-        if (error.message.includes('not found') || error.status === 404) {
-          setProductNotFound(true);
-        } else if (error.message.includes('Authentication')) {
-          setSubmitError('Please log in again to continue.');
-          setTimeout(() => navigate('/admin/login'), 2000);
-        } else {
-          setSubmitError('Failed to load product data. Please try again.');
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProductData();
-  }, [id, navigate]);
+  const IMAGE_CONFIG = {
+    maxSize: 2 * 1024 * 1024, // 2MB
+    validTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    maxCount: 5
+  };
   
-  // Handle input changes
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Clear field error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+  const FALLBACK_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
+  
+  // Utility functions
+  const formatCategoryName = (category) => 
+    category.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  
+  const parseApiResponse = (response) => {
+    if (typeof response === 'string' && response.includes('<br />')) {
+      try {
+        const jsonMatch = response.match(/\{.*\}$/);
+        if (jsonMatch) return JSON.parse(jsonMatch[0]);
+        
+        if (response.includes('"code":200') && response.includes('updated successfully')) {
+          return { code: 200, message: 'Product updated successfully!' };
+        }
+      } catch (parseError) {
+        console.warn('Could not parse response JSON:', parseError);
+      }
     }
-    
-    // Clear general error
+    return response;
+  };
+  
+  const clearErrors = (field = null) => {
+    if (field) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    } else {
+      setErrors({});
+    }
     if (submitError) setSubmitError('');
   };
   
-  // Validate image file
   const validateImageFile = (file) => {
-    const maxSize = 2 * 1024 * 1024; // 2MB
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    
-    if (!validTypes.includes(file.type)) {
+    if (!IMAGE_CONFIG.validTypes.includes(file.type)) {
       return { valid: false, error: 'Only JPEG, PNG, and WebP images are allowed' };
     }
-    
-    if (file.size > maxSize) {
+    if (file.size > IMAGE_CONFIG.maxSize) {
       return { valid: false, error: 'File size must be less than 2MB' };
     }
-    
     return { valid: true };
   };
   
-  // Handle file selection for new images
-  const handleImageChange = (e) => {
-    const files = Array.from(e.target.files);
-    
-    // Check total image limit (existing + new)
-    if (existingImages.length + newImages.length + files.length > 5) {
-      setErrors(prev => ({
-        ...prev,
-        images: 'Maximum 5 images allowed per product'
-      }));
-      return;
-    }
-    
-    const validFiles = [];
-    const invalidFiles = [];
-    
-    files.forEach(file => {
-      const validation = validateImageFile(file);
-      
-      if (validation.valid) {
-        validFiles.push(file);
-      } else {
-        invalidFiles.push({
-          name: file.name,
-          reason: validation.error
-        });
-      }
-    });
-    
-    // Show validation errors
-    if (invalidFiles.length > 0) {
-      const errorMessage = invalidFiles.map(f => `${f.name}: ${f.reason}`).join(', ');
-      setErrors(prev => ({
-        ...prev,
-        images: errorMessage
-      }));
-    }
-    
-    // Add valid files
-    if (validFiles.length > 0) {
-      setNewImages(prev => [...prev, ...validFiles]);
-      
-      // Generate preview URLs
-      validFiles.forEach(file => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setNewImagePreviews(prev => [...prev, reader.result]);
-        };
-        reader.readAsDataURL(file);
-      });
-      
-      // Clear image error if we have valid files
-      if (errors.images && validFiles.length > 0) {
-        setErrors(prev => ({
-          ...prev,
-          images: ''
-        }));
-      }
-    }
-    
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-  
-  // Remove a new image
-  const handleRemoveNewImage = (index) => {
-    setNewImages(prev => prev.filter((_, i) => i !== index));
-    setNewImagePreviews(prev => prev.filter((_, i) => i !== index));
-  };
-  
-  // Remove an existing image
-  const handleRemoveExistingImage = (index) => {
-    setExistingImages(prev => prev.filter((_, i) => i !== index));
-  };
-  
-  // Validate form
-  const validateForm = () => {
-    const newErrors = {};
-    
-    // Required field validation
-    if (!formData.name.trim()) {
-      newErrors.name = 'Product name is required';
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = 'Product name must be at least 2 characters';
-    }
-    
-    if (!formData.price.trim()) {
-      newErrors.price = 'Price is required';
-    } else if (isNaN(formData.price) || parseFloat(formData.price) <= 0) {
-      newErrors.price = 'Please enter a valid price greater than 0';
-    }
-    
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required';
-    } else if (formData.description.trim().length < 10) {
-      newErrors.description = 'Description must be at least 10 characters';
-    }
-    
-    if (!formData.quantity.trim()) {
-      newErrors.quantity = 'Quantity is required';
-    } else if (isNaN(formData.quantity) || parseInt(formData.quantity) < 0) {
-      newErrors.quantity = 'Please enter a valid quantity (0 or greater)';
-    }
-    
-    if (!formData.category) {
-      newErrors.category = 'Category is required';
-    } else if (!productCategories.includes(formData.category)) {
-      newErrors.category = 'Invalid category selected';
-    }
-    
-    // Optional slashed price validation
-    if (formData.slashed_price && (isNaN(formData.slashed_price) || parseFloat(formData.slashed_price) <= 0)) {
-      newErrors.slashed_price = 'Please enter a valid original price';
-    }
-    
-    // Validate slashed price is greater than current price
-    if (formData.slashed_price && formData.price) {
-      const slashedPrice = parseFloat(formData.slashed_price);
-      const currentPrice = parseFloat(formData.price);
-      if (slashedPrice <= currentPrice) {
-        newErrors.slashed_price = 'Original price must be greater than current price';
-      }
-    }
-    
-    // At least one image required (existing or new)
-    if (existingImages.length === 0 && newImages.length === 0) {
-      newErrors.images = 'At least one product image is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-  
-  // Check if form has changes
   const hasChanges = () => {
     if (!originalData) return false;
     
@@ -285,7 +98,185 @@ const EditProductPage = () => {
     );
   };
   
-  // Handle form submission
+  // Fetch product data
+  useEffect(() => {
+    const fetchProductData = async () => {
+      if (!id) {
+        setProductNotFound(true);
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        const response = await productService.fetchProduct(id);
+        
+        if (!response || response.code !== 200 || !response.product) {
+          setProductNotFound(true);
+          return;
+        }
+        
+        const productData = response.product;
+        setOriginalData(productData);
+        
+        setFormData({
+          name: productData.name || '',
+          price: productData.price?.toString() || '',
+          slashed_price: productData.slashed_price?.toString() || '',
+          category: productData.category || '',
+          quantity: productData.available_qty?.toString() || '',
+          description: productData.description || '',
+        });
+        
+        setExistingImages(Array.isArray(productData.images) ? productData.images : []);
+        
+      } catch (error) {
+        console.error('Error fetching product:', error);
+        
+        if (error.message.includes('not found') || error.status === 404) {
+          setProductNotFound(true);
+        } else if (error.message.includes('Authentication')) {
+          setSubmitError('Please log in again to continue.');
+          setTimeout(() => navigate('/admin/login'), 2000);
+        } else {
+          setSubmitError('Failed to load product data. Please try again.');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProductData();
+  }, [id, navigate]);
+  
+  // Event handlers
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    clearErrors(name);
+  };
+  
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files);
+    
+    if (existingImages.length + newImages.length + files.length > IMAGE_CONFIG.maxCount) {
+      setErrors(prev => ({ ...prev, images: `Maximum ${IMAGE_CONFIG.maxCount} images allowed per product` }));
+      return;
+    }
+    
+    const validFiles = [];
+    const invalidFiles = [];
+    
+    files.forEach(file => {
+      const validation = validateImageFile(file);
+      if (validation.valid) {
+        validFiles.push(file);
+      } else {
+        invalidFiles.push({ name: file.name, reason: validation.error });
+      }
+    });
+    
+    if (invalidFiles.length > 0) {
+      const errorMessage = invalidFiles.map(f => `${f.name}: ${f.reason}`).join(', ');
+      setErrors(prev => ({ ...prev, images: errorMessage }));
+    }
+    
+    if (validFiles.length > 0) {
+      setNewImages(prev => [...prev, ...validFiles]);
+      
+      validFiles.forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => setNewImagePreviews(prev => [...prev, reader.result]);
+        reader.readAsDataURL(file);
+      });
+      
+      if (errors.images) clearErrors('images');
+    }
+    
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+  
+  const handleRemoveImage = (index, type) => {
+    if (type === 'new') {
+      setNewImages(prev => prev.filter((_, i) => i !== index));
+      setNewImagePreviews(prev => prev.filter((_, i) => i !== index));
+    } else {
+      setExistingImages(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+  
+  const validateForm = () => {
+    const newErrors = {};
+    
+    // Required field validations
+    const validations = {
+      name: {
+        required: true,
+        minLength: 2,
+        message: 'Product name is required and must be at least 2 characters'
+      },
+      price: {
+        required: true,
+        type: 'number',
+        min: 0.01,
+        message: 'Please enter a valid price greater than 0'
+      },
+      description: {
+        required: true,
+        minLength: 10,
+        message: 'Description is required and must be at least 10 characters'
+      },
+      quantity: {
+        required: true,
+        type: 'integer',
+        min: 0,
+        message: 'Please enter a valid quantity (0 or greater)'
+      },
+      category: {
+        required: true,
+        enum: PRODUCT_CATEGORIES,
+        message: 'Please select a valid category'
+      }
+    };
+    
+    Object.entries(validations).forEach(([field, rules]) => {
+      const value = formData[field]?.trim();
+      
+      if (rules.required && !value) {
+        newErrors[field] = rules.message;
+        return;
+      }
+      
+      if (value) {
+        if (rules.minLength && value.length < rules.minLength) {
+          newErrors[field] = rules.message;
+        } else if (rules.type === 'number' && (isNaN(value) || parseFloat(value) < (rules.min || 0))) {
+          newErrors[field] = rules.message;
+        } else if (rules.type === 'integer' && (isNaN(value) || parseInt(value) < (rules.min || 0))) {
+          newErrors[field] = rules.message;
+        } else if (rules.enum && !rules.enum.includes(value)) {
+          newErrors[field] = rules.message;
+        }
+      }
+    });
+    
+    // Slashed price validation
+    if (formData.slashed_price) {
+      if (isNaN(formData.slashed_price) || parseFloat(formData.slashed_price) <= 0) {
+        newErrors.slashed_price = 'Please enter a valid original price';
+      } else if (formData.price && parseFloat(formData.slashed_price) <= parseFloat(formData.price)) {
+        newErrors.slashed_price = 'Original price must be greater than current price';
+      }
+    }
+    
+    // Image validation
+    if (existingImages.length === 0 && newImages.length === 0) {
+      newErrors.images = 'At least one product image is required';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -299,60 +290,33 @@ const EditProductPage = () => {
       return;
     }
     
-    setIsSubmitting(true);
+    setSubmitting(true);
     setSubmitError('');
     setSubmitSuccess(false);
     
     try {
-      // Prepare data for submission - only include changed fields
       const productData = {};
       
-      // Add changed text fields
-      if (formData.name !== originalData.name) {
-        productData.name = formData.name.trim();
-      }
-      if (parseFloat(formData.price) !== originalData.price) {
-        productData.price = parseFloat(formData.price);
-      }
-      if (formData.description !== originalData.description) {
-        productData.description = formData.description.trim();
-      }
-      if (parseInt(formData.quantity) !== originalData.available_qty) {
-        productData.quantity = parseInt(formData.quantity, 10);
-      }
-      if (formData.category !== originalData.category) {
-        productData.category = formData.category;
-      }
+      // Add only changed fields
+      if (formData.name !== originalData.name) productData.name = formData.name.trim();
+      if (parseFloat(formData.price) !== originalData.price) productData.price = parseFloat(formData.price);
+      if (formData.description !== originalData.description) productData.description = formData.description.trim();
+      if (parseInt(formData.quantity) !== originalData.available_qty) productData.quantity = parseInt(formData.quantity, 10);
+      if (formData.category !== originalData.category) productData.category = formData.category;
       
-      // Handle slashed price
       const newSlashedPrice = formData.slashed_price ? parseFloat(formData.slashed_price) : null;
       const originalSlashedPrice = originalData.slashed_price || null;
-      if (newSlashedPrice !== originalSlashedPrice) {
-        if (newSlashedPrice) {
-          productData.slashed_price = newSlashedPrice;
-        }
+      if (newSlashedPrice !== originalSlashedPrice && newSlashedPrice) {
+        productData.slashed_price = newSlashedPrice;
       }
       
-      // Add new images if any
-      if (newImages.length > 0) {
-        productData.images = newImages;
-      }
+      if (newImages.length > 0) productData.images = newImages;
       
-      console.log('Submitting update with data:', {
-        productId: id,
-        changes: Object.keys(productData),
-        hasNewImages: newImages.length > 0,
-        existingImagesCount: existingImages.length
-      });
-      
-      // Make the API call
       const response = await productService.updateProduct(id, productData);
-      console.log('Update response:', response);
+      const parsedResponse = parseApiResponse(response);
       
-      if (response && response.code === 200) {
+      if (parsedResponse && (parsedResponse.code === 200 || parsedResponse.code === '200')) {
         setSubmitSuccess(true);
-        
-        // Navigate back after showing success message
         setTimeout(() => {
           navigate('/admin/products', {
             state: {
@@ -364,24 +328,28 @@ const EditProductPage = () => {
           });
         }, 2000);
       } else {
-        throw new Error(response?.message || 'Failed to update product');
+        throw new Error(parsedResponse?.message || 'Failed to update product');
       }
       
     } catch (error) {
       console.error('Error updating product:', error);
       
-      if (error.message.includes('Authentication')) {
+      if (error.message?.includes('Authentication')) {
         setSubmitError('Please log in again to continue.');
         setTimeout(() => navigate('/admin/login'), 2000);
       } else {
-        setSubmitError(error.message || 'An error occurred while updating the product.');
+        const errorMessage = error.message || 'An error occurred while updating the product.';
+        if (errorMessage === 'Failed to update product' && error.stack?.includes('code":200')) {
+          setSubmitError('Product may have been updated. Please check the products list to confirm.');
+        } else {
+          setSubmitError(errorMessage);
+        }
       }
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
   
-  // Handle navigate back
   const handleGoBack = () => {
     if (hasChanges() && !window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
       return;
@@ -389,64 +357,197 @@ const EditProductPage = () => {
     navigate('/admin/products');
   };
   
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-6">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
+  // Render components
+  const LoadingSpinner = () => (
+    <div className="min-h-screen bg-gray-50 py-6">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
   
-  // Product not found state
-  if (productNotFound) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-6">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="bg-white px-6 py-4 border-b border-gray-200">
+  const NotFoundPage = () => (
+    <div className="min-h-screen bg-gray-50 py-6">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-white px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center">
+              <button
+                onClick={() => navigate('/admin/products')}
+                className="flex items-center text-gray-600 hover:text-gray-800 mr-4"
+              >
+                <ChevronLeft size={20} />
+                <span className="ml-1">Back</span>
+              </button>
+              <h1 className="text-2xl font-semibold text-gray-900">Product Not Found</h1>
+            </div>
+          </div>
+          
+          <div className="px-6 py-6">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-md mb-6">
               <div className="flex items-center">
-                <button
-                  onClick={() => navigate('/admin/products')}
-                  className="flex items-center text-gray-600 hover:text-gray-800 mr-4"
-                >
-                  <ChevronLeft size={20} />
-                  <span className="ml-1">Back</span>
-                </button>
-                <h1 className="text-2xl font-semibold text-gray-900">Product Not Found</h1>
+                <AlertCircle size={20} className="mr-3 text-red-500 flex-shrink-0" />
+                <p className="text-red-800">
+                  The product you are looking for does not exist or has been removed.
+                </p>
               </div>
             </div>
             
-            <div className="px-6 py-6">
-              <div className="p-4 bg-red-50 border border-red-200 rounded-md mb-6">
-                <div className="flex items-center">
-                  <AlertCircle size={20} className="mr-3 text-red-500 flex-shrink-0" />
-                  <p className="text-red-800">
-                    The product you are looking for does not exist or has been removed.
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex justify-end">
-                <button
-                  onClick={() => navigate('/admin/products')}
-                  className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md transition-colors"
-                >
-                  Return to Products
-                </button>
-              </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => navigate('/admin/products')}
+                className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md transition-colors"
+              >
+                Return to Products
+              </button>
             </div>
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+  
+  const StatusMessage = ({ type, message, submessage }) => (
+    <div className={`mb-6 p-4 border rounded-md ${
+      type === 'success' 
+        ? 'bg-green-50 border-green-200' 
+        : 'bg-red-50 border-red-200'
+    }`}>
+      <div className="flex items-center">
+        {type === 'success' ? (
+          <CheckCircle size={20} className="mr-3 text-green-500 flex-shrink-0" />
+        ) : (
+          <AlertCircle size={20} className="mr-3 text-red-500 flex-shrink-0" />
+        )}
+        <div>
+          <p className={`${type === 'success' ? 'text-green-800' : 'text-red-800'} font-medium`}>
+            {message}
+          </p>
+          {submessage && (
+            <p className={`${type === 'success' ? 'text-green-700' : 'text-red-700'} text-sm mt-1`}>
+              {submessage}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+  
+  const FormField = ({ 
+    label, 
+    name, 
+    type = 'text', 
+    required = false, 
+    placeholder, 
+    currency = false,
+    rows,
+    options,
+    className = '',
+    ...props 
+  }) => (
+    <div className={className}>
+      <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-2">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      {type === 'select' ? (
+        <select
+          id={name}
+          name={name}
+          value={formData[name]}
+          onChange={handleChange}
+          disabled={submitting}
+          className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+            errors[name] ? 'border-red-300' : 'border-gray-300'
+          }`}
+          {...props}
+        >
+          <option value="">{placeholder}</option>
+          {options?.map((option) => (
+            <option key={option} value={option}>
+              {formatCategoryName(option)}
+            </option>
+          ))}
+        </select>
+      ) : type === 'textarea' ? (
+        <textarea
+          id={name}
+          name={name}
+          value={formData[name]}
+          onChange={handleChange}
+          disabled={submitting}
+          rows={rows || 4}
+          className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+            errors[name] ? 'border-red-300' : 'border-gray-300'
+          }`}
+          placeholder={placeholder}
+          {...props}
+        />
+      ) : (
+        <div className={currency ? 'relative' : ''}>
+          {currency && (
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <span className="text-gray-500">₦</span>
+            </div>
+          )}
+          <input
+            type={type}
+            id={name}
+            name={name}
+            value={formData[name]}
+            onChange={handleChange}
+            disabled={submitting}
+            className={`w-full ${currency ? 'pl-8' : 'pl-3'} pr-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+              errors[name] ? 'border-red-300' : 'border-gray-300'
+            }`}
+            placeholder={placeholder}
+            {...props}
+          />
+        </div>
+      )}
+      {errors[name] && (
+        <p className="mt-1 text-sm text-red-600">{errors[name]}</p>
+      )}
+    </div>
+  );
+  
+  const ImageGrid = ({ images, type, onRemove }) => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+      {images.map((image, index) => (
+        <div key={`${type}-${index}`} className="relative group">
+          <div className="aspect-square w-full overflow-hidden rounded-lg bg-gray-100">
+            <img
+              src={type === 'new' ? image : image}
+              alt={`${type === 'new' ? 'New' : 'Product'} image ${index + 1}`}
+              className="h-full w-full object-cover"
+              onError={(e) => { e.target.src = FALLBACK_IMAGE; }}
+            />
+          </div>
+          {!submitting && (
+            <button
+              type="button"
+              onClick={() => onRemove(index, type)}
+              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <X size={16} />
+            </button>
+          )}
+          {type === 'new' && (
+            <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+              New
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+  
+  // Main render
+  if (loading) return <LoadingSpinner />;
+  if (productNotFound) return <NotFoundPage />;
   
   return (
     <div className="min-h-screen bg-gray-50 py-6">
@@ -454,203 +555,91 @@ const EditProductPage = () => {
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           {/* Header */}
           <div className="bg-white px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <button
-                  onClick={handleGoBack}
-                  className="flex items-center text-gray-600 hover:text-gray-800 mr-4 transition-colors"
-                  disabled={isSubmitting}
-                >
-                  <ChevronLeft size={20} />
-                  <span className="ml-1">Back</span>
-                </button>
-                <h1 className="text-2xl font-semibold text-gray-900">Edit Product</h1>
-              </div>
+            <div className="flex items-center">
+              <button
+                onClick={handleGoBack}
+                className="flex items-center text-gray-600 hover:text-gray-800 mr-4 transition-colors"
+                disabled={submitting}
+              >
+                <ChevronLeft size={20} />
+                <span className="ml-1">Back</span>
+              </button>
+              <h1 className="text-2xl font-semibold text-gray-900">Edit Product</h1>
             </div>
           </div>
           
           <div className="px-6 py-6">
-            {/* Success Message */}
+            {/* Status Messages */}
             {submitSuccess && (
-              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
-                <div className="flex items-center">
-                  <CheckCircle size={20} className="mr-3 text-green-500 flex-shrink-0" />
-                  <div>
-                    <p className="text-green-800 font-medium">Product updated successfully!</p>
-                    <p className="text-green-700 text-sm mt-1">
-                      Redirecting to products list...
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <StatusMessage 
+                type="success" 
+                message="Product updated successfully!" 
+                submessage="Redirecting to products list..."
+              />
             )}
             
-            {/* Error Message */}
             {submitError && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-                <div className="flex items-center">
-                  <AlertCircle size={20} className="mr-3 text-red-500 flex-shrink-0" />
-                  <p className="text-red-800">{submitError}</p>
-                </div>
-              </div>
+              <StatusMessage type="error" message={submitError} />
             )}
             
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Product Name */}
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                    Product Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                      errors.name ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Enter product name"
-                  />
-                  {errors.name && (
-                    <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-                  )}
-                </div>
+                <FormField
+                  label="Product Name"
+                  name="name"
+                  required
+                  placeholder="Enter product name"
+                />
                 
-                {/* Category */}
-                <div>
-                  <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
-                    Category <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    id="category"
-                    name="category"
-                    value={formData.category}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                      errors.category ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                  >
-                    <option value="">Select Category</option>
-                    {productCategories.map((category) => (
-                      <option key={category} value={category}>
-                        {category.split(' ').map(word => 
-                          word.charAt(0).toUpperCase() + word.slice(1)
-                        ).join(' ')}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.category && (
-                    <p className="mt-1 text-sm text-red-600">{errors.category}</p>
-                  )}
-                </div>
+                <FormField
+                  label="Category"
+                  name="category"
+                  type="select"
+                  required
+                  placeholder="Select Category"
+                  options={PRODUCT_CATEGORIES}
+                />
                 
-                {/* Price */}
-                <div>
-                  <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
-                    Price <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500">₦</span>
-                    </div>
-                    <input
-                      type="number"
-                      id="price"
-                      name="price"
-                      value={formData.price}
-                      onChange={handleChange}
-                      disabled={isSubmitting}
-                      min="0"
-                      step="0.01"
-                      className={`w-full pl-8 pr-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                        errors.price ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  {errors.price && (
-                    <p className="mt-1 text-sm text-red-600">{errors.price}</p>
-                  )}
-                </div>
+                <FormField
+                  label="Price"
+                  name="price"
+                  type="number"
+                  required
+                  currency
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                />
                 
-                {/* Slashed Price */}
-                <div>
-                  <label htmlFor="slashed_price" className="block text-sm font-medium text-gray-700 mb-2">
-                    Original Price (Optional)
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500">₦</span>
-                    </div>
-                    <input
-                      type="number"
-                      id="slashed_price"
-                      name="slashed_price"
-                      value={formData.slashed_price}
-                      onChange={handleChange}
-                      disabled={isSubmitting}
-                      min="0"
-                      step="0.01"
-                      className={`w-full pl-8 pr-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                        errors.slashed_price ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  {errors.slashed_price && (
-                    <p className="mt-1 text-sm text-red-600">{errors.slashed_price}</p>
-                  )}
-                </div>
+                <FormField
+                  label="Original Price (Optional)"
+                  name="slashed_price"
+                  type="number"
+                  currency
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                />
                 
-                {/* Quantity */}
-                <div className="md:col-span-2">
-                  <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-2">
-                    Quantity <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    id="quantity"
-                    name="quantity"
-                    value={formData.quantity}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    min="0"
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                      errors.quantity ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Enter available quantity"
-                  />
-                  {errors.quantity && (
-                    <p className="mt-1 text-sm text-red-600">{errors.quantity}</p>
-                  )}
-                </div>
+                <FormField
+                  label="Quantity"
+                  name="quantity"
+                  type="number"
+                  required
+                  placeholder="Enter available quantity"
+                  min="0"
+                  className="md:col-span-2"
+                />
                 
-                {/* Description */}
-                <div className="md:col-span-2">
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                    Description <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    rows={4}
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                      errors.description ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Enter product description"
-                  />
-                  {errors.description && (
-                    <p className="mt-1 text-sm text-red-600">{errors.description}</p>
-                  )}
-                </div>
+                <FormField
+                  label="Description"
+                  name="description"
+                  type="textarea"
+                  required
+                  placeholder="Enter product description"
+                  className="md:col-span-2"
+                />
                 
                 {/* Existing Images */}
                 {existingImages.length > 0 && (
@@ -658,31 +647,11 @@ const EditProductPage = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-3">
                       Current Images ({existingImages.length})
                     </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                      {existingImages.map((imageUrl, index) => (
-                        <div key={`existing-${index}`} className="relative group">
-                          <div className="aspect-square w-full overflow-hidden rounded-lg bg-gray-100">
-                            <img
-                              src={imageUrl}
-                              alt={`Product image ${index + 1}`}
-                              className="h-full w-full object-cover"
-                              onError={(e) => {
-                                e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
-                              }}
-                            />
-                          </div>
-                          {!isSubmitting && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveExistingImage(index)}
-                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <X size={16} />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                    <ImageGrid 
+                      images={existingImages} 
+                      type="existing" 
+                      onRemove={handleRemoveImage} 
+                    />
                   </div>
                 )}
                 
@@ -693,17 +662,12 @@ const EditProductPage = () => {
                     {existingImages.length === 0 && <span className="text-red-500">*</span>}
                   </label>
                   
-                  <div 
-                    className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                      errors.images ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-gray-400'
-                    }`}
-                  >
+                  <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                    errors.images ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-gray-400'
+                  }`}>
                     <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                     <div className="space-y-2">
-                      <label
-                        htmlFor="images"
-                        className="cursor-pointer text-blue-600 hover:text-blue-500 font-medium"
-                      >
+                      <label htmlFor="images" className="cursor-pointer text-blue-600 hover:text-blue-500 font-medium">
                         Choose files
                         <input
                           id="images"
@@ -714,12 +678,12 @@ const EditProductPage = () => {
                           multiple
                           accept="image/*"
                           onChange={handleImageChange}
-                          disabled={isSubmitting}
+                          disabled={submitting}
                         />
                       </label>
                       <p className="text-gray-500">or drag and drop</p>
                       <p className="text-sm text-gray-400">
-                        PNG, JPG, WebP up to 2MB each (max 5 total)
+                        PNG, JPG, WebP up to 2MB each (max {IMAGE_CONFIG.maxCount} total)
                       </p>
                     </div>
                   </div>
@@ -734,31 +698,11 @@ const EditProductPage = () => {
                       <p className="text-sm font-medium text-gray-700 mb-3">
                         New Images ({newImages.length}):
                       </p>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                        {newImagePreviews.map((url, index) => (
-                          <div key={`new-${index}`} className="relative group">
-                            <div className="aspect-square w-full overflow-hidden rounded-lg bg-gray-100">
-                              <img
-                                src={url}
-                                alt={`New image ${index + 1}`}
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                            {!isSubmitting && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveNewImage(index)}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <X size={16} />
-                              </button>
-                            )}
-                            <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-                              New
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                      <ImageGrid 
+                        images={newImagePreviews} 
+                        type="new" 
+                        onRemove={handleRemoveImage} 
+                      />
                     </div>
                   )}
                 </div>
@@ -770,20 +714,20 @@ const EditProductPage = () => {
                   type="button"
                   onClick={handleGoBack}
                   className="px-6 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-                  disabled={isSubmitting}
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || !hasChanges()}
+                  disabled={submitting || !hasChanges()}
                   className={`px-6 py-2 border border-transparent rounded-md text-sm font-medium text-white transition-colors ${
-                    isSubmitting || !hasChanges()
+                    submitting || !hasChanges()
                       ? 'bg-gray-400 cursor-not-allowed' 
                       : 'bg-blue-600 hover:bg-blue-700'
                   }`}
                 >
-                  {isSubmitting ? (
+                  {submitting ? (
                     <div className="flex items-center">
                       <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
