@@ -1,4 +1,4 @@
-// src/api/config.js - Exactly following API documentation
+// src/api/config.js - Corrected endpoints based on API documentation
 export const API_CONFIG = {
   BASE_URL: import.meta.env.VITE_API_URL || 'https://leksycosmetics.com/api',
   TIMEOUT: 30000,
@@ -22,10 +22,10 @@ export const ENDPOINTS = {
   FETCH_PRODUCT: '/fetch-product',
   FETCH_PRODUCTS: '/fetch-products',
   
-  // Orders - from API docs
+  // Orders - CORRECTED based on API docs
   INITIATE_CHECKOUT: '/checkout/initiate',
   FETCH_ORDER: '/fetch-order',
-  FETCH_ORDERS: '/admin/fetch-orders', // Requires Authorization: Bearer {token}
+  FETCH_ORDERS: '/fetch-orders', // CORRECTED: Removed /admin/ prefix
   CHANGE_DELIVERY_STATUS: '/admin/change-delivery-status',
   
   // Contact - from API docs
@@ -37,7 +37,7 @@ export const ENDPOINTS = {
   INITIATE_CONSULTATION: '/consultation/initiate',
   FETCH_BOOKED_TIMES: '/consultation/fetch-booked-times',
   FETCH_CONSULTATION: '/admin/fetch-consultation',
-  FETCH_CONSULTATIONS: '/admin/fetch-consultations', // Requires Authorization: Bearer {token}
+  FETCH_CONSULTATIONS: '/fetch-consultations', // CORRECTED: Based on API docs pattern
   
   // Newsletter - from API docs
   ADD_NEWSLETTER_SUBSCRIBER: '/newsletter-subscribers/add',

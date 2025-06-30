@@ -9,11 +9,17 @@ class ApiClient {
       headers: { 'Accept': 'application/json' }
     });
     
-    this.requestQueue = new Map();
-    this.isRefreshing = false;
-    this.failedQueue = [];
-    this.refreshPromise = null;
     this.setupInterceptors();
+    this.initializeAuth();
+  }
+
+  // Initialize auth headers on startup
+  initializeAuth() {
+    const token = this.getToken();
+    if (token && !this.isTokenExpired()) {
+      this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      console.log('✅ Initialized axios with existing valid token');
+    }
   }
 
   setupInterceptors() {
@@ -21,217 +27,80 @@ class ApiClient {
     this.client.interceptors.request.use(
       (config) => {
         const token = this.getToken();
-        const isAdminRoute = this.isAdminRoute(config.url);
         
-        if (isAdminRoute && token) {
+        // DEBUG: Log the token and headers
+        console.log('🔍 DEBUG: Request interceptor');
+        console.log('🔍 Token from cookie:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN');
+        console.log('🔍 Request URL:', config.url);
+        console.log('🔍 Request method:', config.method);
+        
+        if (token && !this.isTokenExpired()) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log('Adding auth header for admin route:', config.url);
+          console.log('✅ Authorization header set:', config.headers.Authorization ? 'YES' : 'NO');
+        } else {
+          console.log('❌ No valid token available - request may fail if auth required');
+          if (token && this.isTokenExpired()) {
+            console.log('⚠️ Token expired, clearing auth');
+            this.clearAuth();
+          }
         }
+        
+        console.log('🔍 All headers:', config.headers);
         
         return config;
       },
-      (error) => Promise.reject(this.formatError(error))
+      (error) => {
+        console.error('❌ Request interceptor error:', error);
+        return Promise.reject(this.formatError(error));
+      }
     );
 
-    // Response interceptor
+    // Response interceptor - FIXED for cookie approach
     this.client.interceptors.response.use(
       (response) => {
-        // Update token if provided
-        if (response.data?.token) {
-          console.log('Updating token from API response');
-          this.setToken(response.data.token);
+        // Check multiple possible locations for new token
+        const newToken = response.data?.token || 
+                         response.data?.data?.token || 
+                         response.headers['x-new-token'] ||
+                         response.headers['new-token'];
+        
+        if (newToken) {
+          console.log('🔄 Updating token from API response');
+          console.log('🔄 Old token:', this.getToken()?.substring(0, 20) + '...');
+          console.log('🔄 New token:', newToken.substring(0, 20) + '...');
+          
+          // Update token and axios headers
+          this.setToken(newToken);
+          
+          console.log('✅ Token updated successfully');
         }
+        
         return response;
       },
       async (error) => {
-        const originalRequest = error.config;
+        console.error('❌ Response error:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          url: error.config?.url
+        });
         
-        // Handle 401 errors with proper queue management
-        if (error.response?.status === 401 && !this.isLoginRoute(originalRequest.url)) {
-          return this.handleTokenExpiration(originalRequest, error);
-        }
-
-        // Retry logic for network errors
-        if (this.shouldRetry(error) && originalRequest && !originalRequest._retry) {
-          originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
+        // Handle 401 errors - clear auth and redirect
+        if (error.response?.status === 401) {
+          console.log('🔄 401 error - clearing auth');
+          this.clearAuth();
           
-          if (originalRequest._retryCount <= (API_CONFIG.MAX_RETRIES || 3)) {
-            originalRequest._retry = true;
-            await this.delay((API_CONFIG.RETRY_DELAY || 1000) * originalRequest._retryCount);
-            return this.client(originalRequest);
+          // Only redirect if not already on login page
+          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+            setTimeout(() => {
+              window.location.href = '/admin/login?reason=session_expired';
+            }, 100);
           }
         }
 
         return Promise.reject(this.formatError(error));
       }
     );
-  }
-
-  async handleTokenExpiration(originalRequest, error) {
-    // Prevent infinite loops
-    if (originalRequest._retry) {
-      this.clearAuth();
-      this.redirectToLogin('Token refresh failed');
-      return Promise.reject(this.formatError(error));
-    }
-
-    // If already refreshing, queue the request
-    if (this.isRefreshing) {
-      return new Promise((resolve, reject) => {
-        this.failedQueue.push({ resolve, reject, config: originalRequest });
-      });
-    }
-
-    // Start refresh process
-    originalRequest._retry = true;
-    this.isRefreshing = true;
-
-    try {
-      console.log('Token expired, attempting refresh...');
-      const newToken = await this.refreshToken();
-      
-      if (newToken) {
-        // Process queued requests
-        this.processQueue(null, newToken);
-        
-        // Retry original request with new token
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        return this.client(originalRequest);
-      } else {
-        throw new Error('No token received from refresh');
-      }
-    } catch (refreshError) {
-      console.error('Token refresh failed:', refreshError);
-      this.processQueue(refreshError, null);
-      this.clearAuth();
-      this.redirectToLogin('Session expired');
-      return Promise.reject(this.formatError(refreshError));
-    } finally {
-      this.isRefreshing = false;
-      this.refreshPromise = null;
-    }
-  }
-
-  processQueue(error, token = null) {
-    this.failedQueue.forEach(({ resolve, reject, config }) => {
-      if (error) {
-        reject(error);
-      } else {
-        config.headers.Authorization = `Bearer ${token}`;
-        resolve(this.client(config));
-      }
-    });
-    
-    this.failedQueue = [];
-  }
-
-  async refreshToken() {
-    // Prevent multiple simultaneous refresh requests
-    if (this.refreshPromise) {
-      return this.refreshPromise;
-    }
-
-    this.refreshPromise = this.attemptTokenRefresh();
-    
-    try {
-      const result = await this.refreshPromise;
-      return result;
-    } finally {
-      this.refreshPromise = null;
-    }
-  }
-
-  async attemptTokenRefresh() {
-    try {
-      // Check if refresh token exists
-      const refreshToken = this.getRefreshToken();
-      if (!refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      // Create a clean axios instance for refresh to avoid interceptors
-      const refreshClient = axios.create({
-        baseURL: API_CONFIG.BASE_URL,
-        timeout: API_CONFIG.TIMEOUT,
-      });
-
-      const response = await refreshClient.post('/auth/refresh', {
-        refreshToken: refreshToken
-      });
-
-      if (response.data?.token) {
-        this.setToken(response.data.token);
-        
-        // Update refresh token if provided (token rotation)
-        if (response.data.refreshToken) {
-          this.setRefreshToken(response.data.refreshToken);
-        }
-        
-        return response.data.token;
-      }
-      
-      throw new Error('Invalid refresh response - no token received');
-    } catch (error) {
-      console.error('Refresh token request failed:', error);
-      
-      // If refresh token is invalid, clear everything
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        this.clearAuth();
-      }
-      
-      throw error;
-    }
-  }
-
-  redirectToLogin(reason = 'Authentication required') {
-    if (typeof window === 'undefined') return;
-    
-    console.log(`🔄 Redirecting to login: ${reason}`);
-    
-    // Emit event for components to handle
-    window.dispatchEvent(new CustomEvent('auth:expired', { 
-      detail: { reason } 
-    }));
-    
-    // Simple redirect without complex routing logic
-    setTimeout(() => {
-      const currentPath = window.location.pathname;
-      if (!this.isLoginRoute(currentPath)) {
-        // Store current path for redirect after login
-        sessionStorage.setItem('redirectAfterLogin', currentPath);
-        window.location.href = `/admin/login?reason=${encodeURIComponent(reason)}`;
-      }
-    }, 100);
-  }
-
-  // Helper methods
-  isAdminRoute(url) {
-    if (!url) return false;
-    return url.includes('/admin/') && !this.isLoginRoute(url);
-  }
-
-  isLoginRoute(url) {
-    if (!url) return false;
-    const loginPatterns = ['/admin/login', '/login', '/auth/login', '/signin'];
-    return loginPatterns.some(pattern => url.includes(pattern));
-  }
-
-  shouldRetry(error) {
-    // Don't retry on auth errors or client errors (4xx)
-    if (error.response?.status >= 400 && error.response?.status < 500) {
-      return false;
-    }
-    
-    return !error.response || 
-           error.code === 'ECONNABORTED' || 
-           error.code === 'NETWORK_ERROR' ||
-           error.code === 'ENOTFOUND' ||
-           error.code === 'ECONNRESET' ||
-           (error.response?.status >= 500 && error.response?.status <= 599);
-  }
-
-  delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   formatError(error) {
@@ -257,7 +126,7 @@ class ApiClient {
       case 400:
         return new Error('Bad request - please check your input');
       case 401:
-        return new Error('Authentication required');
+        return new Error('Authentication required - please login');
       case 403:
         return new Error('Access denied - insufficient permissions');
       case 404:
@@ -277,255 +146,326 @@ class ApiClient {
     }
   }
 
-  async request(config) {
-    const key = this.getRequestKey(config);
-    
-    // Only deduplicate GET requests to avoid issues with mutations
-    if (config.method?.toLowerCase() === 'get' && this.requestQueue.has(key)) {
-      return this.requestQueue.get(key);
-    }
-
-    const promise = this.client(config).finally(() => {
-      this.requestQueue.delete(key);
-    });
-
-    if (config.method?.toLowerCase() === 'get') {
-      this.requestQueue.set(key, promise);
-    }
-    
-    return promise;
-  }
-
-  getRequestKey(config) {
-    const method = config.method?.toUpperCase() || 'GET';
-    const url = config.url || '';
-    const params = JSON.stringify(config.params || {});
-    return `${method}-${url}-${params}`;
-  }
-
+  // COOKIE-BASED TOKEN MANAGEMENT
   getToken() {
-    if (typeof window === 'undefined') return null;
+    if (typeof document === 'undefined') return null;
     
     try {
-      const tokenData = this.getTokenWithExpiry();
-      if (!tokenData || this.isTokenExpired(tokenData)) {
-        return null;
+      const match = document.cookie.match(/auth=([^;]+)/);
+      if (match) {
+        const encoded = match[1];
+        const token = atob(encoded);
+        console.log('🔍 Token found in cookie:', token.substring(0, 20) + '...');
+        return token;
       }
       
-      return tokenData.token;
+      console.log('🔍 No token found in cookies');
+      return null;
     } catch (error) {
-      console.error('Error getting token:', error);
+      console.error('Error getting token from cookie:', error);
       return null;
     }
   }
 
-  getRefreshToken() {
-    if (typeof window === 'undefined') return null;
+  // FIXED - Cookie-based storage with axios header update
+  setToken(token, expiryHours = 24) {
+    if (typeof document === 'undefined') return;
     
     try {
-      // Check localStorage first (more reliable than cookies for JS access)
-      if (typeof localStorage !== 'undefined') {
-        const token = localStorage.getItem('refresh_token');
-        if (token) return token;
-      }
-      
-      // Fallback to cookie (though HttpOnly cookies can't be read by JS)
-      if (typeof document !== 'undefined') {
-        const match = document.cookie.match(/refreshToken=([^;]+)/);
-        if (match) return decodeURIComponent(match[1]);
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error getting refresh token:', error);
-      return null;
-    }
-  }
-
-  setRefreshToken(refreshToken) {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      // Store in localStorage (primary storage)
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('refresh_token', refreshToken);
-      }
-      
-      // Store in cookie (fallback, but can't be HttpOnly when set by JS)
-      if (typeof document !== 'undefined') {
-        const expires = new Date();
-        expires.setDate(expires.getDate() + 30); // 30 days
-        const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-        document.cookie = `refreshToken=${encodeURIComponent(refreshToken)}; path=/; expires=${expires.toUTCString()}; SameSite=Strict${secure}`;
-      }
-      
-      console.log('Refresh token stored');
-    } catch (error) {
-      console.error('Error storing refresh token:', error);
-    }
-  }
-
-  getTokenWithExpiry() {
-    if (typeof window === 'undefined') return null;
-    
-    try {
-      // Try localStorage first
-      if (typeof localStorage !== 'undefined') {
-        const tokenData = localStorage.getItem('auth_token_data');
-        if (tokenData) {
-          return JSON.parse(tokenData);
+      if (token) {
+        // Calculate expiry date
+        const expiryDate = new Date();
+        expiryDate.setTime(expiryDate.getTime() + (expiryHours * 60 * 60 * 1000));
+        
+        // Store token data in a separate cookie for expiry tracking
+        const tokenData = {
+          expiresAt: expiryDate.getTime(),
+          createdAt: Date.now()
+        };
+        
+        // Encode token and store in cookie
+        const encoded = btoa(token);
+        const cookieOptions = [
+          `auth=${encoded}`,
+          'path=/',
+          `max-age=${expiryHours * 3600}`, // max-age in seconds
+          'SameSite=Strict',
+          // Add Secure flag in production
+          // location.protocol === 'https:' ? 'Secure' : ''
+        ].filter(Boolean).join('; ');
+        
+        document.cookie = cookieOptions;
+        
+        // Store token metadata
+        const metaEncoded = btoa(JSON.stringify(tokenData));
+        const metaCookieOptions = [
+          `auth_meta=${metaEncoded}`,
+          'path=/',
+          `max-age=${expiryHours * 3600}`,
+          'SameSite=Strict'
+        ].join('; ');
+        
+        document.cookie = metaCookieOptions;
+        
+        // CRITICAL: Update axios default headers immediately
+        if (this.client && this.client.defaults) {
+          this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          console.log('✅ Updated axios default Authorization header');
         }
         
-        // Legacy fallback
-        const legacyToken = localStorage.getItem('auth_token');
-        if (legacyToken) {
-          return {
-            token: legacyToken,
-            expiresAt: Date.now() + (23 * 60 * 60 * 1000) // 23 hours default
-          };
+        console.log('✅ Token stored in cookie:', token.substring(0, 20) + '...');
+        console.log('✅ Token expires at:', expiryDate.toLocaleString());
+        console.log('✅ Hours until expiry:', expiryHours);
+        
+        // Verify immediately that token is not expired
+        const isExpired = this.isTokenExpired();
+        console.log('✅ Token expired check immediately after storage:', isExpired ? 'EXPIRED' : 'VALID');
+        
+      } else {
+        // Clear cookies
+        document.cookie = 'auth=; path=/; max-age=0';
+        document.cookie = 'auth_meta=; path=/; max-age=0';
+        
+        // Remove from axios headers too
+        if (this.client && this.client.defaults) {
+          delete this.client.defaults.headers.common['Authorization'];
+          console.log('✅ Removed Authorization header from axios defaults');
         }
+        
+        console.log('🗑️ Token cookies cleared');
+      }
+    } catch (error) {
+      console.error('Error storing token in cookie:', error);
+    }
+  }
+
+  // ENHANCED - Cookie-based auth clearing
+  clearAuth() {
+    if (typeof document === 'undefined') return;
+    
+    try {
+      // Clear all auth-related cookies with different path variations
+      const cookiesToClear = ['auth', 'auth_meta', 'auth_token', 'refresh_token', 'user'];
+      const paths = ['/', '/admin', '/admin/'];
+      
+      cookiesToClear.forEach(cookieName => {
+        paths.forEach(path => {
+          document.cookie = `${cookieName}=; path=${path}; max-age=0`;
+          document.cookie = `${cookieName}=; path=${path}; max-age=0; domain=${window.location.hostname}`;
+        });
+      });
+      
+      // Clear axios headers
+      if (this.client && this.client.defaults) {
+        delete this.client.defaults.headers.common['Authorization'];
+        console.log('✅ Cleared Authorization header from axios defaults');
       }
       
-      // Fallback to cookie
-      if (typeof document !== 'undefined') {
-        const match = document.cookie.match(/auth=([^;]+)/);
-        if (match) {
-          try {
-            const decoded = atob(match[1]);
-            try {
-              return JSON.parse(decoded);
-            } catch {
-              // Legacy token format
-              return {
-                token: decoded,
-                expiresAt: Date.now() + (23 * 60 * 60 * 1000)
-              };
-            }
-          } catch (error) {
-            console.error('Error decoding cookie token:', error);
-            // Clear corrupted cookie
-            document.cookie = 'auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-          }
-        }
+      console.log('🗑️ Auth cookies cleared');
+    } catch (error) {
+      console.error('Error clearing auth cookies:', error);
+    }
+  }
+
+  // Get token metadata from cookie
+  getTokenData() {
+    if (typeof document === 'undefined') return null;
+    
+    try {
+      const match = document.cookie.match(/auth_meta=([^;]+)/);
+      if (match) {
+        const encoded = match[1];
+        const tokenData = JSON.parse(atob(encoded));
+        return tokenData;
+      }
+      
+      // If no token metadata but token exists, create default expiry (24 hours from now)
+      const token = this.getToken();
+      if (token) {
+        const defaultData = {
+          expiresAt: Date.now() + (24 * 60 * 60 * 1000),
+          createdAt: Date.now()
+        };
+        
+        // Store the metadata
+        const metaEncoded = btoa(JSON.stringify(defaultData));
+        document.cookie = `auth_meta=${metaEncoded}; path=/; max-age=86400; SameSite=Strict`;
+        
+        console.log('✅ Created default token metadata for existing token');
+        return defaultData;
       }
       
       return null;
     } catch (error) {
-      console.error('Error parsing token data:', error);
+      console.error('Error getting token metadata from cookie:', error);
       return null;
     }
   }
 
-  isTokenExpired(tokenData) {
+  // Check if token is expired
+  isTokenExpired() {
+    const tokenData = this.getTokenData();
     if (!tokenData || !tokenData.expiresAt) {
+      console.log('🔍 Token expired check: No token metadata found');
       return true;
     }
     
-    // 2 minute buffer before actual expiry
-    const bufferTime = 2 * 60 * 1000;
-    return Date.now() >= (tokenData.expiresAt - bufferTime);
+    const now = Date.now();
+    const isExpired = now >= tokenData.expiresAt;
+    const timeUntilExpiry = tokenData.expiresAt - now;
+    const minutesUntilExpiry = Math.floor(timeUntilExpiry / (60 * 1000));
+    const hoursUntilExpiry = Math.floor(timeUntilExpiry / (60 * 60 * 1000));
+    
+    console.log('🔍 Token expiry check:', {
+      now: new Date(now).toLocaleString(),
+      expiresAt: new Date(tokenData.expiresAt).toLocaleString(),
+      minutesUntilExpiry,
+      hoursUntilExpiry,
+      isExpired,
+      timeUntilExpiryMs: timeUntilExpiry
+    });
+    
+    return isExpired;
   }
 
-  setToken(token, expiryHours = 24) {
-    if (typeof window === 'undefined') return;
-    
-    const tokenData = {
-      token: token,
-      expiresAt: Date.now() + (expiryHours * 60 * 60 * 1000),
-      createdAt: Date.now()
-    };
-    
-    try {
-      // Store in localStorage (primary storage)
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('auth_token_data', JSON.stringify(tokenData));
-      }
-      
-      // Store in cookie (fallback)
-      if (typeof document !== 'undefined') {
-        const encoded = btoa(JSON.stringify(tokenData));
-        const expires = new Date(tokenData.expiresAt).toUTCString();
-        const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-        document.cookie = `auth=${encoded}; path=/; expires=${expires}; SameSite=Strict${secure}`;
-      }
-      
-      console.log('Token stored with expiry:', new Date(tokenData.expiresAt).toLocaleString());
-    } catch (error) {
-      console.error('Error storing token:', error);
-    }
-  }
-
-  clearAuth() {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      // Clear localStorage
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem('user');
-        localStorage.removeItem('auth_token_data');
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('refresh_token');
-      }
-      
-      // Clear cookies
-      if (typeof document !== 'undefined') {
-        document.cookie = 'auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        document.cookie = 'refreshToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      }
-      
-      console.log('Auth data cleared');
-    } catch (error) {
-      console.error('Error clearing auth data:', error);
-    }
-  }
-
-  // Check if current token is about to expire
+  // Check if token is expiring soon (within specified minutes)
   isTokenExpiringSoon(minutesThreshold = 10) {
-    const tokenData = this.getTokenWithExpiry();
+    const tokenData = this.getTokenData();
     if (!tokenData || !tokenData.expiresAt) {
       return true;
     }
     
     const thresholdTime = minutesThreshold * 60 * 1000;
-    return Date.now() >= (tokenData.expiresAt - thresholdTime);
+    const timeUntilExpiry = tokenData.expiresAt - Date.now();
+    const isExpiringSoon = timeUntilExpiry <= thresholdTime;
+    
+    console.log('🔍 Token expiring soon check:', {
+      minutesThreshold,
+      timeUntilExpiryMinutes: Math.floor(timeUntilExpiry / (60 * 1000)),
+      isExpiringSoon
+    });
+    
+    return isExpiringSoon;
   }
 
   // Get remaining token time in minutes
   getTokenRemainingTime() {
-    const tokenData = this.getTokenWithExpiry();
+    const tokenData = this.getTokenData();
     if (!tokenData || !tokenData.expiresAt) {
+      console.log('🔍 No token metadata for remaining time calculation');
       return 0;
     }
     
-    const remaining = tokenData.expiresAt - Date.now();
-    return Math.max(0, Math.floor(remaining / (60 * 1000))); // in minutes
+    const now = Date.now();
+    const remaining = tokenData.expiresAt - now;
+    const minutes = Math.max(0, Math.floor(remaining / (60 * 1000)));
+    
+    console.log('🔍 Token remaining time:', {
+      expiresAt: new Date(tokenData.expiresAt).toLocaleString(),
+      now: new Date(now).toLocaleString(),
+      remainingMs: remaining,
+      remainingMinutes: minutes
+    });
+    
+    return minutes;
+  }
+
+  // Set refresh token (for compatibility)
+  setRefreshToken(refreshToken) {
+    if (typeof document === 'undefined') return;
+    
+    try {
+      if (refreshToken) {
+        const encoded = btoa(refreshToken);
+        document.cookie = `refresh_token=${encoded}; path=/; max-age=2592000; SameSite=Strict`; // 30 days
+        console.log('✅ Refresh token stored in cookie');
+      } else {
+        document.cookie = 'refresh_token=; path=/; max-age=0';
+        console.log('🗑️ Refresh token cookie cleared');
+      }
+    } catch (error) {
+      console.error('Error storing refresh token in cookie:', error);
+    }
+  }
+
+  // Get refresh token
+  getRefreshToken() {
+    if (typeof document === 'undefined') return null;
+    
+    try {
+      const match = document.cookie.match(/refresh_token=([^;]+)/);
+      return match ? atob(match[1]) : null;
+    } catch (error) {
+      console.error('Error getting refresh token from cookie:', error);
+      return null;
+    }
+  }
+
+  // Debug method to check auth state
+  debugAuthState() {
+    const token = this.getToken();
+    const tokenData = this.getTokenData();
+    const refreshToken = this.getRefreshToken();
+    const axiosAuthHeader = this.client.defaults.headers.common['Authorization'];
+    
+    // Get user cookie if exists
+    let user = null;
+    try {
+      const userMatch = document.cookie.match(/user=([^;]+)/);
+      user = userMatch ? JSON.parse(atob(userMatch[1])) : null;
+    } catch (e) {
+      // ignore
+    }
+    
+    console.log('🔍 Current Auth State:', {
+      hasToken: !!token,
+      tokenPreview: token ? token.substring(0, 20) + '...' : null,
+      tokenExpiry: tokenData ? new Date(tokenData.expiresAt).toLocaleString() : 'No expiry data',
+      remainingMinutes: this.getTokenRemainingTime(),
+      isExpired: this.isTokenExpired(),
+      isExpiringSoon: this.isTokenExpiringSoon(),
+      hasRefreshToken: !!refreshToken,
+      hasUser: !!user,
+      user: user,
+      axiosAuthHeader: axiosAuthHeader ? axiosAuthHeader.substring(0, 30) + '...' : 'NOT SET',
+      allCookies: document.cookie
+    });
+    
+    return { 
+      token, 
+      tokenData, 
+      refreshToken,
+      user,
+      remainingMinutes: this.getTokenRemainingTime(),
+      axiosAuthHeader
+    };
   }
 
   // Public API methods
   async get(url, params = {}) {
     const queryString = new URLSearchParams(params).toString();
     const fullUrl = queryString ? `${url}?${queryString}` : url;
-    return this.request({ method: 'get', url: fullUrl });
+    return this.client({ method: 'get', url: fullUrl });
   }
 
   async post(url, data, config = {}) {
-    return this.request({ method: 'post', url, data, ...config });
+    return this.client({ method: 'post', url, data, ...config });
   }
 
   async put(url, data, config = {}) {
-    return this.request({ method: 'put', url, data, ...config });
+    return this.client({ method: 'put', url, data, ...config });
   }
 
   async patch(url, data, config = {}) {
-    return this.request({ method: 'patch', url, data, ...config });
+    return this.client({ method: 'patch', url, data, ...config });
   }
 
   async delete(url, config = {}) {
-    return this.request({ method: 'delete', url, ...config });
+    return this.client({ method: 'delete', url, ...config });
   }
 
   async postFormData(url, formData) {
-    return this.request({ 
+    return this.client({ 
       method: 'post', 
       url, 
       data: formData,
@@ -534,7 +474,7 @@ class ApiClient {
   }
 
   async putFormData(url, formData) {
-    return this.request({ 
+    return this.client({ 
       method: 'put', 
       url, 
       data: formData,
@@ -544,4 +484,100 @@ class ApiClient {
 }
 
 const api = new ApiClient();
+
+// Add global debug functions
+if (typeof window !== 'undefined') {
+  window.debugAuth = function() {
+    console.log('=== AUTH DEBUG ===');
+    
+    // Check cookies
+    console.log('🔍 All cookies:', document.cookie);
+    
+    // Check API client state
+    const apiState = api.debugAuthState();
+    
+    console.log('=== END DEBUG ===');
+    
+    return apiState;
+  };
+
+  window.debugTokenExpiry = function() {
+    console.log('=== TOKEN EXPIRY DEBUG ===');
+    
+    // Check what's in cookies
+    const token = api.getToken();
+    const tokenData = api.getTokenData();
+    
+    console.log('🔍 Token from cookie:', token ? token.substring(0, 30) + '...' : 'NONE');
+    console.log('🔍 Token metadata:', tokenData);
+    
+    if (tokenData) {
+      console.log('🔍 Parsed token data:', {
+        createdAt: new Date(tokenData.createdAt).toLocaleString(),
+        expiresAt: new Date(tokenData.expiresAt).toLocaleString(),
+        timeCreated: tokenData.createdAt,
+        timeExpires: tokenData.expiresAt,
+        currentTime: Date.now(),
+        currentTimeFormatted: new Date().toLocaleString()
+      });
+      
+      // Check if the expiry time looks reasonable
+      const hoursUntilExpiry = (tokenData.expiresAt - Date.now()) / (1000 * 60 * 60);
+      console.log('🔍 Hours until expiry:', hoursUntilExpiry);
+      
+      if (hoursUntilExpiry < 0) {
+        console.log('❌ Token is already expired!');
+      } else if (hoursUntilExpiry > 48) {
+        console.log('⚠️ Token expires very far in the future');
+      } else {
+        console.log('✅ Token expiry looks reasonable');
+      }
+    }
+    
+    // Test the API methods
+    console.log('🔍 Testing API methods...');
+    try {
+      console.log('API token:', api.getToken());
+      console.log('API isExpired:', api.isTokenExpired());
+      console.log('API remaining:', api.getTokenRemainingTime());
+      
+      // Check axios headers
+      const authHeader = api.client.defaults.headers.common['Authorization'];
+      console.log('Axios auth header:', authHeader ? authHeader.substring(0, 30) + '...' : 'NOT SET');
+    } catch (e) {
+      console.error('Error testing API methods:', e);
+    }
+    
+    console.log('=== END TOKEN DEBUG ===');
+  };
+
+  // Test token setter
+  window.setTestToken = function() {
+    const testToken = 'test-token-' + Date.now();
+    console.log('🧪 Setting test token:', testToken);
+    api.setToken(testToken, 24); // 24 hours
+    
+    setTimeout(() => {
+      console.log('🧪 Testing token after 1 second...');
+      console.log('Is expired?', api.isTokenExpired());
+      console.log('Remaining time:', api.getTokenRemainingTime());
+      console.log('Axios header set?', api.client.defaults.headers.common['Authorization'] ? 'YES' : 'NO');
+      console.log('Cookies:', document.cookie);
+    }, 1000);
+  };
+
+  // Clear all auth data
+  window.clearAuthDebug = function() {
+    console.log('🧹 Clearing all auth data...');
+    api.clearAuth();
+    console.log('🧹 Auth cleared. Current cookies:', document.cookie);
+  };
+
+  console.log('🔧 Debug functions loaded:');
+  console.log('  - debugAuth() - check full auth state');
+  console.log('  - debugTokenExpiry() - check token expiry details');
+  console.log('  - setTestToken() - set a test token');
+  console.log('  - clearAuthDebug() - clear all auth data');
+}
+
 export default api;

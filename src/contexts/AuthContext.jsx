@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext, createContext, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { authService, api } from '../api';
+import { authService } from '../api/services';
+import api from '../api/axios';
 
 const AuthContext = createContext();
 
@@ -22,18 +23,14 @@ function useProvideAuth() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [tokenExpiry, setTokenExpiry] = useState(null);
-  const [showExpiryWarning, setShowExpiryWarning] = useState(false);
   
-  const tokenCheckInterval = useRef(null);
-  const warningShown = useRef(false);
-  const redirectTimeoutRef = useRef(null);
   const isInitialized = useRef(false);
 
   // Check if current route requires authentication
   const isProtectedRoute = useCallback(() => {
-    const protectedPaths = ['/admin', '/dashboard', '/profile'];
-    return protectedPaths.some(path => location.pathname.startsWith(path));
+    const protectedPaths = ['/admin'];
+    return protectedPaths.some(path => location.pathname.startsWith(path)) && 
+           !location.pathname.includes('/login');
   }, [location.pathname]);
 
   // Check if current route is a login page
@@ -51,12 +48,6 @@ function useProvideAuth() {
 
     console.log(`🔄 Redirecting to login: ${reason}`);
     
-    // Clear any existing redirect timeout
-    if (redirectTimeoutRef.current) {
-      clearTimeout(redirectTimeoutRef.current);
-      redirectTimeoutRef.current = null;
-    }
-
     // Store current location for redirect after login (only for protected routes)
     const currentPath = location.pathname;
     const shouldSaveRedirect = isProtectedRoute() && currentPath !== '/' && currentPath !== '/admin/login';
@@ -65,22 +56,19 @@ function useProvideAuth() {
       sessionStorage.setItem('redirectAfterLogin', currentPath);
     }
 
-    // Add small delay to allow for cleanup
-    redirectTimeoutRef.current = setTimeout(() => {
-      try {
-        navigate('/admin/login', { 
-          replace: true,
-          state: { 
-            from: shouldSaveRedirect ? currentPath : null,
-            reason 
-          }
-        });
-      } catch (error) {
-        console.error('Navigation error:', error);
-        // Fallback to hard redirect
-        window.location.href = `/admin/login?reason=${encodeURIComponent(reason)}`;
-      }
-    }, 100);
+    try {
+      navigate('/admin/login', { 
+        replace: true,
+        state: { 
+          from: shouldSaveRedirect ? currentPath : null,
+          reason 
+        }
+      });
+    } catch (error) {
+      console.error('Navigation error:', error);
+      // Fallback to hard redirect
+      window.location.href = `/admin/login?reason=${encodeURIComponent(reason)}`;
+    }
   }, [navigate, location.pathname, isLoginPage, isProtectedRoute]);
 
   // Navigate to dashboard or saved redirect path after login
@@ -114,51 +102,6 @@ function useProvideAuth() {
   const clearAuthData = useCallback(() => {
     api.clearAuth();
     localStorage.removeItem('user');
-    setTokenExpiry(null);
-    setShowExpiryWarning(false);
-    warningShown.current = false;
-    
-    if (tokenCheckInterval.current) {
-      clearInterval(tokenCheckInterval.current);
-      tokenCheckInterval.current = null;
-    }
-
-    if (redirectTimeoutRef.current) {
-      clearTimeout(redirectTimeoutRef.current);
-      redirectTimeoutRef.current = null;
-    }
-  }, []);
-
-  const startTokenMonitoring = useCallback(() => {
-    // Clear existing interval
-    if (tokenCheckInterval.current) {
-      clearInterval(tokenCheckInterval.current);
-    }
-
-    tokenCheckInterval.current = setInterval(() => {
-      const remainingTime = api.getTokenRemainingTime();
-      setTokenExpiry(remainingTime);
-      
-      // Show warning when 1 hour (60 minutes) or less remaining
-      if (remainingTime <= 60 && remainingTime > 0 && !warningShown.current) {
-        setShowExpiryWarning(true);
-        warningShown.current = true;
-        console.log(`⚠️ Token expires in ${remainingTime} minutes`);
-      }
-      
-      // Auto-logout when token expires
-      if (remainingTime <= 0) {
-        console.log('🔒 Token expired - auto logout');
-        logout('Token expired');
-      }
-    }, 60000); // Check every minute
-  }, []); // Remove dependency on navigateToLogin to prevent recreation
-
-  const stopTokenMonitoring = useCallback(() => {
-    if (tokenCheckInterval.current) {
-      clearInterval(tokenCheckInterval.current);
-      tokenCheckInterval.current = null;
-    }
   }, []);
 
   // Initialize auth state
@@ -170,19 +113,17 @@ function useProvideAuth() {
       try {
         const hasToken = !!api.getToken();
         const userData = getStoredUser();
-        const remainingTime = api.getTokenRemainingTime();
+        const isTokenExpired = api.isTokenExpired();
         
         console.log('Auth initialization:', { 
           hasToken, 
           hasUserData: !!userData,
-          tokenRemainingMinutes: remainingTime,
+          isTokenExpired,
           currentPath: location.pathname
         });
         
-        if (hasToken && userData && remainingTime > 0) {
+        if (hasToken && userData && !isTokenExpired) {
           setUser(userData);
-          setTokenExpiry(remainingTime);
-          startTokenMonitoring();
           console.log('User authenticated:', userData.name || userData.username);
         } else {
           // Log specific issues
@@ -190,7 +131,7 @@ function useProvideAuth() {
             console.log('Token exists but no user data, clearing auth');
           } else if (!hasToken && userData) {
             console.log('User data exists but no valid token, clearing user data');
-          } else if (remainingTime <= 0) {
+          } else if (isTokenExpired) {
             console.log('Token expired, clearing auth');
           } else {
             console.log('No authentication data found');
@@ -219,34 +160,7 @@ function useProvideAuth() {
     };
 
     initializeAuth();
-  }, [clearAuthData, startTokenMonitoring, getStoredUser, isProtectedRoute, isLoginPage, navigateToLogin, location.pathname]);
-
-  // Listen for auth expiry events from API client
-  useEffect(() => {
-    const handleAuthExpired = (event) => {
-      console.log('🔒 Auth expired event received:', event.detail?.reason || 'Unknown reason');
-      setUser(null);
-      clearAuthData();
-      setError('Your session has expired. Please login again.');
-      
-      // Only navigate if not already on login page
-      if (!isLoginPage()) {
-        navigateToLogin(event.detail?.reason || 'Session expired');
-      }
-    };
-
-    window.addEventListener('auth:expired', handleAuthExpired);
-
-    return () => {
-      window.removeEventListener('auth:expired', handleAuthExpired);
-      stopTokenMonitoring();
-      
-      if (redirectTimeoutRef.current) {
-        clearTimeout(redirectTimeoutRef.current);
-        redirectTimeoutRef.current = null;
-      }
-    };
-  }, [clearAuthData, isLoginPage, navigateToLogin, stopTokenMonitoring]);
+  }, [clearAuthData, getStoredUser, isProtectedRoute, isLoginPage, navigateToLogin, location.pathname]);
 
   const login = useCallback(async (username, password) => {
     if (!username?.trim() || !password?.trim()) {
@@ -255,8 +169,6 @@ function useProvideAuth() {
 
     setIsLoading(true);
     setError(null);
-    setShowExpiryWarning(false);
-    warningShown.current = false;
     
     try {
       console.log('Starting login for:', username);
@@ -283,22 +195,10 @@ function useProvideAuth() {
       
       // Set token first, then user data
       api.setToken(result.token);
-      
-      // Set refresh token if provided
-      if (result.refreshToken) {
-        api.setRefreshToken(result.refreshToken);
-      }
-      
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
       
-      // Start monitoring token expiry
-      const remainingTime = api.getTokenRemainingTime();
-      setTokenExpiry(remainingTime);
-      startTokenMonitoring();
-      
       console.log('Login successful for:', userData.name || userData.username);
-      console.log('Token expires in:', remainingTime, 'minutes');
       
       // Navigate to appropriate page after successful login
       navigateAfterLogin();
@@ -330,7 +230,7 @@ function useProvideAuth() {
     } finally {
       setIsLoading(false);
     }
-  }, [clearAuthData, startTokenMonitoring, navigateAfterLogin]);
+  }, [clearAuthData, navigateAfterLogin]);
 
   const logout = useCallback(async (reason = 'User logout', shouldNavigate = true) => {
     console.log(`🚪 Logging out: ${reason}`);
@@ -352,46 +252,6 @@ function useProvideAuth() {
       navigateToLogin(reason);
     }
   }, [clearAuthData, navigateToLogin, isLoginPage]);
-
-  const extendSession = useCallback(async () => {
-    if (!user) return false;
-    
-    try {
-      setIsLoading(true);
-      
-      // Try to get a new token through any API call that returns a token
-      // This could be a dedicated refresh endpoint or any authenticated endpoint
-      const response = await api.get('/admin/auth/verify'); // Adjust endpoint as needed
-      
-      if (response.data?.token) {
-        api.setToken(response.data.token);
-        const remainingTime = api.getTokenRemainingTime();
-        setTokenExpiry(remainingTime);
-        setShowExpiryWarning(false);
-        warningShown.current = false;
-        console.log('Session extended, token expires in:', remainingTime, 'minutes');
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Failed to extend session:', error);
-      
-      // If session extension fails due to auth error, logout
-      if (error?.status === 401 || error?.message?.includes('Authentication')) {
-        logout('Session extension failed', true);
-      }
-      
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, logout]);
-
-  const dismissExpiryWarning = useCallback(() => {
-    setShowExpiryWarning(false);
-    warningShown.current = false; // Reset warning flag
-  }, []);
 
   const updateUser = useCallback((updates) => {
     if (!user) return;
@@ -415,48 +275,28 @@ function useProvideAuth() {
     setError(null);
   }, []);
 
-  // Get formatted time remaining
-  const getFormattedTimeRemaining = useCallback(() => {
-    if (!tokenExpiry || tokenExpiry <= 0) return 'Expired';
-    
-    const hours = Math.floor(tokenExpiry / 60);
-    const minutes = tokenExpiry % 60;
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
-  }, [tokenExpiry]);
-
   // Memoize the computed values to avoid recalculation on every render
   const authValues = useMemo(() => {
-    const hasValidToken = !!api.getToken();
+    const hasValidToken = !!api.getToken() && !api.isTokenExpired();
     const isUserAuthenticated = Boolean(user && hasValidToken);
     const isUserAdmin = Boolean(user?.role === 'admin' || user?.role === 'superadmin');
-    const isTokenSoonToExpire = hasValidToken ? api.isTokenExpiringSoon() : false;
     
     return {
       // State
       user,
       isLoading,
       error,
-      tokenExpiry,
-      showExpiryWarning,
       
       // Computed values
       isAuthenticated: isUserAuthenticated,
       isAdmin: isUserAdmin,
-      isTokenExpiringSoon: isTokenSoonToExpire,
       isProtectedRoute: isProtectedRoute(),
       isLoginPage: isLoginPage(),
       
       // Functions
-      getFormattedTimeRemaining,
       login,
       logout,
       updateUser,
-      extendSession,
-      dismissExpiryWarning,
       clearError,
       handleAuthError,
       navigateToLogin,
@@ -466,16 +306,11 @@ function useProvideAuth() {
     user, 
     isLoading, 
     error, 
-    tokenExpiry, 
-    showExpiryWarning, 
     isProtectedRoute,
     isLoginPage,
-    getFormattedTimeRemaining,
     login,
     logout,
     updateUser,
-    extendSession,
-    dismissExpiryWarning,
     clearError,
     handleAuthError,
     navigateToLogin,

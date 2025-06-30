@@ -37,72 +37,210 @@ const storage = {
   }
 };
 
+// Fixed authService - solves token expiry and login issues
+
 export const authService = {
   async login(username, password) {
     if (!username || !password) {
       throw new Error('Username and password are required');
     }
 
-    const formData = new FormData();
-    formData.append('username', username.trim());
-    formData.append('password', password);
-
     try {
-      const response = await api.post('/admin/login', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      console.log('🔐 Starting login process...');
+      console.log('🔐 Username:', username);
+      console.log('🔐 Password length:', password.length);
+      
+      // Clear any existing auth data first
+      this.clearAuth();
+      
+      // Try multiple login formats to find the one that works
+      let response;
+      let loginMethod = 'unknown';
+      
+      try {
+        // METHOD 1: Form-encoded data (most common)
+        console.log('🧪 Trying method 1: Form-encoded data');
+        const formData = new URLSearchParams();
+        formData.append('username', username.trim());
+        formData.append('password', password);
+        
+        response = await api.post('/admin/login', formData, {
+          headers: { 
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        });
+        loginMethod = 'form-encoded';
+        console.log('✅ Form-encoded method worked');
+      } catch (formError) {
+        console.log('❌ Form-encoded method failed:', formError.message);
+        
+        try {
+          // METHOD 2: Query parameters (as per API docs)
+          console.log('🧪 Trying method 2: Query parameters');
+          response = await api.post(`/admin/login?username=${encodeURIComponent(username.trim())}&password=${encodeURIComponent(password)}`);
+          loginMethod = 'query-params';
+          console.log('✅ Query parameters method worked');
+        } catch (queryError) {
+          console.log('❌ Query parameters method failed:', queryError.message);
+          
+          try {
+            // METHOD 3: JSON body
+            console.log('🧪 Trying method 3: JSON body');
+            response = await api.post('/admin/login', {
+              username: username.trim(),
+              password: password
+            });
+            loginMethod = 'json';
+            console.log('✅ JSON method worked');
+          } catch (jsonError) {
+            console.log('❌ All login methods failed');
+            throw new Error('Login failed - server not accepting credentials in any expected format');
+          }
+        }
+      }
+
+      console.log('🔐 Login response:', {
+        method: loginMethod,
+        code: response.data?.code,
+        hasToken: !!response.data?.token,
+        hasUser: !!response.data?.user,
+        message: response.data?.message,
+        tokenPreview: response.data?.token ? response.data.token.substring(0, 20) + '...' : 'NO TOKEN'
       });
 
       if (response.data?.code === 200) {
-        // Set token first
+        // CRITICAL: Handle token storage properly
         if (response.data.token) {
-          api.setToken(response.data.token);
+          console.log('✅ Setting token in API client');
+          
+          // Check if server provides token expiry information
+          let tokenExpiryHours = 24; // default
+          
+          if (response.data.expires_in) {
+            // Server provides expiry in seconds
+            tokenExpiryHours = response.data.expires_in / 3600;
+            console.log('📅 Server provided expiry (seconds):', response.data.expires_in);
+          } else if (response.data.expires_at) {
+            // Server provides absolute expiry time
+            const serverExpiry = new Date(response.data.expires_at).getTime();
+            const now = Date.now();
+            tokenExpiryHours = Math.max(1, (serverExpiry - now) / (1000 * 60 * 60));
+            console.log('📅 Server provided expiry (absolute):', response.data.expires_at);
+          } else {
+            console.log('📅 Using default expiry:', tokenExpiryHours, 'hours');
+          }
+          
+          // Set token with proper expiry
+          api.setToken(response.data.token, tokenExpiryHours);
+          
+          // Verify token was set and is not immediately expired
+          const verifyToken = api.getToken();
+          const isExpired = api.isTokenExpired();
+          
+          console.log('✅ Token verification:', {
+            tokenSet: !!verifyToken,
+            isExpired: isExpired,
+            remainingTime: api.getTokenRemainingTime() + ' minutes'
+          });
+          
+          if (!verifyToken) {
+            throw new Error('Failed to store authentication token');
+          }
+          
+          if (isExpired) {
+            console.error('❌ CRITICAL: Token is expired immediately after storage!');
+            // Try storing without expiry logic as fallback
+            localStorage.setItem('token', response.data.token);
+            console.log('🔧 Stored token without expiry logic as fallback');
+          }
+          
+        } else {
+          throw new Error('No authentication token received from server');
         }
         
-        // Then set user data
+        // Store user data
         if (response.data.user) {
           storage.setItem('user', JSON.stringify(response.data.user));
+          console.log('✅ User data stored:', response.data.user);
+        } else {
+          console.warn('⚠️ No user data received from server');
         }
         
+        console.log('✅ Login completed successfully');
         return response.data;
       }
 
-      throw new Error(response.data?.message || 'Login failed');
+      throw new Error(response.data?.message || 'Login failed - invalid response');
     } catch (error) {
+      console.error('❌ Login error:', error);
+      
       // Clear any partial auth state on login failure
       this.clearAuth();
-      throw error;
+      
+      // Provide more specific error messages
+      if (error.response?.status === 401) {
+        throw new Error('Invalid username or password');
+      } else if (error.response?.status === 403) {
+        throw new Error('Access denied - admin privileges required');
+      } else if (error.message.includes('Network')) {
+        throw new Error('Network error - please check your connection');
+      } else {
+        throw new Error(error.message || 'Login failed - please try again');
+      }
     }
   },
 
   async logout() {
     try {
-      // Attempt graceful logout
-      await api.post(ENDPOINTS.ADMIN_LOGOUT);
+      console.log('🔓 Logging out...');
+      
+      // Attempt graceful logout with current token
+      if (this.isAuthenticated()) {
+        await api.post('/admin/logout');
+        console.log('✅ Server logout successful');
+      }
     } catch (error) {
-      console.warn('Logout API call failed:', error.message);
-      // Continue with local cleanup even if API fails
+      console.warn('⚠️ Server logout failed:', error.message);
+      // Continue with local cleanup even if server logout fails
     } finally {
       this.clearAuth();
+      console.log('✅ Local logout completed');
     }
   },
 
   clearAuth() {
     api.clearAuth();
     storage.removeItem('user');
+    console.log('🗑️ Auth cleared via authService');
   },
 
   isAuthenticated() {
     const hasToken = !!api.getToken();
     const hasUser = !!storage.getItem('user');
+    const isExpired = api.isTokenExpired();
     
-    // If we have a token but no user data, or vice versa, clear both
-    if (hasToken !== hasUser) {
-      console.warn('Auth state mismatch detected, clearing auth');
+    console.log('🔍 Authentication check:', { 
+      hasToken, 
+      hasUser, 
+      isExpired,
+      remainingTime: api.getTokenRemainingTime() + ' minutes'
+    });
+    
+    // If token is expired, clear auth
+    if (hasToken && isExpired) {
+      console.warn('⚠️ Token expired, clearing auth');
       this.clearAuth();
       return false;
     }
     
-    return hasToken && hasUser;
+    // If we have a token but no user data, or vice versa, clear both
+    if (hasToken !== hasUser) {
+      console.warn('⚠️ Auth state mismatch detected, clearing auth');
+      this.clearAuth();
+      return false;
+    }
+    
+    return hasToken && hasUser && !isExpired;
   },
 
   getAuthUser() {
@@ -116,6 +254,33 @@ export const authService = {
       storage.removeItem('user');
       return null;
     }
+  },
+
+  // Debug method
+  debugAuthState() {
+    const token = api.getToken();
+    const user = this.getAuthUser();
+    const isAuth = this.isAuthenticated();
+    const isExpired = api.isTokenExpired();
+    const remainingTime = api.getTokenRemainingTime();
+    
+    console.log('🔍 AuthService State:', {
+      hasToken: !!token,
+      tokenPreview: token ? token.substring(0, 20) + '...' : null,
+      hasUser: !!user,
+      user: user,
+      isAuthenticated: isAuth,
+      isTokenExpired: isExpired,
+      tokenRemainingMinutes: remainingTime
+    });
+    
+    return { 
+      token, 
+      user, 
+      isAuthenticated: isAuth, 
+      isExpired,
+      remainingTime 
+    };
   }
 };
 
@@ -329,8 +494,9 @@ export const orderService = {
       
       console.log('📡 API request params:', params);
       
-      // API docs show this requires Authorization Bearer token
-      const response = await api.get('/admin/fetch-orders', params);
+      // CORRECTED: Use the correct endpoint from API docs
+      // API docs: GET '{base_url}/api/fetch-orders?...' with Authorization Bearer header
+      const response = await api.get('/fetch-orders', params);
       
       console.log('✅ Orders API response:', {
         code: response.data?.code,
@@ -389,7 +555,7 @@ export const orderService = {
       console.log('🔄 Changing delivery status:', { orderId, newStatus });
       
       // API docs: POST /admin/change-delivery-status?new_delivery_status={new_delivery_status}&order_id={order_id}
-      // But the docs show it as query params, let's follow that exactly
+      // Note: This one correctly keeps /admin/ prefix as shown in API docs
       const params = {
         order_id: orderId,
         new_delivery_status: newStatus
