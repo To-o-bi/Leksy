@@ -37,8 +37,7 @@ const storage = {
   }
 };
 
-// Fixed authService - solves token expiry and login issues
-
+// Fixed authService that works with simplified API client
 export const authService = {
   async login(username, password) {
     if (!username || !password) {
@@ -52,6 +51,10 @@ export const authService = {
       
       // Clear any existing auth data first
       this.clearAuth();
+      
+      // Debug: Check auth state before login
+      console.log('🔍 Auth state before login:');
+      api.debugAuth();
       
       // Try multiple login formats to find the one that works
       let response;
@@ -105,66 +108,46 @@ export const authService = {
         hasToken: !!response.data?.token,
         hasUser: !!response.data?.user,
         message: response.data?.message,
-        tokenPreview: response.data?.token ? response.data.token.substring(0, 20) + '...' : 'NO TOKEN'
+        tokenPreview: response.data?.token ? response.data.token.substring(0, 20) + '...' : 'NO TOKEN',
+        fullResponseData: response.data // Log full response for debugging
       });
 
       if (response.data?.code === 200) {
-        // CRITICAL: Handle token storage properly
+        // Store token FIRST before anything else
         if (response.data.token) {
           console.log('✅ Setting token in API client');
+          console.log('🔍 Token to store:', response.data.token);
           
-          // Check if server provides token expiry information
-          let tokenExpiryHours = 24; // default
+          // Set token using the API client method
+          api.setToken(response.data.token);
           
-          if (response.data.expires_in) {
-            // Server provides expiry in seconds
-            tokenExpiryHours = response.data.expires_in / 3600;
-            console.log('📅 Server provided expiry (seconds):', response.data.expires_in);
-          } else if (response.data.expires_at) {
-            // Server provides absolute expiry time
-            const serverExpiry = new Date(response.data.expires_at).getTime();
-            const now = Date.now();
-            tokenExpiryHours = Math.max(1, (serverExpiry - now) / (1000 * 60 * 60));
-            console.log('📅 Server provided expiry (absolute):', response.data.expires_at);
-          } else {
-            console.log('📅 Using default expiry:', tokenExpiryHours, 'hours');
-          }
-          
-          // Set token with proper expiry
-          api.setToken(response.data.token, tokenExpiryHours);
-          
-          // Verify token was set and is not immediately expired
-          const verifyToken = api.getToken();
-          const isExpired = api.isTokenExpired();
-          
-          console.log('✅ Token verification:', {
-            tokenSet: !!verifyToken,
-            isExpired: isExpired,
-            remainingTime: api.getTokenRemainingTime() + ' minutes'
-          });
-          
-          if (!verifyToken) {
-            throw new Error('Failed to store authentication token');
-          }
-          
-          if (isExpired) {
-            console.error('❌ CRITICAL: Token is expired immediately after storage!');
-            // Try storing without expiry logic as fallback
-            localStorage.setItem('token', response.data.token);
-            console.log('🔧 Stored token without expiry logic as fallback');
-          }
+          // Verify token was stored immediately
+          setTimeout(() => {
+            console.log('🔍 Immediate verification after token storage:');
+            const storedToken = api.getToken();
+            console.log('Stored token:', storedToken ? storedToken.substring(0, 20) + '...' : 'NOT STORED');
+            console.log('Document cookies:', document.cookie);
+            api.debugAuth();
+          }, 100);
           
         } else {
           throw new Error('No authentication token received from server');
         }
         
-        // Store user data
+        // Store user data AFTER token
         if (response.data.user) {
-          storage.setItem('user', JSON.stringify(response.data.user));
+          localStorage.setItem('user', JSON.stringify(response.data.user));
           console.log('✅ User data stored:', response.data.user);
         } else {
           console.warn('⚠️ No user data received from server');
         }
+        
+        // Final verification
+        setTimeout(() => {
+          console.log('🔍 Final auth verification:');
+          console.log('Auth service isAuthenticated:', this.isAuthenticated());
+          api.debugAuth();
+        }, 200);
         
         console.log('✅ Login completed successfully');
         return response.data;
@@ -209,29 +192,27 @@ export const authService = {
   },
 
   clearAuth() {
+    console.log('🧹 Clearing auth data...');
     api.clearAuth();
-    storage.removeItem('user');
+    localStorage.removeItem('user');
     console.log('🗑️ Auth cleared via authService');
+    
+    // Debug: Verify auth was cleared
+    setTimeout(() => {
+      console.log('🔍 Auth state after clearing:');
+      api.debugAuth();
+    }, 100);
   },
 
+  // SIMPLIFIED: Just check if we have token and user data
   isAuthenticated() {
     const hasToken = !!api.getToken();
-    const hasUser = !!storage.getItem('user');
-    const isExpired = api.isTokenExpired();
+    const hasUser = !!localStorage.getItem('user');
     
     console.log('🔍 Authentication check:', { 
       hasToken, 
-      hasUser, 
-      isExpired,
-      remainingTime: api.getTokenRemainingTime() + ' minutes'
+      hasUser
     });
-    
-    // If token is expired, clear auth
-    if (hasToken && isExpired) {
-      console.warn('⚠️ Token expired, clearing auth');
-      this.clearAuth();
-      return false;
-    }
     
     // If we have a token but no user data, or vice versa, clear both
     if (hasToken !== hasUser) {
@@ -240,29 +221,27 @@ export const authService = {
       return false;
     }
     
-    return hasToken && hasUser && !isExpired;
+    return hasToken && hasUser;
   },
 
   getAuthUser() {
     try {
-      const userData = storage.getItem('user');
+      const userData = localStorage.getItem('user');
       if (!userData) return null;
       
       return JSON.parse(userData);
     } catch (error) {
       console.error('Error parsing user data:', error);
-      storage.removeItem('user');
+      localStorage.removeItem('user');
       return null;
     }
   },
 
-  // Debug method
+  // SIMPLIFIED: Debug method without expiry checks
   debugAuthState() {
     const token = api.getToken();
     const user = this.getAuthUser();
     const isAuth = this.isAuthenticated();
-    const isExpired = api.isTokenExpired();
-    const remainingTime = api.getTokenRemainingTime();
     
     console.log('🔍 AuthService State:', {
       hasToken: !!token,
@@ -270,16 +249,13 @@ export const authService = {
       hasUser: !!user,
       user: user,
       isAuthenticated: isAuth,
-      isTokenExpired: isExpired,
-      tokenRemainingMinutes: remainingTime
+      cookies: document.cookie
     });
     
     return { 
       token, 
       user, 
-      isAuthenticated: isAuth, 
-      isExpired,
-      remainingTime 
+      isAuthenticated: isAuth
     };
   }
 };

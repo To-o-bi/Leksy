@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowUp, ArrowDown, ArrowUpRight, Users, ShoppingBag, DollarSign, Clock, RefreshCw } from 'lucide-react';
 import { orderService, contactService, productService, authService } from '../../api/services';
+import { useAuth } from '../../contexts/AuthContext'; // Import auth context
 
-// Dashboard Stats Component
+// Dashboard Stats Component (keeping the same)
 const DashboardStats = ({ dashboardData, isLoading }) => {
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-NG', {
@@ -123,7 +124,7 @@ const DashboardStats = ({ dashboardData, isLoading }) => {
   );
 };
 
-// Recent Orders Component
+// Recent Orders Component (keeping the same)
 const RecentOrders = ({ orders, isLoading, onRefresh }) => {
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-NG', {
@@ -261,8 +262,9 @@ const RecentOrders = ({ orders, isLoading, onRefresh }) => {
   );
 };
 
-// Main Dashboard Component
+// Main Dashboard Component with Auth Error Handling
 const DashboardPage = () => {
+  const auth = useAuth(); // Add auth context
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dashboardData, setDashboardData] = useState({
@@ -275,6 +277,29 @@ const DashboardPage = () => {
     productGrowth: 0
   });
   const [recentOrders, setRecentOrders] = useState([]);
+
+  // Helper function to handle auth errors - LESS AGGRESSIVE
+  const handleAuthError = (error) => {
+    const isAuthError = error.isAPILevel401 || 
+                       error.response?.status === 401 || 
+                       error.response?.data?.code === 401 ||
+                       error.message?.includes('Admin authentication required');
+    
+    if (isAuthError) {
+      console.log('🚨 Auth error detected in dashboard, but NOT auto-logging out');
+      console.log('🔍 Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        apiCode: error.response?.data?.code,
+        hasToken: !!api.getToken()
+      });
+      
+      // DON'T automatically logout - let user see the error and decide
+      return true; // Return true to indicate it was an auth error
+    }
+    
+    return false;
+  };
 
   useEffect(() => {
     fetchDashboardData();
@@ -294,6 +319,17 @@ const DashboardPage = () => {
 
       console.log('Orders response:', ordersResponse);
       console.log('Products response:', productsResponse);
+
+      // Check for auth errors in responses
+      if (ordersResponse.status === 'rejected') {
+        const wasAuthError = handleAuthError(ordersResponse.reason);
+        if (wasAuthError) return; // Stop processing if we're logging out
+      }
+
+      if (productsResponse.status === 'rejected') {
+        const wasAuthError = handleAuthError(productsResponse.reason);
+        if (wasAuthError) return; // Stop processing if we're logging out
+      }
 
       // Process orders data
       let ordersData = [];
@@ -332,7 +368,14 @@ const DashboardPage = () => {
           console.log('Orders API returned unexpected format:', ordersResult);
         }
       } else {
-        console.error('Orders fetch failed:', ordersResponse.reason);
+        console.error('Orders fetch failed:', ordersResponse.reason?.message || ordersResponse.reason);
+        // Check if it's an auth error but don't auto-logout
+        const wasAuthError = handleAuthError(ordersResponse.reason);
+        if (wasAuthError) {
+          setError('Authentication issue detected. You may need to log in again.');
+        } else {
+          setError(ordersResponse.reason?.message || 'Failed to fetch orders');
+        }
       }
 
       // Process products data
@@ -347,7 +390,14 @@ const DashboardPage = () => {
           console.log('Products API returned unexpected format:', productsResult);
         }
       } else {
-        console.error('Products fetch failed:', productsResponse.reason);
+        console.error('Products fetch failed:', productsResponse.reason?.message || productsResponse.reason);
+        // Check if it's an auth error but don't auto-logout  
+        const wasAuthError = handleAuthError(productsResponse.reason);
+        if (wasAuthError) {
+          setError(prev => prev || 'Authentication issue detected. You may need to log in again.');
+        } else {
+          setError(prev => prev || (productsResponse.reason?.message || 'Failed to fetch products'));
+        }
       }
 
       // Generate some mock growth percentages for demo
@@ -375,7 +425,14 @@ const DashboardPage = () => {
 
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
-      setError(err.message || 'Failed to load dashboard data');
+      
+      // Check if it's an auth error but don't auto-logout
+      const wasAuthError = handleAuthError(err);
+      if (wasAuthError) {
+        setError('Authentication issue detected. You may need to log in again.');
+      } else {
+        setError(err.message || 'Failed to load dashboard data');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -386,23 +443,41 @@ const DashboardPage = () => {
   const userName = user?.name || user?.username || 'Admin';
 
   if (error) {
+    const isAuthIssue = error.includes('Authentication issue');
+    
     return (
       <div className="space-y-6">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+        <div className={`border rounded-xl p-6 ${isAuthIssue ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'}`}>
           <div className="flex items-center mb-4">
-            <div className="bg-red-100 p-2 rounded-full mr-3">
-              <ArrowDown className="h-5 w-5 text-red-600" />
+            <div className={`p-2 rounded-full mr-3 ${isAuthIssue ? 'bg-yellow-100' : 'bg-red-100'}`}>
+              <ArrowDown className={`h-5 w-5 ${isAuthIssue ? 'text-yellow-600' : 'text-red-600'}`} />
             </div>
-            <h3 className="text-lg font-semibold text-red-800">Error Loading Dashboard</h3>
+            <h3 className={`text-lg font-semibold ${isAuthIssue ? 'text-yellow-800' : 'text-red-800'}`}>
+              {isAuthIssue ? 'Authentication Issue' : 'Error Loading Dashboard'}
+            </h3>
           </div>
-          <p className="text-red-600 mb-4">{error}</p>
-          <button 
-            onClick={fetchDashboardData}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center"
-          >
-            <RefreshCw size={16} className="mr-2" />
-            Try Again
-          </button>
+          <p className={`mb-4 ${isAuthIssue ? 'text-yellow-600' : 'text-red-600'}`}>{error}</p>
+          <div className="flex space-x-3">
+            <button 
+              onClick={fetchDashboardData}
+              className={`px-4 py-2 rounded-lg transition-colors flex items-center ${
+                isAuthIssue 
+                  ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
+            >
+              <RefreshCw size={16} className="mr-2" />
+              Try Again
+            </button>
+            {isAuthIssue && (
+              <button 
+                onClick={() => auth.logout('Manual logout', true)}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Log Out & Sign In Again
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

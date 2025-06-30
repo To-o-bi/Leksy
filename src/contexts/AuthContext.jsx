@@ -104,7 +104,7 @@ function useProvideAuth() {
     localStorage.removeItem('user');
   }, []);
 
-  // Initialize auth state
+  // SIMPLIFIED: Initialize auth state without client-side expiry checks
   useEffect(() => {
     const initializeAuth = async () => {
       if (isInitialized.current) return;
@@ -113,16 +113,16 @@ function useProvideAuth() {
       try {
         const hasToken = !!api.getToken();
         const userData = getStoredUser();
-        const isTokenExpired = api.isTokenExpired();
         
         console.log('Auth initialization:', { 
           hasToken, 
           hasUserData: !!userData,
-          isTokenExpired,
           currentPath: location.pathname
         });
         
-        if (hasToken && userData && !isTokenExpired) {
+        // SIMPLE CHECK: If we have both token and user data, assume valid
+        // Let the server tell us if the token is expired via 401 responses
+        if (hasToken && userData) {
           setUser(userData);
           console.log('User authenticated:', userData.name || userData.username);
         } else {
@@ -130,9 +130,7 @@ function useProvideAuth() {
           if (hasToken && !userData) {
             console.log('Token exists but no user data, clearing auth');
           } else if (!hasToken && userData) {
-            console.log('User data exists but no valid token, clearing user data');
-          } else if (isTokenExpired) {
-            console.log('Token expired, clearing auth');
+            console.log('User data exists but no token, clearing user data');
           } else {
             console.log('No authentication data found');
           }
@@ -275,10 +273,10 @@ function useProvideAuth() {
     setError(null);
   }, []);
 
-  // Memoize the computed values to avoid recalculation on every render
+  // SIMPLIFIED: Memoize values without complex token expiry checks
   const authValues = useMemo(() => {
-    const hasValidToken = !!api.getToken() && !api.isTokenExpired();
-    const isUserAuthenticated = Boolean(user && hasValidToken);
+    const hasToken = !!api.getToken();
+    const isUserAuthenticated = Boolean(user && hasToken);
     const isUserAdmin = Boolean(user?.role === 'admin' || user?.role === 'superadmin');
     
     return {
