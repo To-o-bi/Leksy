@@ -271,11 +271,13 @@ export const contactService = {
   }
 };
 
+// Fixed orderService following API documentation exactly
 export const orderService = {
   async initiateCheckout(checkoutData) {
     // Validation
     this._validateCheckoutData(checkoutData);
 
+    // According to API docs, checkout/initiate uses GET parameters
     const params = {
       name: checkoutData.name?.trim() || '',
       email: checkoutData.email?.trim() || '',
@@ -284,46 +286,136 @@ export const orderService = {
       cart: JSON.stringify(checkoutData.cart)
     };
 
-    // Add address fields if needed
+    // Add address fields if delivery method is 'address'
     if (checkoutData.delivery_method === 'address') {
       params.state = checkoutData.state.trim();
       params.city = checkoutData.city.trim();
       params.street_address = checkoutData.street_address.trim();
     }
 
-    // Add success redirect URL (safe for SSR)
+    // Add success redirect URL
     if (checkoutData.success_redirect) {
       params.success_redirect = checkoutData.success_redirect;
     } else if (isBrowser()) {
       params.success_redirect = `${window.location.origin}/checkout/success`;
     }
 
-    const response = await api.post(ENDPOINTS.INITIATE_CHECKOUT, null, { params });
+    // API docs show this as POST with query parameters
+    const response = await api.post(`/checkout/initiate?${new URLSearchParams(params).toString()}`);
     return response.data;
   },
 
   async fetchOrders(filters = {}) {
-    const response = await api.get(ENDPOINTS.FETCH_ORDERS, filters);
-    return response.data;
+    try {
+      console.log('🔄 Fetching orders with filters:', filters);
+      
+      // Build query parameters exactly as API docs specify
+      const params = {};
+      
+      // API docs: order_status = {successful|unsuccessful|all} (default: successful)
+      if (filters.order_status && filters.order_status !== 'all') {
+        params.order_status = filters.order_status;
+      }
+      
+      // API docs: delivery_status = {unpaid|order-received|packaged|in-transit|delivered|all} (default: all except unpaid)
+      if (filters.delivery_status && filters.delivery_status !== 'all') {
+        params.delivery_status = filters.delivery_status;
+      }
+      
+      // API docs: limit = {integer|optional}
+      if (filters.limit) {
+        params.limit = filters.limit;
+      }
+      
+      console.log('📡 API request params:', params);
+      
+      // API docs show this requires Authorization Bearer token
+      const response = await api.get('/admin/fetch-orders', params);
+      
+      console.log('✅ Orders API response:', {
+        code: response.data?.code,
+        message: response.data?.message,
+        orderCount: response.data?.products?.length || 0
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('❌ Fetch orders error:', error);
+      
+      // Enhanced error handling for admin endpoints
+      if (error.response?.status === 401) {
+        throw new Error('Admin authentication required. Please log in as admin.');
+      } else if (error.response?.status === 403) {
+        throw new Error('Admin privileges required to view orders.');
+      } else if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      } else {
+        throw new Error('Failed to fetch orders. Please try again.');
+      }
+    }
   },
 
   async fetchOrder(orderId) {
     if (!orderId) throw new Error('Order ID is required');
     
-    const response = await api.get(ENDPOINTS.FETCH_ORDER, { order_id: orderId });
-    return response.data;
+    try {
+      console.log('🔄 Fetching single order:', orderId);
+      
+      // API docs: GET /fetch-order?order_id={order_id}
+      const response = await api.get('/fetch-order', { order_id: orderId });
+      
+      console.log('✅ Single order response:', {
+        code: response.data?.code,
+        hasOrder: !!response.data?.product
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('❌ Fetch order error:', error);
+      throw new Error(error.response?.data?.message || 'Failed to fetch order details');
+    }
   },
 
   async changeDeliveryStatus(orderId, newStatus) {
     const validStatuses = ['unpaid', 'order-received', 'packaged', 'in-transit', 'delivered'];
-    if (!validStatuses.includes(newStatus)) throw new Error('Invalid delivery status');
+    
     if (!orderId) throw new Error('Order ID is required');
+    if (!newStatus) throw new Error('New delivery status is required');
+    if (!validStatuses.includes(newStatus)) {
+      throw new Error(`Invalid delivery status. Must be one of: ${validStatuses.join(', ')}`);
+    }
 
-    const response = await api.get(ENDPOINTS.CHANGE_DELIVERY_STATUS, {
-      order_id: orderId,
-      new_delivery_status: newStatus
-    });
-    return response.data;
+    try {
+      console.log('🔄 Changing delivery status:', { orderId, newStatus });
+      
+      // API docs: POST /admin/change-delivery-status?new_delivery_status={new_delivery_status}&order_id={order_id}
+      // But the docs show it as query params, let's follow that exactly
+      const params = {
+        order_id: orderId,
+        new_delivery_status: newStatus
+      };
+      
+      const response = await api.post(`/admin/change-delivery-status?${new URLSearchParams(params).toString()}`);
+      
+      console.log('✅ Status change response:', {
+        code: response.data?.code,
+        message: response.data?.message
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('❌ Change delivery status error:', error);
+      
+      if (error.response?.status === 401) {
+        throw new Error('Admin authentication required. Please log in as admin.');
+      } else if (error.response?.status === 403) {
+        throw new Error('Admin privileges required to change order status.');
+      } else if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      } else {
+        throw new Error('Failed to update delivery status. Please try again.');
+      }
+    }
   },
 
   _validateCheckoutData(checkoutData) {
