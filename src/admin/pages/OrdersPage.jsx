@@ -156,7 +156,7 @@ const AllOrders = () => {
       });
       
       if (result?.code === 200) {
-        const formattedOrders = formatOrderData(result.products || []);
+        const formattedOrders = formatOrderData(result.orders || []);
         setOrders(formattedOrders);
         console.log(`✅ Successfully loaded ${formattedOrders.length} orders`);
       } else {

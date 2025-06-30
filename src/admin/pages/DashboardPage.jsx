@@ -340,8 +340,8 @@ const DashboardPage = () => {
         const ordersResult = ordersResponse.value;
         console.log('Orders result:', ordersResult);
         
-        if (ordersResult?.code === 200 && ordersResult.products) {
-          ordersData = ordersResult.products;
+        if (ordersResult?.code === 200 && ordersResult.orders) {
+          ordersData = ordersResult.orders;
           console.log('Orders data:', ordersData);
           
           // Calculate metrics from orders
