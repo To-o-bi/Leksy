@@ -51,7 +51,7 @@ const AdminSidebar = ({ isOpen, isMobile, onClose }) => {
   const otherNavItems = useMemo(() => [
     {
       name: 'Newsletter',
-      path: '/admin/newsletter',
+      path: '/admin/newletter',
       icon: 'M3 5H21V15H17C16.4477 15 16 15.4477 16 16V17C16 18.6569 14.6569 20 13 20H11C9.34315 20 8 18.6569 8 17V16C8 15.4477 7.55228 15 7 15H3V5ZM3 10L9 13L15 13L21 10',
       stroke: true
     },
