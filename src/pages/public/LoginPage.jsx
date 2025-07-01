@@ -105,11 +105,11 @@ const LoginPage = () => {
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
           {/* Header Section */}
           <div className="px-8 pt-8 pb-6 text-center bg-gradient-to-r from-pink-600 to-rose-600">
-            <div className="mx-auto h-16 w-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 shadow-lg">
+            <div className="mx-auto h-20 w-20 rounded-full bg-white backdrop-blur-sm flex items-center justify-center mb-4 shadow-lg">
               <img 
-                src="/assets/images/icons/leksy-white.png" 
+                src="/assets/images/icons/leksy-logo.png" 
                 alt="Leksy Cosmetics Logo" 
-                className="h-10 w-10 object-contain"
+                className="h-12 w-12 object-contain"
               />
             </div>
             <h2 className="text-2xl font-bold text-white">Admin Portal</h2>
