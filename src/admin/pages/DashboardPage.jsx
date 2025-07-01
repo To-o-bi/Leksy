@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Add this import
 import { ArrowUp, ArrowDown, ArrowUpRight, Users, ShoppingBag, DollarSign, Clock, RefreshCw } from 'lucide-react';
 import { orderService, contactService, productService, authService } from '../../api/services';
 import { useAuth } from '../../contexts/AuthContext'; // Import auth context
@@ -124,8 +125,10 @@ const DashboardStats = ({ dashboardData, isLoading }) => {
   );
 };
 
-// Recent Orders Component (keeping the same)
+// Recent Orders Component with navigation
 const RecentOrders = ({ orders, isLoading, onRefresh }) => {
+  const navigate = useNavigate(); // Add navigation hook
+  
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
@@ -204,7 +207,10 @@ const RecentOrders = ({ orders, isLoading, onRefresh }) => {
             <RefreshCw size={16} className="mr-1" />
             Refresh
           </button>
-          <button className="text-sm flex items-center text-blue-600 hover:text-blue-800 px-3 py-2 rounded-lg hover:bg-blue-50">
+          <button 
+            onClick={() => navigate('/admin/orders')}
+            className="text-sm flex items-center text-blue-600 hover:text-blue-800 px-3 py-2 rounded-lg hover:bg-blue-50"
+          >
             View all <ArrowUpRight size={16} className="ml-1" />
           </button>
         </div>
