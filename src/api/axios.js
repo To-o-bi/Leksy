@@ -274,6 +274,14 @@ class ApiClient {
     return this.client.delete(url);
   }
 
+  async postFormData(url, formData) {
+  return this.client.post(url, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  });
+}
+
   // Debug method to check auth state
   debugAuth() {
     const token = this.getToken();
