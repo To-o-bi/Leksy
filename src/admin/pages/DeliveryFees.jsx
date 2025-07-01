@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Edit2, Save, X, Truck, MapPin, AlertCircle, CheckCircle, ChevronDown, ChevronRight, Building2 } from 'lucide-react';
-import { 
-  DeliveryFeeService, 
-  LagosLGAService, 
-  DeliveryFeeUtils, 
-  NotificationService 
-} from '../../api/deliveryFeeService';
+import api from '../../api/axios';
+
+const BASE_URL = 'https://leksycosmetics.com/api'; 
 
 const DeliveryFeeAdmin = () => {
-  // State management
   const [deliveryFees, setDeliveryFees] = useState([]);
   const [lagosLGAs, setLagosLGAs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -21,60 +17,90 @@ const DeliveryFeeAdmin = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedLagos, setExpandedLagos] = useState(false);
 
-  // Initialize component
+  // Lagos State LGAs
+  const LAGOS_LGAS = [
+    'Agege', 'Ajeromi-Ifelodun', 'Alimosho', 'Amuwo-Odofin', 'Apapa',
+    'Badagry', 'Epe', 'Eti-Osa', 'Ibeju-Lekki', 'Ifako-Ijaiye',
+    'Ikeja', 'Ikorodu', 'Kosofe', 'Lagos Island', 'Lagos Mainland',
+    'Mushin', 'Ojo', 'Oshodi-Isolo', 'Shomolu', 'Surulere'
+  ];
+
+  // Fetch all delivery fees on component mount
   useEffect(() => {
-    loadInitialData();
+    fetchDeliveryFees();
+    fetchLagosLGAs();
   }, []);
 
-  // Notification helper
-  const showNotification = (notification) => {
-    setNotification(notification);
+  const showNotification = (type, message) => {
+    setNotification({ type, message });
     setTimeout(() => setNotification(null), 5000);
   };
 
-  // Load initial data
-  const loadInitialData = async () => {
-    await Promise.all([
-      fetchDeliveryFees(),
-      fetchLagosLGAs()
-    ]);
-  };
-
-  // Fetch delivery fees
   const fetchDeliveryFees = async () => {
     setLoading(true);
     try {
-      const result = await DeliveryFeeService.fetchDeliveryFees();
-      setDeliveryFees(result.data);
-      showNotification(NotificationService.success(result.message));
+      console.log('Fetching delivery fees...');
+      const response = await api.get('/fetch-delivery-fees');
+      console.log('API Response:', response.data);
+      
+      const data = response.data;
+      
+      if (data.code === 200) {
+        setDeliveryFees(data.delivery_fees || []);
+        showNotification('success', data.message || `Loaded ${data.delivery_fees?.length || 0} delivery fees`);
+      } else {
+        throw new Error(data.message || 'Failed to fetch delivery fees');
+      }
     } catch (error) {
-      showNotification(NotificationService.error(error.message));
+      console.error('Error fetching delivery fees:', error);
+      showNotification('error', error.response?.data?.message || error.message || 'Failed to load delivery fees');
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch Lagos LGAs
   const fetchLagosLGAs = async () => {
     try {
-      const result = await LagosLGAService.fetchLagosLGAs();
-      setLagosLGAs(result.data);
+      console.log('Fetching Lagos LGAs...');
+      // For now, we'll use a mock endpoint that follows your API pattern
+      // You'll need to implement: GET /api/fetch-lagos-lgas
+      const response = await api.get('/fetch-lagos-lgas');
+      console.log('Lagos LGAs Response:', response.data);
       
-      if (result.isDefault) {
-        showNotification(NotificationService.info(result.message));
+      const data = response.data;
+      
+      if (data.code === 200) {
+        setLagosLGAs(data.lgas || []);
+      } else {
+        throw new Error(data.message || 'Failed to fetch Lagos LGAs');
       }
     } catch (error) {
-      showNotification(NotificationService.error(error.message));
+      console.error('Error fetching Lagos LGAs:', error);
+      // Initialize with default LGAs if API doesn't exist yet
+      const defaultLGAs = LAGOS_LGAS.map(lga => ({
+        lga: lga,
+        delivery_fee: 0
+      }));
+      setLagosLGAs(defaultLGAs);
+      console.log('Using default Lagos LGAs - API endpoint may not be implemented yet');
     }
   };
 
-  // Edit handlers for states
   const handleEdit = (state) => {
     const currentFee = deliveryFees.find(fee => fee.state === state)?.delivery_fee || 0;
     setEditingStates(prev => new Set([...prev, state]));
     setTempValues(prev => ({
       ...prev,
       [state]: currentFee
+    }));
+  };
+
+  const handleLGAEdit = (lga) => {
+    const currentFee = lagosLGAs.find(item => item.lga === lga)?.delivery_fee || 0;
+    setEditingLGAs(prev => new Set([...prev, lga]));
+    setTempLGAValues(prev => ({
+      ...prev,
+      [lga]: currentFee
     }));
   };
 
@@ -91,50 +117,6 @@ const DeliveryFeeAdmin = () => {
     });
   };
 
-  const handleSave = async (state) => {
-    const newFee = tempValues[state];
-    
-    if (!DeliveryFeeUtils.validateFee(newFee)) {
-      showNotification(NotificationService.error('Please enter a valid delivery fee'));
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const result = await DeliveryFeeService.updateSingleDeliveryFee(state, newFee);
-      
-      if (result.data) {
-        setDeliveryFees(result.data);
-      } else {
-        // Fallback: update local state manually
-        setDeliveryFees(prev => 
-          prev.map(fee => 
-            fee.state === state 
-              ? { ...fee, delivery_fee: parseInt(newFee) }
-              : fee
-          )
-        );
-      }
-      
-      handleCancel(state);
-      showNotification(NotificationService.success(result.message));
-    } catch (error) {
-      showNotification(NotificationService.error(error.message));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Edit handlers for LGAs
-  const handleLGAEdit = (lga) => {
-    const currentFee = lagosLGAs.find(item => item.lga === lga)?.delivery_fee || 0;
-    setEditingLGAs(prev => new Set([...prev, lga]));
-    setTempLGAValues(prev => ({
-      ...prev,
-      [lga]: currentFee
-    }));
-  };
-
   const handleLGACancel = (lga) => {
     setEditingLGAs(prev => {
       const newSet = new Set(prev);
@@ -148,68 +130,133 @@ const DeliveryFeeAdmin = () => {
     });
   };
 
-  const handleLGASave = async (lga) => {
-    const newFee = tempLGAValues[lga];
+  const handleSave = async (state) => {
+    const newFee = tempValues[state];
     
-    if (!DeliveryFeeUtils.validateFee(newFee)) {
-      showNotification(NotificationService.error('Please enter a valid delivery fee'));
+    if (!newFee || newFee < 0) {
+      showNotification('error', 'Please enter a valid delivery fee');
       return;
     }
 
     setSaving(true);
     try {
-      const result = await LagosLGAService.updateSingleLGAFee(lga, newFee);
+      console.log(`Updating delivery fee for ${state} to ${newFee}`);
+      // Following your API pattern: POST /api/admin/update-delivery-fees?State={price}
+      const params = { [state]: newFee };
+      const response = await api.post('/admin/update-delivery-fees', null, { params });
+      console.log('Update response:', response.data);
       
-      if (result.data) {
-        setLagosLGAs(result.data);
+      const data = response.data;
+      
+      if (data.code === 200) {
+        if (data.delivery_fees) {
+          setDeliveryFees(data.delivery_fees);
+        } else {
+          // Fallback: update local state manually
+          setDeliveryFees(prev => 
+            prev.map(fee => 
+              fee.state === state 
+                ? { ...fee, delivery_fee: parseInt(newFee) }
+                : fee
+            )
+          );
+        }
+        
+        // Clear editing state
+        handleCancel(state);
+        showNotification('success', data.message || `Updated delivery fee for ${state} successfully`);
       } else {
-        // Fallback: update local state manually
-        setLagosLGAs(prev => 
-          prev.map(item => 
-            item.lga === lga 
-              ? { ...item, delivery_fee: parseInt(newFee) }
-              : item
-          )
-        );
+        throw new Error(data.message || 'Failed to update delivery fee');
       }
-      
-      handleLGACancel(lga);
-      showNotification(NotificationService.success(result.message));
     } catch (error) {
-      showNotification(NotificationService.error(error.message));
+      console.error('Error updating delivery fee:', error);
+      showNotification('error', error.response?.data?.message || error.message || `Failed to update delivery fee for ${state}`);
     } finally {
       setSaving(false);
     }
   };
 
-  // Bulk update handlers
-  const handleBulkUpdate = async () => {
-    if (Object.keys(tempValues).length === 0) {
-      showNotification(NotificationService.error('No changes to save'));
+  const handleLGASave = async (lga) => {
+    const newFee = tempLGAValues[lga];
+    
+    if (newFee < 0) {
+      showNotification('error', 'Please enter a valid delivery fee');
       return;
     }
 
     setSaving(true);
     try {
-      const result = await DeliveryFeeService.updateBulkDeliveryFees(tempValues);
+      console.log(`Updating LGA delivery fee for ${lga} to ${newFee}`);
+      // Following your API pattern, this would be: POST /api/admin/update-lagos-lgas?{LGA}={fee}
+      const params = { [lga]: newFee };
+      const response = await api.post('/admin/update-lagos-lgas', null, { params });
+      console.log('LGA Update response:', response.data);
       
-      if (result.data) {
-        setDeliveryFees(result.data);
+      const data = response.data;
+      
+      if (data.code === 200) {
+        if (data.lgas) {
+          setLagosLGAs(data.lgas);
+        } else {
+          // Fallback: update local state manually
+          setLagosLGAs(prev => 
+            prev.map(item => 
+              item.lga === lga 
+                ? { ...item, delivery_fee: parseInt(newFee) }
+                : item
+            )
+          );
+        }
+        
+        handleLGACancel(lga);
+        showNotification('success', data.message || `Updated delivery fee for ${lga} LGA successfully`);
       } else {
-        setDeliveryFees(prev => 
-          prev.map(fee => 
-            tempValues[fee.state] !== undefined
-              ? { ...fee, delivery_fee: parseInt(tempValues[fee.state]) }
-              : fee
-          )
-        );
+        throw new Error(data.message || 'Failed to update LGA delivery fee');
       }
-      
-      setEditingStates(new Set());
-      setTempValues({});
-      showNotification(NotificationService.success(result.message));
     } catch (error) {
-      showNotification(NotificationService.error(error.message));
+      console.error('Error updating LGA delivery fee:', error);
+      showNotification('error', error.response?.data?.message || error.message || `Failed to update delivery fee for ${lga}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleBulkUpdate = async () => {
+    if (Object.keys(tempValues).length === 0) {
+      showNotification('error', 'No changes to save');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      console.log('Bulk updating delivery fees:', tempValues);
+      const response = await api.post('/admin/update-delivery-fees', null, { params: tempValues });
+      console.log('Bulk update response:', response.data);
+      
+      const data = response.data;
+      
+      if (data.code === 200) {
+        if (data.delivery_fees) {
+          setDeliveryFees(data.delivery_fees);
+        } else {
+          setDeliveryFees(prev => 
+            prev.map(fee => 
+              tempValues[fee.state] !== undefined
+                ? { ...fee, delivery_fee: parseInt(tempValues[fee.state]) }
+                : fee
+            )
+          );
+        }
+        setEditingStates(new Set());
+        setTempValues({});
+        
+        showNotification('success', 'All delivery fees updated successfully');
+      } else {
+        throw new Error(data.message || 'Failed to update delivery fees');
+      }
+    } catch (error) {
+      console.error('Error updating delivery fees:', error);
+      showNotification('error', error.message || 'Failed to update delivery fees');
     } finally {
       setSaving(false);
     }
@@ -217,42 +264,66 @@ const DeliveryFeeAdmin = () => {
 
   const handleBulkLGAUpdate = async () => {
     if (Object.keys(tempLGAValues).length === 0) {
-      showNotification(NotificationService.error('No LGA changes to save'));
+      showNotification('error', 'No LGA changes to save');
       return;
     }
 
     setSaving(true);
     try {
-      const result = await LagosLGAService.updateBulkLGAFees(tempLGAValues);
+      console.log('Bulk updating Lagos LGA fees:', tempLGAValues);
+      // Following your API pattern: POST /api/admin/update-lagos-lgas?LGA1={price1}&LGA2={price2}
+      const response = await api.post('/admin/update-lagos-lgas', null, { params: tempLGAValues });
+      console.log('Bulk LGA update response:', response.data);
       
-      if (result.data) {
-        setLagosLGAs(result.data);
+      const data = response.data;
+      
+      if (data.code === 200) {
+        if (data.lgas) {
+          setLagosLGAs(data.lgas);
+        } else {
+          // Fallback: update local state manually if API doesn't return updated data
+          setLagosLGAs(prev => 
+            prev.map(item => 
+              tempLGAValues[item.lga] !== undefined
+                ? { ...item, delivery_fee: parseInt(tempLGAValues[item.lga]) }
+                : item
+            )
+          );
+        }
+        setEditingLGAs(new Set());
+        setTempLGAValues({});
+        showNotification('success', data.message || 'All Lagos LGA fees updated successfully');
       } else {
-        setLagosLGAs(prev => 
-          prev.map(item => 
-            tempLGAValues[item.lga] !== undefined
-              ? { ...item, delivery_fee: parseInt(tempLGAValues[item.lga]) }
-              : item
-          )
-        );
+        throw new Error(data.message || 'Failed to update LGA fees');
       }
-      
-      setEditingLGAs(new Set());
-      setTempLGAValues({});
-      showNotification(NotificationService.success(result.message));
     } catch (error) {
-      showNotification(NotificationService.error(error.message));
+      console.error('Error updating LGA fees:', error);
+      showNotification('error', error.response?.data?.message || error.message || 'Failed to update LGA fees');
     } finally {
       setSaving(false);
     }
   };
 
-  // Computed values
-  const filteredFees = DeliveryFeeUtils.filterBySearch(deliveryFees, searchTerm, 'state');
-  const filteredLGAs = DeliveryFeeUtils.filterBySearch(lagosLGAs, searchTerm, 'lga');
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      minimumFractionDigits: 0
+    }).format(price);
+  };
+
+  const filteredFees = deliveryFees.filter(fee =>
+    fee.state.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredLGAs = lagosLGAs.filter(lga =>
+    lga.lga.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   const totalStatesEditing = editingStates.size;
   const totalLGAsEditing = editingLGAs.size;
-  const averageFee = DeliveryFeeUtils.calculateAverageFee(deliveryFees);
+
+  const isLagosState = (state) => state.toLowerCase() === 'lagos';
 
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen">
@@ -261,9 +332,7 @@ const DeliveryFeeAdmin = () => {
         <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg flex items-center gap-2 ${
           notification.type === 'success' 
             ? 'bg-green-100 text-green-800 border border-green-200' 
-            : notification.type === 'error'
-            ? 'bg-red-100 text-red-800 border border-red-200'
-            : 'bg-blue-100 text-blue-800 border border-blue-200'
+            : 'bg-red-100 text-red-800 border border-red-200'
         }`}>
           {notification.type === 'success' ? (
             <CheckCircle className="w-5 h-5" />
@@ -307,7 +376,10 @@ const DeliveryFeeAdmin = () => {
 
           <div className="flex gap-2">
             <button
-              onClick={loadInitialData}
+              onClick={() => {
+                fetchDeliveryFees();
+                fetchLagosLGAs();
+              }}
               disabled={loading}
               className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
             >
@@ -370,7 +442,10 @@ const DeliveryFeeAdmin = () => {
             <div>
               <p className="text-sm font-medium text-gray-600">Average State Fee</p>
               <p className="text-2xl font-bold text-gray-900">
-                {DeliveryFeeUtils.formatPrice(averageFee)}
+                {deliveryFees.length > 0 
+                  ? formatPrice(deliveryFees.reduce((sum, fee) => sum + fee.delivery_fee, 0) / deliveryFees.length)
+                  : formatPrice(0)
+                }
               </p>
             </div>
             <div className="p-3 bg-green-100 rounded-full">
@@ -392,6 +467,22 @@ const DeliveryFeeAdmin = () => {
         </div>
       </div>
 
+      {/* Instructions */}
+      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-blue-800">
+            <p className="font-medium mb-1">How to use:</p>
+            <ul className="list-disc list-inside space-y-1 text-blue-700">
+              <li>Click the edit icon to modify a delivery fee for any state</li>
+              <li>You can edit multiple states at once and save all changes together</li>
+              <li>Use the search box to quickly find specific states</li>
+              <li>Changes will be immediately reflected on the checkout page</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
       {/* Delivery Fees Table */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
@@ -403,7 +494,7 @@ const DeliveryFeeAdmin = () => {
               </span>
             )}
           </h2>
-        </div>
+        </div>        
 
         {loading ? (
           <div className="p-8 text-center">
@@ -437,7 +528,7 @@ const DeliveryFeeAdmin = () => {
                     <tr className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          {DeliveryFeeUtils.isLagosState(fee.state) && (
+                          {isLagosState(fee.state) && (
                             <button
                               onClick={() => setExpandedLagos(!expandedLagos)}
                               className="p-1 hover:bg-gray-200 rounded mr-2"
@@ -456,7 +547,7 @@ const DeliveryFeeAdmin = () => {
                             <div className="text-sm font-medium text-gray-900">
                               {fee.state}
                             </div>
-                            {DeliveryFeeUtils.isLagosState(fee.state) && (
+                            {isLagosState(fee.state) && (
                               <div className="text-xs text-gray-500">
                                 {lagosLGAs.length} LGAs available
                               </div>
@@ -482,8 +573,8 @@ const DeliveryFeeAdmin = () => {
                           </div>
                         ) : (
                           <div className="text-sm text-gray-900 font-medium">
-                            {DeliveryFeeUtils.formatPrice(fee.delivery_fee)}
-                            {DeliveryFeeUtils.isLagosState(fee.state) && (
+                            {formatPrice(fee.delivery_fee)}
+                            {isLagosState(fee.state) && (
                               <span className="ml-2 text-xs text-gray-500">(Base rate)</span>
                             )}
                           </div>
@@ -519,7 +610,7 @@ const DeliveryFeeAdmin = () => {
                     </tr>
                     
                     {/* Lagos LGAs Sub-table */}
-                    {DeliveryFeeUtils.isLagosState(fee.state) && expandedLagos && (
+                    {isLagosState(fee.state) && expandedLagos && (
                       <tr>
                         <td colSpan="3" className="px-6 py-4 bg-gray-50">
                           <div className="space-y-2">
@@ -565,7 +656,7 @@ const DeliveryFeeAdmin = () => {
                                       ) : (
                                         <div className="flex items-center gap-2">
                                           <span className="text-xs font-medium text-gray-900">
-                                            {DeliveryFeeUtils.formatPrice(lgaItem.delivery_fee)}
+                                            {formatPrice(lgaItem.delivery_fee)}
                                           </span>
                                           <button
                                             onClick={() => handleLGAEdit(lgaItem.lga)}

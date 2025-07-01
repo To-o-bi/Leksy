@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Image, Plus, X, AlertCircle, CheckCircle } from 'lucide-react';
 import { productService } from '../../../api/services';
 
@@ -148,9 +149,8 @@ const AddProductPage = () => {
         
         // Reset form and redirect after successful submission
         setTimeout(() => {
-          // In real app, navigate to product stock page
-          window.location.href = '/admin/products/stock';
-          // Or if using React Router: navigate('/admin/products/stock');
+          
+         navigate('/admin/products/stock');
         }, 2000);
       } else {
         throw new Error(result?.message || 'Failed to add product');
@@ -290,7 +290,7 @@ const AddProductPage = () => {
       handleFileSelection(e.dataTransfer.files);
     }
   };
-
+  const navigate = useNavigate();
   const handleBack = () => {
     const hasChanges = Object.values(formData).some(value => 
       typeof value === 'string' ? value.trim() !== '' : 
@@ -301,7 +301,7 @@ const AddProductPage = () => {
       return;
     }
     
-    // In real app: navigate('/admin/products');
+    navigate('/admin/products');
     console.log('Would navigate back to products list...');
   };
 

@@ -3,14 +3,6 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import AdminLayout from '../admin/components/layout/AdminLayout';
 
-/**
- * ProtectedRoute component
- * Enhanced security wrapper for admin routes
- * - Checks authentication status
- * - Shows loading state during authentication check
- * - Redirects to login with proper state preservation
- * - Wraps content in AdminLayout once authenticated
- */
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading, isAdmin, user } = useAuth();
   const location = useLocation();
@@ -19,10 +11,11 @@ const ProtectedRoute = ({ children }) => {
   console.log('ProtectedRoute check:', { 
     isAuthenticated, 
     isAdmin,
-    user,
+    user: user ? { id: user.id, name: user.name || user.username } : null,
     isLoading, 
     pathname: location.pathname,
-    token: localStorage.getItem('auth_token') ? 'exists' : 'missing'
+    // Use the proper token check from the auth context instead of direct localStorage access
+    hasToken: isAuthenticated ? 'yes' : 'no'
   });
   
   // Show loading state while authentication is being checked
@@ -38,18 +31,24 @@ const ProtectedRoute = ({ children }) => {
   }
 
   // First check: Redirect to login if not authenticated
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user) {
+    console.log('🚫 Redirecting to login: User not authenticated');
     // Store the current location in state to redirect back after login
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
   
   // Second check: Verify user has admin privileges
   if (!isAdmin) {
-    // Redirect unauthorized users to the homepage
-    return <Navigate to="/" replace />;
+    console.log('🚫 Redirecting to login: User lacks admin privileges');
+    // Redirect unauthorized users to the login page with an error message
+    return <Navigate to="/admin/login" state={{ 
+      from: location, 
+      error: 'Admin privileges required' 
+    }} replace />;
   }
 
   // User is authenticated and has admin rights, render admin layout with children
+  console.log('✅ Access granted: Rendering admin content');
   return <AdminLayout>{children}</AdminLayout>;
 };
 
