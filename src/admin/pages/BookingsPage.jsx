@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Eye, RefreshCw, AlertCircle, Calendar, Phone, Mail, User, CheckCircle } from 'lucide-react';
+import api from '../../api/axios'; // Import your ApiClient
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState([]);
@@ -75,44 +76,31 @@ const BookingsPage = () => {
     }).format(amount);
   };
 
-  // Fetch consultations/bookings
+  // Fetch consultations/bookings using ApiClient
   const fetchBookings = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Get admin token from localStorage
-      const token = localStorage.getItem('token');
+      // Check if user is authenticated
+      const token = api.getToken();
       if (!token) {
         throw new Error('Admin authentication required. Please log in as admin.');
       }
 
-      const filters = {
-        limit: 100
-      };
+      console.log('🔍 Fetching consultations with token:', token ? token.substring(0, 20) + '...' : 'NO TOKEN');
 
-      // Use fetch to call the consultations API
-      const response = await fetch('https://leksycosmetics.com/api/fetch-consultations', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      // Use the ApiClient to fetch consultations
+      const response = await api.get('admin/fetch-consultations', {
+        limit: 100
       });
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Unauthorized. Please log in as admin.');
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      console.log('✅ Consultations response:', response.data);
       
-      if (data && data.code === 200) {
+      if (response.data && response.data.code === 200) {
         // Handle both coming and past consultations as per API structure
-        const comingConsultations = data.coming_consultations || [];
-        const pastConsultations = data.past_consultations || [];
+        const comingConsultations = response.data.coming_consultations || [];
+        const pastConsultations = response.data.past_consultations || [];
         const allConsultations = [...comingConsultations, ...pastConsultations];
         
         const formattedBookings = allConsultations.map((consultation) => ({
@@ -142,17 +130,20 @@ const BookingsPage = () => {
         }));
         
         setBookings(formattedBookings);
+        console.log('✅ Processed bookings:', formattedBookings.length);
       } else {
-        throw new Error(data?.message || 'Failed to fetch consultation bookings');
+        throw new Error(response.data?.message || 'Failed to fetch consultation bookings');
       }
     } catch (err) {
-      console.error('Error fetching bookings:', err);
+      console.error('❌ Error fetching bookings:', err);
       
       let errorMessage = 'Failed to load consultation bookings';
       
-      if (err.message.includes('Unauthorized') || 
+      if (err.response?.status === 401 || 
+          err.message.includes('Unauthorized') || 
           err.message.includes('authentication') ||
-          err.message.includes('Admin')) {
+          err.message.includes('Admin') ||
+          err.isAPILevel401) {
         errorMessage = 'Admin authentication required. Please ensure you are logged in as an admin to view consultation bookings.';
       } else if (err.message) {
         errorMessage = err.message;
@@ -218,14 +209,22 @@ const BookingsPage = () => {
         message: `Session status updated to "${newStatus}"`
       });
       
-      // Here you would make the actual API call to update the status
-      // await updateConsultationStatus(id, newStatus);
+      // TODO: Implement actual API call to update the status
+      // const response = await api.put(`/admin/consultation/${id}/status`, {
+      //   session_held_status: newStatus
+      // });
       
     } catch (err) {
+      console.error('❌ Error updating session status:', err);
       setNotification({
         type: 'error',
         message: 'Failed to update session status'
       });
+      
+      // Revert the local state change
+      setBookings(prev => prev.map(booking => 
+        booking.id === id ? { ...booking, sessionStatus: booking.sessionStatus } : booking
+      ));
     } finally {
       setIsUpdating(false);
     }
@@ -235,6 +234,25 @@ const BookingsPage = () => {
   const viewBookingDetails = (booking) => {
     setSelectedBooking(booking);
     setShowModal(true);
+  };
+
+  // Debug auth state
+  const debugAuth = () => {
+    console.log('🔍 BookingsPage Auth Debug:');
+    const authState = api.debugAuth();
+    console.log(authState);
+    
+    if (!authState.hasToken) {
+      setNotification({
+        type: 'error',
+        message: 'No authentication token found. Please log in as admin.'
+      });
+    } else {
+      setNotification({
+        type: 'success',
+        message: 'Authentication token found and valid.'
+      });
+    }
   };
 
   // Auto-dismiss notifications
@@ -285,21 +303,29 @@ const BookingsPage = () => {
             {error.includes('authentication') || error.includes('Admin') ? 'Authentication Required' : 'Error Loading Bookings'}
           </h3>
           <p className="text-gray-600 mb-4">{error}</p>
-          {error.includes('authentication') || error.includes('Admin') ? (
+          <div className="flex justify-center space-x-3">
+            {error.includes('authentication') || error.includes('Admin') ? (
+              <button 
+                onClick={() => window.location.href = '/admin/login'}
+                className="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600"
+              >
+                Go to Login
+              </button>
+            ) : (
+              <button 
+                onClick={fetchBookings}
+                className="bg-pink-500 text-white px-6 py-2 rounded-md hover:bg-pink-600"
+              >
+                Try Again
+              </button>
+            )}
             <button 
-              onClick={() => window.location.href = '/admin/login'}
-              className="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 mr-2"
+              onClick={debugAuth}
+              className="bg-gray-500 text-white px-6 py-2 rounded-md hover:bg-gray-600"
             >
-              Go to Login
+              Debug Auth
             </button>
-          ) : (
-            <button 
-              onClick={fetchBookings}
-              className="bg-pink-500 text-white px-6 py-2 rounded-md hover:bg-pink-600"
-            >
-              Try Again
-            </button>
-          )}
+          </div>
         </div>
       </div>
     );
@@ -328,14 +354,22 @@ const BookingsPage = () => {
               {loading ? 'Loading...' : `${filteredBookings.length} of ${bookings.length} consultations`}
             </p>
           </div>
-          <button 
-            onClick={fetchBookings}
-            className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-md flex items-center"
-            disabled={loading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+          <div className="flex space-x-2">
+            <button 
+              onClick={debugAuth}
+              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md flex items-center text-sm"
+            >
+              Debug Auth
+            </button>
+            <button 
+              onClick={fetchBookings}
+              className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-md flex items-center"
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* Search and Filters */}
