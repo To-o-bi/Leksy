@@ -87,10 +87,10 @@ const LoginPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Checking authentication...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-pink-200 border-t-pink-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 font-medium">Verifying credentials...</p>
         </div>
       </div>
     );
@@ -99,112 +99,148 @@ const LoginPage = () => {
   const urlMessage = getUrlMessage();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <div className="max-w-md w-full space-y-8">
-        
-        <div className="text-center">
-          <div className="mx-auto h-16 w-16 rounded-full bg-blue-500 flex items-center justify-center shadow-lg">
-            <LogIn className="h-8 w-8 text-white" />
-          </div>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">Admin Login</h2>
-          <p className="mt-2 text-sm text-gray-600">Sign in to manage Leksy Cosmetics</p>
-        </div>
-        
-        {urlMessage && (
-          <div className={`p-4 rounded-md border ${
-            urlMessage.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 
-            urlMessage.type === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
-            'bg-blue-50 border-blue-200 text-blue-800'
-          }`}>
-            <div className="flex items-center">
-              <AlertCircle className="w-5 h-5 mr-2" />
-              <span className="text-sm">{urlMessage.message}</span>
-            </div>
-          </div>
-        )}
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          
-          <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-            <input
-              id="username"
-              name="username"
-              type="text"
-              required
-              className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                error ? 'border-red-300' : 'border-gray-300'
-              }`}
-              placeholder="Enter username"
-              value={formData.username}
-              onChange={handleChange}
-              disabled={isSubmitting}
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <div className="relative">
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                required
-                className={`w-full px-3 py-2 pr-10 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  error ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Enter password"
-                value={formData.password}
-                onChange={handleChange}
-                disabled={isSubmitting}
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-rose-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full">
+        {/* Main Card */}
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          {/* Header Section */}
+          <div className="px-8 pt-8 pb-6 text-center bg-gradient-to-r from-pink-600 to-rose-600">
+            <div className="mx-auto h-16 w-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 shadow-lg">
+              <img 
+                src="/assets/images/icons/leksy-white.png" 
+                alt="Leksy Cosmetics Logo" 
+                className="h-10 w-10 object-contain"
               />
-              <button
-                type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                onClick={() => setShowPassword(!showPassword)}
-                disabled={isSubmitting}
-              >
-                {showPassword ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
-              </button>
             </div>
+            <h2 className="text-2xl font-bold text-white">Admin Portal</h2>
+            <p className="text-pink-100 text-sm mt-1">Leksy Cosmetics Management</p>
           </div>
-          
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-              <div className="flex items-center">
-                <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
-                <span className="text-sm text-red-800">{error}</span>
-              </div>
-            </div>
-          )}
-          
-          <button
-            type="submit"
-            disabled={isSubmitting || !formData.username || !formData.password}
-            className={`w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
-              isSubmitting || !formData.username || !formData.password
-                ? 'bg-gray-400 cursor-not-allowed' 
-                : 'bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500'
-            }`}
-          >
-            {isSubmitting ? (
-              <div className="flex items-center">
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Signing in...
-              </div>
-            ) : (
-              <div className="flex items-center">
-                <LogIn className="w-4 h-4 mr-2" />
-                Sign in
+
+          {/* Content Section */}
+          <div className="px-8 py-8">
+            {/* URL Message */}
+            {urlMessage && (
+              <div className={`mb-6 p-4 rounded-xl border ${
+                urlMessage.type === 'error' ? 'bg-red-50 border-red-200' : 
+                urlMessage.type === 'warning' ? 'bg-amber-50 border-amber-200' :
+                'bg-blue-50 border-blue-200'
+              }`}>
+                <div className="flex items-center">
+                  <AlertCircle className={`w-5 h-5 mr-3 ${
+                    urlMessage.type === 'error' ? 'text-red-500' : 
+                    urlMessage.type === 'warning' ? 'text-amber-500' :
+                    'text-blue-500'
+                  }`} />
+                  <span className={`text-sm font-medium ${
+                    urlMessage.type === 'error' ? 'text-red-800' : 
+                    urlMessage.type === 'warning' ? 'text-amber-800' :
+                    'text-blue-800'
+                  }`}>{urlMessage.message}</span>
+                </div>
               </div>
             )}
-          </button>
-          
-        </form>
+            
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Username Field */}
+              <div className="space-y-2">
+                <label htmlFor="username" className="block text-sm font-semibold text-gray-700">
+                  Username
+                </label>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  required
+                  className={`w-full px-4 py-3 border-2 rounded-xl transition-all duration-200 focus:ring-4 focus:ring-pink-100 focus:border-pink-500 outline-none ${
+                    error ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50 focus:bg-white'
+                  }`}
+                  placeholder="Enter your username"
+                  value={formData.username}
+                  onChange={handleChange}
+                  disabled={isSubmitting}
+                />
+              </div>
+              
+              {/* Password Field */}
+              <div className="space-y-2">
+                <label htmlFor="password" className="block text-sm font-semibold text-gray-700">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    className={`w-full px-4 py-3 pr-12 border-2 rounded-xl transition-all duration-200 focus:ring-4 focus:ring-pink-100 focus:border-pink-500 outline-none ${
+                      error ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50 focus:bg-white'
+                    }`}
+                    placeholder="Enter your password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    disabled={isSubmitting}
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-gray-700 transition-colors"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={isSubmitting}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+              
+              {/* Error Message */}
+              {error && (
+                <div className="p-4 bg-red-50 border-2 border-red-200 rounded-xl">
+                  <div className="flex items-center">
+                    <AlertCircle className="w-5 h-5 text-red-500 mr-3 flex-shrink-0" />
+                    <span className="text-sm font-medium text-red-800">{error}</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isSubmitting || !formData.username || !formData.password}
+                className={`w-full flex justify-center items-center py-3.5 px-4 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                  isSubmitting || !formData.username || !formData.password
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 focus:ring-4 focus:ring-pink-200'
+                }`}
+              >
+                {isSubmitting ? (
+                  <div className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-current" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Signing in...
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    <LogIn className="w-5 h-5 mr-2" />
+                    Sign In
+                  </div>
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* Footer */}
+          <div className="px-8 py-4 bg-gray-50 border-t border-gray-100">
+            <p className="text-xs text-gray-500 text-center">
+              Secure admin access for authorized personnel only
+            </p>
+          </div>
+        </div>
         
+        {/* Bottom Text */}
+        <p className="mt-6 text-center text-sm text-gray-600">
+          © 2025 Leksy Cosmetics. All rights reserved.
+        </p>
       </div>
     </div>
   );
