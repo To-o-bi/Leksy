@@ -606,7 +606,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-consultation?consultat
 ## Fetch All Consultations
 
 ```CURL
-curl --location --request GET '{base_url}/api/fetch-consultations?&payment_status={payment_status|default:successful|optional}&session_held_status={session_held_status|default:all:except:unpaid|optional}&limit={limit|integer|optional}' \
+curl --location --request GET '{base_url}/api/admin/fetch-consultations?&payment_status={payment_status|default:successful|optional}&session_held_status={session_held_status|default:all:except:unpaid|optional}&limit={limit|integer|optional}' \
 --header 'Authorization: Bearer {token}'
 ```
 
