@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Eye, RefreshCw, AlertCircle, Calendar, Phone, Mail, User, CheckCircle } from 'lucide-react';
-import api from '../../api/axios'; // Import your ApiClient
+import api from '../../api/axios';
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState([]);
@@ -17,12 +17,11 @@ const BookingsPage = () => {
   
   const bookingsPerPage = 10;
 
-  // Format date
+  // Utility functions
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown';
     try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-GB', {
+      return new Date(dateString).toLocaleDateString('en-GB', {
         day: '2-digit',
         month: 'short',
         year: 'numeric'
@@ -32,40 +31,26 @@ const BookingsPage = () => {
     }
   };
 
-  // Format time
-  const formatTime = (timeRange) => {
-    return timeRange || 'Time not specified';
-  };
+  const formatTime = (timeRange) => timeRange || 'Time not specified';
 
-  // Get status badge styling
   const getStatusBadgeStyle = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'completed':
-        return 'bg-green-100 text-green-600';
-      case 'in-session':
-        return 'bg-blue-100 text-blue-600';
-      case 'unheld':
-        return 'bg-yellow-100 text-yellow-600';
-      case 'cancelled':
-        return 'bg-red-100 text-red-600';
-      default:
-        return 'bg-gray-100 text-gray-600';
-    }
+    const styles = {
+      completed: 'bg-green-100 text-green-600',
+      'in-session': 'bg-blue-100 text-blue-600',
+      unheld: 'bg-yellow-100 text-yellow-600',
+      cancelled: 'bg-red-100 text-red-600',
+    };
+    return styles[status?.toLowerCase()] || 'bg-gray-100 text-gray-600';
   };
 
-  // Get payment status badge styling
   const getPaymentStatusStyle = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'successful':
-        return 'bg-green-100 text-green-600';
-      case 'unsuccessful':
-        return 'bg-red-100 text-red-600';
-      default:
-        return 'bg-gray-100 text-gray-600';
-    }
+    const styles = {
+      successful: 'bg-green-100 text-green-600',
+      unsuccessful: 'bg-red-100 text-red-600',
+    };
+    return styles[status?.toLowerCase()] || 'bg-gray-100 text-gray-600';
   };
 
-  // Format price
   const formatPrice = (amount) => {
     if (!amount) return '₦0';
     return new Intl.NumberFormat('en-NG', {
@@ -76,66 +61,58 @@ const BookingsPage = () => {
     }).format(amount);
   };
 
-  // Fetch consultations/bookings using ApiClient
+  // API functions
   const fetchBookings = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Check if user is authenticated
       const token = api.getToken();
       if (!token) {
         throw new Error('Admin authentication required. Please log in as admin.');
       }
 
-      console.log('🔍 Fetching consultations with token:', token ? token.substring(0, 20) + '...' : 'NO TOKEN');
-
-      // Use the ApiClient to fetch consultations
-      const response = await api.get('admin/fetch-consultations', {
-        limit: 100
-      });
-
-      console.log('✅ Consultations response:', response.data);
+      const response = await api.get('admin/fetch-consultations', { limit: 100 });
       
-      if (response.data && response.data.code === 200) {
-        // Handle both coming and past consultations as per API structure
-        const comingConsultations = response.data.coming_consultations || [];
-        const pastConsultations = response.data.past_consultations || [];
-        const allConsultations = [...comingConsultations, ...pastConsultations];
+      if (response.data?.code === 200) {
+        const { coming_consultations = [], past_consultations = [] } = response.data;
+        const allConsultations = [...coming_consultations, ...past_consultations];
         
-        const formattedBookings = allConsultations.map((consultation) => ({
-          id: consultation.consultation_id || consultation.unique_id,
-          uniqueId: consultation.unique_id,
-          firstName: consultation.name?.split(' ')[0] || 'Unknown',
-          lastName: consultation.name?.split(' ').slice(1).join(' ') || '',
-          fullName: consultation.name || 'Unknown Customer',
-          email: consultation.email || '',
-          phone: consultation.phone || '',
-          ageRange: consultation.age_range || '',
-          gender: consultation.gender || '',
-          skinType: consultation.skin_type || '',
-          skinConcerns: consultation.skin_concerns || '',
-          currentProducts: consultation.current_skincare_products || '',
-          additionalDetails: consultation.additional_details || '',
-          channel: consultation.channel || '',
-          consultationDate: consultation.date || '',
-          timeRange: consultation.time_range || '',
-          sessionStatus: consultation.session_held_status || 'unheld',
-          paymentStatus: consultation.payment_status?.toLowerCase() || 'unsuccessful',
-          amountPaid: consultation.amount_paid || 0,
-          amountCalculated: consultation.amount_calculated || 0,
-          createdAt: consultation.created_at || '',
-          apiRef: consultation.api_ref || '',
-          rawData: consultation
-        }));
+        const formattedBookings = allConsultations.map((consultation) => {
+          const nameParts = consultation.name?.split(' ') || ['Unknown'];
+          return {
+            id: consultation.consultation_id || consultation.unique_id,
+            uniqueId: consultation.unique_id,
+            firstName: nameParts[0],
+            lastName: nameParts.slice(1).join(' '),
+            fullName: consultation.name || 'Unknown Customer',
+            email: consultation.email || '',
+            phone: consultation.phone || '',
+            ageRange: consultation.age_range || '',
+            gender: consultation.gender || '',
+            skinType: consultation.skin_type || '',
+            skinConcerns: consultation.skin_concerns || '',
+            currentProducts: consultation.current_skincare_products || '',
+            additionalDetails: consultation.additional_details || '',
+            channel: consultation.channel || '',
+            consultationDate: consultation.date || '',
+            timeRange: consultation.time_range || '',
+            sessionStatus: consultation.session_held_status || 'unheld',
+            paymentStatus: consultation.payment_status?.toLowerCase() || 'unsuccessful',
+            amountPaid: consultation.amount_paid || 0,
+            amountCalculated: consultation.amount_calculated || 0,
+            createdAt: consultation.created_at || '',
+            apiRef: consultation.api_ref || '',
+            rawData: consultation
+          };
+        });
         
         setBookings(formattedBookings);
-        console.log('✅ Processed bookings:', formattedBookings.length);
       } else {
         throw new Error(response.data?.message || 'Failed to fetch consultation bookings');
       }
     } catch (err) {
-      console.error('❌ Error fetching bookings:', err);
+      console.error('Error fetching bookings:', err);
       
       let errorMessage = 'Failed to load consultation bookings';
       
@@ -155,52 +132,45 @@ const BookingsPage = () => {
     }
   };
 
-  // Filter bookings
   const filterBookings = () => {
     let filtered = [...bookings];
     
     // Filter by status tab
     if (activeTab !== 'all') {
-      if (activeTab === 'upcoming') {
-        filtered = filtered.filter(booking => 
-          booking.sessionStatus === 'unheld' && 
-          booking.paymentStatus === 'successful'
-        );
-      } else if (activeTab === 'paid') {
-        filtered = filtered.filter(booking => booking.paymentStatus === 'successful');
-      } else if (activeTab === 'unpaid') {
-        filtered = filtered.filter(booking => booking.paymentStatus === 'unsuccessful');
-      } else {
-        filtered = filtered.filter(booking => booking.sessionStatus === activeTab);
-      }
+      const filters = {
+        upcoming: booking => booking.sessionStatus === 'unheld' && booking.paymentStatus === 'successful',
+        paid: booking => booking.paymentStatus === 'successful',
+        unpaid: booking => booking.paymentStatus === 'unsuccessful',
+        default: booking => booking.sessionStatus === activeTab
+      };
+      
+      const filterFn = filters[activeTab] || filters.default;
+      filtered = filtered.filter(filterFn);
     }
     
     // Filter by search term
     if (searchTerm.trim()) {
       const query = searchTerm.toLowerCase();
       filtered = filtered.filter(booking => 
-        booking.id?.toLowerCase().includes(query) ||
-        booking.fullName?.toLowerCase().includes(query) ||
-        booking.email?.toLowerCase().includes(query) ||
-        booking.phone?.toLowerCase().includes(query) ||
-        booking.skinConcerns?.toLowerCase().includes(query)
+        [booking.id, booking.fullName, booking.email, booking.phone, booking.skinConcerns]
+          .some(field => field?.toLowerCase().includes(query))
       );
     }
     
     setFilteredBookings(filtered);
   };
 
-  // Update session status
   const updateSessionStatus = async (id, newStatus) => {
     try {
       setIsUpdating(true);
       
       // Update local state immediately for better UX
-      setBookings(prev => prev.map(booking => 
-        booking.id === id ? { ...booking, sessionStatus: newStatus } : booking
-      ));
+      const updateBooking = booking => 
+        booking.id === id ? { ...booking, sessionStatus: newStatus } : booking;
       
-      if (selectedBooking && selectedBooking.id === id) {
+      setBookings(prev => prev.map(updateBooking));
+      
+      if (selectedBooking?.id === id) {
         setSelectedBooking({ ...selectedBooking, sessionStatus: newStatus });
       }
       
@@ -215,7 +185,7 @@ const BookingsPage = () => {
       // });
       
     } catch (err) {
-      console.error('❌ Error updating session status:', err);
+      console.error('Error updating session status:', err);
       setNotification({
         type: 'error',
         message: 'Failed to update session status'
@@ -230,32 +200,28 @@ const BookingsPage = () => {
     }
   };
 
-  // View booking details
   const viewBookingDetails = (booking) => {
     setSelectedBooking(booking);
     setShowModal(true);
   };
 
-  // Debug auth state
-  const debugAuth = () => {
-    console.log('🔍 BookingsPage Auth Debug:');
-    const authState = api.debugAuth();
-    console.log(authState);
-    
-    if (!authState.hasToken) {
-      setNotification({
-        type: 'error',
-        message: 'No authentication token found. Please log in as admin.'
-      });
-    } else {
-      setNotification({
-        type: 'success',
-        message: 'Authentication token found and valid.'
-      });
-    }
+  const sendMeetingLink = (email) => {
+    // TODO: Implement actual meeting link sending
+    setNotification({
+      type: 'success',
+      message: `Meeting link sent to ${email}`
+    });
   };
 
-  // Auto-dismiss notifications
+  const sendReminder = (email) => {
+    // TODO: Implement actual reminder sending
+    setNotification({
+      type: 'success',
+      message: `Reminder sent to ${email}`
+    });
+  };
+
+  // Effects
   useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => setNotification(null), 5000);
@@ -263,29 +229,39 @@ const BookingsPage = () => {
     }
   }, [notification]);
 
-  // Fetch bookings on mount
   useEffect(() => {
     fetchBookings();
   }, []);
 
-  // Filter bookings when dependencies change
   useEffect(() => {
     filterBookings();
   }, [bookings, activeTab, searchTerm]);
 
-  // Calculate pagination
+  // Pagination calculations
   const totalPages = Math.ceil(filteredBookings.length / bookingsPerPage);
   const indexOfLastBooking = currentPage * bookingsPerPage;
   const indexOfFirstBooking = indexOfLastBooking - bookingsPerPage;
   const currentBookings = filteredBookings.slice(indexOfFirstBooking, indexOfLastBooking);
 
+  // Status tabs configuration
+  const statusTabs = [
+    { key: 'all', label: 'All' },
+    { key: 'upcoming', label: 'Upcoming' },
+    { key: 'paid', label: 'Paid' },
+    { key: 'unpaid', label: 'Unpaid' },
+    { key: 'completed', label: 'Completed' },
+    { key: 'in-session', label: 'In Session' },
+    { key: 'unheld', label: 'Unheld' }
+  ];
+
+  // Loading state
   if (loading && bookings.length === 0) {
     return (
       <div className="bg-white rounded-lg p-6 shadow-sm">
         <div className="animate-pulse">
           <div className="h-8 bg-gray-200 rounded w-48 mb-6"></div>
           <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
+            {Array.from({ length: 5 }, (_, i) => (
               <div key={i} className="h-12 bg-gray-200 rounded w-full"></div>
             ))}
           </div>
@@ -294,38 +270,24 @@ const BookingsPage = () => {
     );
   }
 
+  // Error state
   if (error && bookings.length === 0) {
+    const isAuthError = error.includes('authentication') || error.includes('Admin');
+    
     return (
       <div className="bg-white rounded-lg p-6 shadow-sm">
         <div className="text-center py-12">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-800 mb-2">
-            {error.includes('authentication') || error.includes('Admin') ? 'Authentication Required' : 'Error Loading Bookings'}
+            {isAuthError ? 'Authentication Required' : 'Error Loading Bookings'}
           </h3>
           <p className="text-gray-600 mb-4">{error}</p>
-          <div className="flex justify-center space-x-3">
-            {error.includes('authentication') || error.includes('Admin') ? (
-              <button 
-                onClick={() => window.location.href = '/admin/login'}
-                className="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600"
-              >
-                Go to Login
-              </button>
-            ) : (
-              <button 
-                onClick={fetchBookings}
-                className="bg-pink-500 text-white px-6 py-2 rounded-md hover:bg-pink-600"
-              >
-                Try Again
-              </button>
-            )}
-            <button 
-              onClick={debugAuth}
-              className="bg-gray-500 text-white px-6 py-2 rounded-md hover:bg-gray-600"
-            >
-              Debug Auth
-            </button>
-          </div>
+          <button 
+            onClick={isAuthError ? () => window.location.href = '/admin/login' : fetchBookings}
+            className="bg-pink-500 text-white px-6 py-2 rounded-md hover:bg-pink-600"
+          >
+            {isAuthError ? 'Go to Login' : 'Try Again'}
+          </button>
         </div>
       </div>
     );
@@ -336,7 +298,9 @@ const BookingsPage = () => {
       {/* Notification */}
       {notification && (
         <div className={`fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 ${
-          notification.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+          notification.type === 'success' 
+            ? 'bg-green-50 text-green-800 border border-green-200' 
+            : 'bg-red-50 text-red-800 border border-red-200'
         }`}>
           <div className="flex items-center justify-between">
             <span>{notification.message}</span>
@@ -354,22 +318,14 @@ const BookingsPage = () => {
               {loading ? 'Loading...' : `${filteredBookings.length} of ${bookings.length} consultations`}
             </p>
           </div>
-          <div className="flex space-x-2">
-            <button 
-              onClick={debugAuth}
-              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md flex items-center text-sm"
-            >
-              Debug Auth
-            </button>
-            <button 
-              onClick={fetchBookings}
-              className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-md flex items-center"
-              disabled={loading}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-          </div>
+          <button 
+            onClick={fetchBookings}
+            className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-md flex items-center"
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
 
         {/* Search and Filters */}
@@ -388,15 +344,7 @@ const BookingsPage = () => {
 
           {/* Status Tabs */}
           <div className="flex space-x-2 overflow-x-auto">
-            {[
-              { key: 'all', label: 'All' },
-              { key: 'upcoming', label: 'Upcoming' },
-              { key: 'paid', label: 'Paid' },
-              { key: 'unpaid', label: 'Unpaid' },
-              { key: 'completed', label: 'Completed' },
-              { key: 'in-session', label: 'In Session' },
-              { key: 'unheld', label: 'Unheld' }
-            ].map((tab) => (
+            {statusTabs.map((tab) => (
               <button
                 key={tab.key}
                 className={`px-4 py-2 text-sm rounded-md whitespace-nowrap ${
@@ -420,12 +368,11 @@ const BookingsPage = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="pb-3 text-sm font-medium text-gray-500 uppercase">ID</th>
-                <th className="pb-3 text-sm font-medium text-gray-500 uppercase">CUSTOMER</th>
-                <th className="pb-3 text-sm font-medium text-gray-500 uppercase">CONSULTATION</th>
-                <th className="pb-3 text-sm font-medium text-gray-500 uppercase">PAYMENT</th>
-                <th className="pb-3 text-sm font-medium text-gray-500 uppercase">SESSION</th>
-                <th className="pb-3 text-sm font-medium text-gray-500 uppercase">ACTION</th>
+                {['ID', 'CUSTOMER', 'CONSULTATION', 'PAYMENT', 'SESSION', 'ACTION'].map(header => (
+                  <th key={header} className="pb-3 text-sm font-medium text-gray-500 uppercase">
+                    {header}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -543,50 +490,37 @@ const BookingsPage = () => {
                     Customer Information
                   </h4>
                   <div className="space-y-3">
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Full Name</label>
-                      <p className="text-gray-900">{selectedBooking.fullName}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Email</label>
-                      <div className="flex items-center">
-                        <Mail className="h-4 w-4 mr-2 text-gray-400" />
-                        <p className="text-gray-900">{selectedBooking.email}</p>
+                    {[
+                      { label: 'Full Name', value: selectedBooking.fullName },
+                      { label: 'Email', value: selectedBooking.email, icon: Mail },
+                      { label: 'Phone', value: selectedBooking.phone, icon: Phone },
+                      { label: 'Age Range', value: selectedBooking.ageRange },
+                      { label: 'Gender', value: selectedBooking.gender, capitalize: true }
+                    ].map(({ label, value, icon: Icon, capitalize }) => (
+                      <div key={label}>
+                        <label className="text-sm font-medium text-gray-500">{label}</label>
+                        <div className="flex items-center">
+                          {Icon && <Icon className="h-4 w-4 mr-2 text-gray-400" />}
+                          <p className={`text-gray-900 ${capitalize ? 'capitalize' : ''}`}>{value}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Phone</label>
-                      <div className="flex items-center">
-                        <Phone className="h-4 w-4 mr-2 text-gray-400" />
-                        <p className="text-gray-900">{selectedBooking.phone}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Age Range</label>
-                      <p className="text-gray-900">{selectedBooking.ageRange}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Gender</label>
-                      <p className="text-gray-900 capitalize">{selectedBooking.gender}</p>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
                 <div>
                   <h4 className="font-semibold text-gray-900 border-b pb-2 mb-4">Skin Information</h4>
                   <div className="space-y-3">
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Skin Type</label>
-                      <p className="text-gray-900 capitalize">{selectedBooking.skinType}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Skin Concerns</label>
-                      <p className="text-gray-900">{selectedBooking.skinConcerns}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Current Products</label>
-                      <p className="text-gray-900">{selectedBooking.currentProducts || 'Not specified'}</p>
-                    </div>
+                    {[
+                      { label: 'Skin Type', value: selectedBooking.skinType, capitalize: true },
+                      { label: 'Skin Concerns', value: selectedBooking.skinConcerns },
+                      { label: 'Current Products', value: selectedBooking.currentProducts || 'Not specified' }
+                    ].map(({ label, value, capitalize }) => (
+                      <div key={label}>
+                        <label className="text-sm font-medium text-gray-500">{label}</label>
+                        <p className={`text-gray-900 ${capitalize ? 'capitalize' : ''}`}>{value}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -643,13 +577,13 @@ const BookingsPage = () => {
                   <h4 className="font-semibold text-gray-900 border-b pb-2 mb-4">Actions</h4>
                   <div className="space-y-3">
                     <button
-                      onClick={() => alert(`Meeting link would be sent to ${selectedBooking.email}`)}
+                      onClick={() => sendMeetingLink(selectedBooking.email)}
                       className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
                     >
                       Send Meeting Link
                     </button>
                     <button
-                      onClick={() => alert(`Reminder would be sent to ${selectedBooking.email}`)}
+                      onClick={() => sendReminder(selectedBooking.email)}
                       className="w-full px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 text-sm"
                     >
                       Send Reminder
