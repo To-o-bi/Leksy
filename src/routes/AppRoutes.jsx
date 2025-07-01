@@ -66,7 +66,7 @@ const AppRoutes = () => {
     <Suspense fallback={<LoadingFallback />}>
       <Routes>
         {/* Login Route */}
-        <Route path="/login" element={<LoginWrapper />} />
+        <Route path="admin/login" element={<LoginWrapper />} />
         
         {/* Public Routes */}
         <Route element={<PublicRoutes />}>

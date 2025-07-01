@@ -114,8 +114,13 @@ const newsletterService = {
 
       console.log('🔄 Attempting newsletter subscription for:', cleanEmail);
 
-      // FIXED: Send email as query parameter instead of request body
-      const response = await api.post(`/newsletter-subscribers/add?email=${encodeURIComponent(cleanEmail)}`);
+      // According to your API docs: POST with email as query parameter and empty body
+      console.log('📤 Sending POST request with email as query parameter...');
+      
+      // Use axios directly to ensure we send an empty body
+      const response = await api.client.post(`/newsletter-subscribers/add?email=${encodeURIComponent(cleanEmail)}`, {});
+      
+      console.log('📨 Add subscriber response:', response.data);
       
       if (response?.data?.code === 200) {
         return {
@@ -128,13 +133,28 @@ const newsletterService = {
           message: response?.data?.message || 'Failed to subscribe. Please try again.'
         };
       }
-    } catch (error) {
-      console.error('❌ Newsletter subscription error:', error);
-      return {
-        success: false,
-        message: error.message || 'Network error. Please check your connection and try again.'
-      };
-    }
+      } catch (error) {
+        console.error('❌ Newsletter subscription error:', error);
+        console.error('❌ Full error details:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+          config: error.config
+        });
+        
+        // Check if it's a validation error from the server
+        if (error.response?.data?.message) {
+          return {
+            success: false,
+            message: error.response.data.message
+          };
+        }
+        
+        return {
+          success: false,
+          message: error.message || 'Network error. Please check your connection and try again.'
+        };
+      }
   },
 
   async removeSubscriber(email) {
