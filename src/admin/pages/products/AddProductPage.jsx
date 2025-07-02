@@ -316,361 +316,365 @@ const AddProductPage = () => {
   }, [notification]);
 
   return (
-    <div className="bg-gray-50 min-h-screen p-4 sm:p-6 md:p-8">
-      {/* Notification */}
-      {notification && (
-        <div className={`fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 max-w-md ${
-          notification.type === 'success' 
-            ? 'bg-green-50 text-green-800 border border-green-200' 
-            : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              {notification.type === 'success' ? (
-                <CheckCircle size={20} className="mr-2 flex-shrink-0" />
-              ) : (
-                <AlertCircle size={20} className="mr-2 flex-shrink-0" />
-              )}
-              <span>{notification.message}</span>
-            </div>
-            <button 
-              onClick={() => setNotification(null)} 
-              className="ml-4 text-xl font-bold hover:opacity-70"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="max-w-7xl mx-auto">
-        {/* Back button navigation */}
-        <div className="mb-6">
-          <button 
-            onClick={handleBack}
-            className="flex items-center text-gray-600 hover:text-pink-500 transition-colors"
-            disabled={isSubmitting}
-          >
-            <ChevronLeft size={20} />
-            <span className="ml-1">Back to Products</span>
-          </button>
-        </div>  
-        
-        <h1 className="text-2xl font-medium mb-6 md:mb-8">Add New Product</h1>
-        
-        <div className="bg-white rounded-lg p-4 sm:p-6 md:p-8 shadow-sm">
-          <div className="flex flex-col md:flex-row">
-            {/* Image Upload Section */}
-            <div className="w-full md:w-1/3 md:mr-8 mb-6 md:mb-0">
-              <div
-                className={`${
-                  isDragging ? 'border-pink-500 bg-pink-50' : errors.images ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-gray-100'
-                } border-2 border-dashed h-64 rounded-lg flex items-center justify-center mb-4 transition-all cursor-pointer`}
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                {previewImages.length === 0 ? (
-                  <div className="text-center p-4">
-                    <div className="mx-auto bg-white p-4 rounded-full mb-2 inline-flex">
-                      <Image size={24} className="text-gray-400" />
-                    </div>
-                    <p className="text-gray-500 mb-2">Drag and drop images here or click to browse</p>
-                    <button 
-                      type="button" 
-                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-4 rounded-md text-sm"
-                      disabled={isSubmitting}
-                    >
-                      Add Image
-                    </button>
-                    <p className="text-xs text-gray-400 mt-2">Max 5 images, 2MB each</p>
-                  </div>
+    <div className="bg-gray-50 min-h-screen overflow-y-auto">
+      <div className="p-4 sm:p-6 md:p-8 pb-20">
+        {/* Notification */}
+        {notification && (
+          <div className={`fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 max-w-md ${
+            notification.type === 'success' 
+              ? 'bg-green-50 text-green-800 border border-green-200' 
+              : 'bg-red-50 text-red-800 border border-red-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                {notification.type === 'success' ? (
+                  <CheckCircle size={20} className="mr-2 flex-shrink-0" />
                 ) : (
-                  <div className="relative w-full h-full">
-                    <img 
-                      src={previewImages[0].url} 
-                      alt="Product preview" 
-                      className="h-full w-full object-contain rounded-lg" 
-                    />
-                    {!isSubmitting && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeImage(0);
-                        }}
-                        className="absolute top-2 right-2 bg-gray-800 bg-opacity-70 text-white p-1 rounded-full hover:bg-opacity-100"
-                      >
-                        <X size={16} />
-                      </button>
-                    )}
-                  </div>
+                  <AlertCircle size={20} className="mr-2 flex-shrink-0" />
                 )}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImageUpload}
-                  multiple
-                  accept="image/*"
-                  className="hidden"
-                  disabled={isSubmitting}
-                />
+                <span>{notification.message}</span>
               </div>
-              
-              {errors.images && (
-                <p className="mb-4 text-red-500 text-sm flex items-center">
-                  <AlertCircle size={16} className="mr-1" />
-                  {errors.images}
-                </p>
-              )}
-              
-              <div className="grid grid-cols-4 gap-2">
-                {[...Array(4)].map((_, index) => {
-                  const imageIndex = index + 1;
-                  const hasImage = previewImages.length > imageIndex;
-                  
-                  return (
-                    <div 
-                      key={index}
-                      className={`h-20 w-full bg-gray-100 rounded-md relative ${hasImage ? '' : 'flex items-center justify-center border border-gray-300 cursor-pointer'}`}
-                      onClick={() => !hasImage && !isSubmitting && fileInputRef.current?.click()}
-                    >
-                      {hasImage ? (
-                        <>
-                          <img 
-                            src={previewImages[imageIndex].url} 
-                            alt={`Product thumbnail ${imageIndex}`} 
-                            className="h-full w-full object-cover rounded-md" 
-                          />
-                          {!isSubmitting && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeImage(imageIndex);
-                              }}
-                              className="absolute top-1 right-1 bg-gray-800 bg-opacity-70 text-white p-1 rounded-full hover:bg-opacity-100"
-                            >
-                              <X size={12} />
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        <Plus size={20} className="text-gray-400" />
+              <button 
+                onClick={() => setNotification(null)} 
+                className="ml-4 text-xl font-bold hover:opacity-70"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="max-w-7xl mx-auto">
+          {/* Back button navigation */}
+          <div className="mb-6">
+            <button 
+              onClick={handleBack}
+              className="flex items-center text-gray-600 hover:text-pink-500 transition-colors"
+              disabled={isSubmitting}
+            >
+              <ChevronLeft size={20} />
+              <span className="ml-1">Back to Products</span>
+            </button>
+          </div>  
+          
+          <h1 className="text-2xl font-medium mb-6 md:mb-8">Add New Product</h1>
+          
+          <div className="bg-white rounded-lg p-4 sm:p-6 md:p-8 shadow-sm">
+            <div className="flex flex-col lg:flex-row lg:gap-8">
+              {/* Image Upload Section */}
+              <div className="w-full lg:w-1/3 mb-8 lg:mb-0">
+                <div
+                  className={`${
+                    isDragging ? 'border-pink-500 bg-pink-50' : errors.images ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-gray-100'
+                  } border-2 border-dashed min-h-64 rounded-lg flex items-center justify-center mb-4 transition-all cursor-pointer`}
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  {previewImages.length === 0 ? (
+                    <div className="text-center p-4">
+                      <div className="mx-auto bg-white p-4 rounded-full mb-2 inline-flex">
+                        <Image size={24} className="text-gray-400" />
+                      </div>
+                      <p className="text-gray-500 mb-2">Drag and drop images here or click to browse</p>
+                      <button 
+                        type="button" 
+                        className="bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-4 rounded-md text-sm"
+                        disabled={isSubmitting}
+                      >
+                        Add Image
+                      </button>
+                      <p className="text-xs text-gray-400 mt-2">Max 5 images, 2MB each</p>
+                    </div>
+                  ) : (
+                    <div className="relative w-full h-64">
+                      <img 
+                        src={previewImages[0].url} 
+                        alt="Product preview" 
+                        className="h-full w-full object-contain rounded-lg" 
+                      />
+                      {!isSubmitting && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeImage(0);
+                          }}
+                          className="absolute top-2 right-2 bg-gray-800 bg-opacity-70 text-white p-1 rounded-full hover:bg-opacity-100"
+                        >
+                          <X size={16} />
+                        </button>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-            
-            <div className="w-full md:w-2/3">
-              {/* Product Details */}
-              <div className="mb-6">
-                <label className="block text-gray-700 mb-2">Product Name*</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  disabled={isSubmitting}
-                  className={`w-full border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
-                  placeholder="Enter product name"
-                />
-                {errors.name && (
-                  <p className="mt-1 text-red-500 text-sm flex items-center">
-                    <AlertCircle size={16} className="mr-1" />
-                    {errors.name}
-                  </p>
-                )}
-              </div>
-              
-              <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 mb-6">
-                <div className="w-full sm:w-1/2">
-                  <label className="block text-gray-700 mb-2">Current Price*</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                      <span className="text-gray-700 font-bold">₦</span>
-                    </div>
-                    <input
-                      type="number"
-                      name="price"
-                      value={formData.price}
-                      onChange={handleInputChange}
-                      disabled={isSubmitting}
-                      min="0"
-                      step="0.01"
-                      className={`w-full border ${errors.price ? 'border-red-500' : 'border-gray-300'} rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  {errors.price && (
-                    <p className="mt-1 text-red-500 text-sm flex items-center">
-                      <AlertCircle size={16} className="mr-1" />
-                      {errors.price}
-                    </p>
                   )}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleImageUpload}
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    disabled={isSubmitting}
+                  />
                 </div>
                 
-                <div className="w-full sm:w-1/2">
-                  <label className="block text-gray-700 mb-2">Slashed Price (Optional)</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                      <span className="text-gray-700 font-bold">₦</span>
+                {errors.images && (
+                  <p className="mb-4 text-red-500 text-sm flex items-center">
+                    <AlertCircle size={16} className="mr-1" />
+                    {errors.images}
+                  </p>
+                )}
+                
+                <div className="grid grid-cols-4 gap-2">
+                  {[...Array(4)].map((_, index) => {
+                    const imageIndex = index + 1;
+                    const hasImage = previewImages.length > imageIndex;
+                    
+                    return (
+                      <div 
+                        key={index}
+                        className={`h-20 w-full bg-gray-100 rounded-md relative ${hasImage ? '' : 'flex items-center justify-center border border-gray-300 cursor-pointer'}`}
+                        onClick={() => !hasImage && !isSubmitting && fileInputRef.current?.click()}
+                      >
+                        {hasImage ? (
+                          <>
+                            <img 
+                              src={previewImages[imageIndex].url} 
+                              alt={`Product thumbnail ${imageIndex}`} 
+                              className="h-full w-full object-cover rounded-md" 
+                            />
+                            {!isSubmitting && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeImage(imageIndex);
+                                }}
+                                className="absolute top-1 right-1 bg-gray-800 bg-opacity-70 text-white p-1 rounded-full hover:bg-opacity-100"
+                              >
+                                <X size={12} />
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <Plus size={20} className="text-gray-400" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              <div className="w-full lg:w-2/3">
+                {/* Product Details */}
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-gray-700 mb-2">Product Name*</label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      disabled={isSubmitting}
+                      className={`w-full border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
+                      placeholder="Enter product name"
+                    />
+                    {errors.name && (
+                      <p className="mt-1 text-red-500 text-sm flex items-center">
+                        <AlertCircle size={16} className="mr-1" />
+                        {errors.name}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+                    <div className="w-full sm:w-1/2">
+                      <label className="block text-gray-700 mb-2">Current Price*</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                          <span className="text-gray-700 font-bold">₦</span>
+                        </div>
+                        <input
+                          type="number"
+                          name="price"
+                          value={formData.price}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          min="0"
+                          step="0.01"
+                          className={`w-full border ${errors.price ? 'border-red-500' : 'border-gray-300'} rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      {errors.price && (
+                        <p className="mt-1 text-red-500 text-sm flex items-center">
+                          <AlertCircle size={16} className="mr-1" />
+                          {errors.price}
+                        </p>
+                      )}
                     </div>
+                    
+                    <div className="w-full sm:w-1/2">
+                      <label className="block text-gray-700 mb-2">Slashed Price (Optional)</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                          <span className="text-gray-700 font-bold">₦</span>
+                        </div>
+                        <input
+                          type="number"
+                          name="slashed_price"
+                          value={formData.slashed_price}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          min="0"
+                          step="0.01"
+                          className={`w-full border ${errors.slashed_price ? 'border-red-500' : 'border-gray-300'} rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      {errors.slashed_price && (
+                        <p className="mt-1 text-red-500 text-sm flex items-center">
+                          <AlertCircle size={16} className="mr-1" />
+                          {errors.slashed_price}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-gray-700 mb-2">Category*</label>
+                    <div className="relative">
+                      <select
+                        name="category"
+                        value={formData.category}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`w-full border ${errors.category ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-pink-500`}
+                      >
+                        <option value="">Select Category</option>
+                        {categories.map(category => (
+                          <option key={category.value} value={category.value}>
+                            {category.label}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </div>
+                    </div>
+                    {errors.category && (
+                      <p className="mt-1 text-red-500 text-sm flex items-center">
+                        <AlertCircle size={16} className="mr-1" />
+                        {errors.category}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-gray-700 mb-2">Available Quantity*</label>
                     <input
                       type="number"
-                      name="slashed_price"
-                      value={formData.slashed_price}
+                      name="quantity"
+                      value={formData.quantity}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
                       min="0"
-                      step="0.01"
-                      className={`w-full border ${errors.slashed_price ? 'border-red-500' : 'border-gray-300'} rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
-                      placeholder="0.00"
+                      className={`w-full border ${errors.quantity ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
+                      placeholder="Enter quantity"
                     />
+                    {errors.quantity && (
+                      <p className="mt-1 text-red-500 text-sm flex items-center">
+                        <AlertCircle size={16} className="mr-1" />
+                        {errors.quantity}
+                      </p>
+                    )}
                   </div>
-                  {errors.slashed_price && (
-                    <p className="mt-1 text-red-500 text-sm flex items-center">
-                      <AlertCircle size={16} className="mr-1" />
-                      {errors.slashed_price}
-                    </p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="mb-6">
-                <label className="block text-gray-700 mb-2">Category*</label>
-                <div className="relative">
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    disabled={isSubmitting}
-                    className={`w-full border ${errors.category ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-pink-500`}
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map(category => (
-                      <option key={category.value} value={category.value}>
-                        {category.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </div>
-                </div>
-                {errors.category && (
-                  <p className="mt-1 text-red-500 text-sm flex items-center">
-                    <AlertCircle size={16} className="mr-1" />
-                    {errors.category}
-                  </p>
-                )}
-              </div>
-              
-              <div className="mb-6">
-                <label className="block text-gray-700 mb-2">Available Quantity*</label>
-                <input
-                  type="number"
-                  name="quantity"
-                  value={formData.quantity}
-                  onChange={handleInputChange}
-                  disabled={isSubmitting}
-                  min="0"
-                  className={`w-full border ${errors.quantity ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
-                  placeholder="Enter quantity"
-                />
-                {errors.quantity && (
-                  <p className="mt-1 text-red-500 text-sm flex items-center">
-                    <AlertCircle size={16} className="mr-1" />
-                    {errors.quantity}
-                  </p>
-                )}
-              </div>
 
-              {/* Skin Concerns Section - Fixed UI layout */}
-              <div className="mb-6">
-                <label className="block text-gray-700 mb-2">Skin Concerns*</label>
-                <p className="text-sm text-gray-500 mb-3">Select which skin concerns this product addresses:</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {concernOptions.map(concern => (
-                    <label 
-                      key={concern.value} 
-                      className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${
-                        formData.concern_options.includes(concern.value)
-                          ? 'bg-pink-50 border-pink-300 text-pink-700'
-                          : 'bg-white border-gray-200 hover:bg-gray-50'
-                      } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  {/* Skin Concerns Section - Fixed UI layout */}
+                  <div>
+                    <label className="block text-gray-700 mb-2">Skin Concerns*</label>
+                    <p className="text-sm text-gray-500 mb-3">Select which skin concerns this product addresses:</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {concernOptions.map(concern => (
+                        <label 
+                          key={concern.value} 
+                          className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${
+                            formData.concern_options.includes(concern.value)
+                              ? 'bg-pink-50 border-pink-300 text-pink-700'
+                              : 'bg-white border-gray-200 hover:bg-gray-50'
+                          } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formData.concern_options.includes(concern.value)}
+                            onChange={() => handleConcernToggle(concern.value)}
+                            disabled={isSubmitting}
+                            className="sr-only"
+                          />
+                          <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center flex-shrink-0 ${
+                            formData.concern_options.includes(concern.value)
+                              ? 'bg-pink-500 border-pink-500'
+                              : 'border-gray-300'
+                          }`}>
+                            {formData.concern_options.includes(concern.value) && (
+                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </div>
+                          <span className="text-sm font-medium">{concern.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {errors.concern_options && (
+                      <p className="mt-2 text-red-500 text-sm flex items-center">
+                        <AlertCircle size={16} className="mr-1" />
+                        {errors.concern_options}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-gray-700 mb-2">Product Description*</label>
+                    <textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      disabled={isSubmitting}
+                      rows="5"
+                      className={`w-full border ${errors.description ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 resize-vertical`}
+                      placeholder="Write detailed information about your product..."
+                    />
+                    {errors.description && (
+                      <p className="mt-1 text-red-500 text-sm flex items-center">
+                        <AlertCircle size={16} className="mr-1" />
+                        {errors.description}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="pt-4">
+                    <button
+                      type="button"
+                      onClick={handleSubmit}
+                      disabled={isSubmitting}
+                      className={`w-full ${isSubmitting ? 'bg-pink-400 cursor-not-allowed' : 'bg-pink-500 hover:bg-pink-600'} text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={formData.concern_options.includes(concern.value)}
-                        onChange={() => handleConcernToggle(concern.value)}
-                        disabled={isSubmitting}
-                        className="sr-only"
-                      />
-                      <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center flex-shrink-0 ${
-                        formData.concern_options.includes(concern.value)
-                          ? 'bg-pink-500 border-pink-500'
-                          : 'border-gray-300'
-                      }`}>
-                        {formData.concern_options.includes(concern.value) && (
-                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      {isSubmitting ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                        )}
-                      </div>
-                      <span className="text-sm font-medium">{concern.label}</span>
-                    </label>
-                  ))}
+                          Adding Product...
+                        </>
+                      ) : "Add Product"}
+                    </button>
+                  </div>
                 </div>
-                {errors.concern_options && (
-                  <p className="mt-2 text-red-500 text-sm flex items-center">
-                    <AlertCircle size={16} className="mr-1" />
-                    {errors.concern_options}
-                  </p>
-                )}
-              </div>
-              
-              <div className="mb-6">
-                <label className="block text-gray-700 mb-2">Product Description*</label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  disabled={isSubmitting}
-                  rows="5"
-                  className={`w-full border ${errors.description ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
-                  placeholder="Write detailed information about your product..."
-                />
-                {errors.description && (
-                  <p className="mt-1 text-red-500 text-sm flex items-center">
-                    <AlertCircle size={16} className="mr-1" />
-                    {errors.description}
-                  </p>
-                )}
-              </div>
-              
-              <div className="mt-8">
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className={`w-full ${isSubmitting ? 'bg-pink-400 cursor-not-allowed' : 'bg-pink-500 hover:bg-pink-600'} text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center`}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Adding Product...
-                    </>
-                  ) : "Add Product"}
-                </button>
               </div>
             </div>
           </div>

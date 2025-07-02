@@ -1,4 +1,4 @@
-// utils/api.js
+// utils/api.js - Enhanced version with improved frontend filtering
 
 const BASE_URL = 'https://leksycosmetics.com/api';
 
@@ -16,6 +16,105 @@ export const handleApiError = (error, defaultMessage = 'An error occurred') => {
     // Other error
     return error.message || defaultMessage;
   }
+};
+
+// Enhanced skin concerns mapping with more comprehensive keywords
+const SKIN_CONCERN_KEYWORDS = {
+  'Anti-Aging': [
+    'anti-aging', 'anti aging', 'antiaging',
+    'wrinkle', 'wrinkles', 'fine lines', 'fine line',
+    'aging', 'age spots', 'mature skin',
+    'firming', 'lifting', 'tightening',
+    'collagen', 'elastin', 'peptide', 'peptides',
+    'retinol', 'retinoid', 'vitamin c',
+    'youth', 'youthful', 'rejuvenating'
+  ],
+  'Oily Skin': [
+    'oily', 'oily skin', 'oil control', 'oil-control',
+    'sebum', 'sebum control', 'shine control',
+    'mattifying', 'matte', 'non-comedogenic',
+    'pore minimizing', 'pore refining',
+    'excess oil', 'greasy', 'combination skin'
+  ],
+  'Dry Skin': [
+    'dry', 'dry skin', 'dehydrated', 'dehydration',
+    'hydrating', 'hydration', 'moisturizing', 'moisture',
+    'nourishing', 'rich', 'intensive',
+    'hyaluronic acid', 'ceramides', 'glycerin',
+    'barrier repair', 'skin barrier',
+    'flaky', 'tight skin', 'parched'
+  ],
+  'Acne': [
+    'acne', 'acne-prone', 'blemish', 'blemishes',
+    'pimple', 'pimples', 'breakout', 'breakouts',
+    'blackhead', 'blackheads', 'whitehead', 'whiteheads',
+    'salicylic acid', 'benzoyl peroxide',
+    'comedogenic', 'spot treatment',
+    'clear skin', 'purifying', 'clarifying'
+  ],
+  'Hyperpigmentation': [
+    'hyperpigmentation', 'pigmentation', 'dark spots', 'dark spot',
+    'age spots', 'sun spots', 'melasma',
+    'brightening', 'whitening', 'lightening',
+    'even skin tone', 'uneven skin tone',
+    'discoloration', 'marks', 'scarring',
+    'vitamin c', 'niacinamide', 'kojic acid',
+    'arbutin', 'hydroquinone'
+  ],
+  'Sensitive Skin': [
+    'sensitive', 'sensitive skin', 'gentle', 'mild',
+    'soothing', 'calming', 'comforting',
+    'fragrance-free', 'fragrance free', 'unscented',
+    'hypoallergenic', 'dermatologist tested',
+    'irritation', 'redness', 'reactive skin',
+    'allantoin', 'chamomile', 'aloe', 'centella'
+  ]
+};
+
+// Enhanced function to check if a product matches skin concerns
+const productMatchesConcerns = (product, concerns) => {
+  if (!concerns || concerns.length === 0) return true;
+  
+  // Combine all product text for searching
+  const productText = [
+    product.name || '',
+    product.description || '',
+    product.category || '',
+    product.ingredients || '', // if available
+    product.benefits || '', // if available
+    product.skinType || '', // if available
+    ...(product.tags || []) // if available
+  ].join(' ').toLowerCase();
+  
+  // Check if product matches ANY of the selected concerns
+  return concerns.some(concern => {
+    const keywords = SKIN_CONCERN_KEYWORDS[concern] || [concern.toLowerCase()];
+    
+    // Check if ANY keyword for this concern is found in the product text
+    return keywords.some(keyword => {
+      // Use word boundaries to avoid partial matches
+      const regex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      return regex.test(productText);
+    });
+  });
+};
+
+// Enhanced search function
+const productMatchesSearch = (product, searchTerm) => {
+  if (!searchTerm || !searchTerm.trim()) return true;
+  
+  const search = searchTerm.toLowerCase().trim();
+  const productText = [
+    product.name || '',
+    product.description || '',
+    product.category || '',
+    product.brand || '', // if available
+    ...(product.tags || []) // if available
+  ].join(' ').toLowerCase();
+  
+  // Split search term into words and check if all words are found
+  const searchWords = search.split(/\s+/);
+  return searchWords.every(word => productText.includes(word));
 };
 
 // Fetch a single product by ID
@@ -40,20 +139,20 @@ export const fetchProduct = async (productId) => {
   }
 };
 
-// Fetch products with optional filtering and sorting
+// Enhanced fetch products with improved frontend filtering
 export const fetchProducts = async (options = {}) => {
   try {
     const {
       category = '',
       categories = [],
-      concerns = [], // Note: This might not be supported by your backend
-      search = '', // Note: This might not be supported by your backend
+      concerns = [],
+      search = '',
       sort = '',
       limit = '',
       productIds = []
     } = options;
 
-    // Build query parameters
+    // Build query parameters for backend
     const params = new URLSearchParams();
     
     // Handle category filtering - convert to backend format
@@ -66,7 +165,6 @@ export const fetchProducts = async (options = {}) => {
     }
     
     if (filterCategories.length > 0) {
-      // Backend expects comma-separated filter parameter
       params.append('filter', filterCategories.join(','));
     }
     
@@ -75,70 +173,60 @@ export const fetchProducts = async (options = {}) => {
       params.append('products_ids_array', productIds.join(','));
     }
     
-    // Handle sorting
+    // Handle sorting (let backend handle this)
     if (sort) {
       params.append('sort', sort);
     }
     
-    // Handle limit
-    if (limit) {
+    // Don't apply limit to backend if we're doing frontend filtering
+    // We'll apply it after filtering
+    const shouldApplyLimitAfterFiltering = concerns.length > 0 || (search && search.trim());
+    
+    if (limit && !shouldApplyLimitAfterFiltering) {
       params.append('limit', limit.toString());
     }
     
-    // Note: Search and concerns filtering might need backend support
-    // For now, we'll handle these client-side
-    
     const url = `${BASE_URL}/fetch-products${params.toString() ? '?' + params.toString() : ''}`;
-    console.log('Fetching products from:', url); // Debug log
+    console.log('Fetching products from:', url);
     
     const response = await fetch(url);
     const data = await response.json();
     
     if (response.ok && data.code === 200) {
       let products = data.products || [];
+      const originalCount = products.length;
       
-      // Client-side filtering for features not supported by backend
+      // Apply frontend filters
       
-      // Apply search filter if provided
+      // Apply search filter
       if (search && search.trim()) {
-        const searchTerm = search.toLowerCase().trim();
-        products = products.filter(product => 
-          product.name.toLowerCase().includes(searchTerm) ||
-          product.description.toLowerCase().includes(searchTerm) ||
-          product.category.toLowerCase().includes(searchTerm)
-        );
+        products = products.filter(product => productMatchesSearch(product, search));
+        console.log(`Search filter applied: ${originalCount} -> ${products.length} products`);
       }
       
-      // Apply concerns filter if provided (client-side)
+      // Apply concerns filter
       if (concerns.length > 0) {
-        // This is a placeholder - you'd need to implement concern matching
-        // based on your product data structure
-        console.log('Concerns filtering not implemented in backend, applying client-side filter');
-        
-        // For now, we'll filter based on product name/description containing concern keywords
-        products = products.filter(product => {
-          const productText = `${product.name} ${product.description}`.toLowerCase();
-          return concerns.some(concern => {
-            const concernKeywords = {
-              'Anti-Aging': ['anti-aging', 'anti aging', 'wrinkle', 'fine lines', 'aging'],
-              'Oily Skin': ['oily', 'oil control', 'sebum'],
-              'Dry Skin': ['dry', 'hydrating', 'moisturizing', 'moisture'],
-              'Acne': ['acne', 'blemish', 'pimple', 'breakout'],
-              'Hyperpigmentation': ['hyperpigmentation', 'dark spots', 'pigmentation', 'brightening'],
-              'Sensitive skin': ['sensitive', 'gentle', 'soothing', 'calming']
-            };
-            
-            const keywords = concernKeywords[concern] || [concern.toLowerCase()];
-            return keywords.some(keyword => productText.includes(keyword));
-          });
-        });
+        const beforeConcernFilter = products.length;
+        products = products.filter(product => productMatchesConcerns(product, concerns));
+        console.log(`Concerns filter applied for [${concerns.join(', ')}]: ${beforeConcernFilter} -> ${products.length} products`);
+      }
+      
+      // Apply limit after filtering if needed
+      if (limit && shouldApplyLimitAfterFiltering) {
+        products = products.slice(0, parseInt(limit));
       }
       
       return {
         success: true,
         products: products,
         totalCount: products.length,
-        message: data.message
+        originalCount: originalCount, // Total before frontend filtering
+        message: data.message,
+        appliedFilters: {
+          categories: filterCategories,
+          concerns: concerns,
+          search: search
+        }
       };
     } else {
       throw new Error(data.message || 'Failed to fetch products');
@@ -166,7 +254,7 @@ export const fetchProductsByIds = async (productIds) => {
   return fetchProducts({ productIds });
 };
 
-// Get available categories (you might want to add this to your backend)
+// Get available categories
 export const getCategories = () => {
   return [
     'serums',
@@ -199,6 +287,28 @@ export const getSkinConcerns = () => {
     'Dry Skin',
     'Acne',
     'Hyperpigmentation',
-    'Sensitive skin'
+    'Sensitive Skin'
   ];
+};
+
+// Helper function to get keywords for a specific concern (for debugging/development)
+export const getConcernKeywords = (concern) => {
+  return SKIN_CONCERN_KEYWORDS[concern] || [];
+};
+
+// Helper function to test if a product would match specific concerns (for debugging)
+export const testProductConcernMatch = (product, concerns) => {
+  return {
+    matches: productMatchesConcerns(product, concerns),
+    productText: [
+      product.name || '',
+      product.description || '',
+      product.category || ''
+    ].join(' ').toLowerCase(),
+    concerns: concerns,
+    keywords: concerns.map(concern => ({
+      concern,
+      keywords: SKIN_CONCERN_KEYWORDS[concern] || []
+    }))
+  };
 };

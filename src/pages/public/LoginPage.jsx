@@ -112,7 +112,7 @@ const LoginPage = () => {
                 className="h-12 w-12 object-contain"
               />
             </div>
-            <h2 className="text-2xl font-bold text-white">Admin Portal</h2>
+            <h2 className="text-2xl font-bold text-white">Admin Dashboard</h2>
             <p className="text-pink-100 text-sm mt-1">Leksy Cosmetics Management</p>
           </div>
 

@@ -481,7 +481,7 @@ const AllOrders = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-gray-200">
-                {['ORDER ID', 'CUSTOMER', 'AMOUNT', 'DATE', 'PAYMENT', 'DELIVERY', 'ACTION'].map(header => (
+                {['ORDER ID', 'CUSTOMER', 'AMOUNT', 'DATE', 'METHOD', 'PAYMENT', 'DELIVERY', 'ACTION'].map(header => (
                   <th key={header} className="pb-3 text-sm font-medium text-gray-500 uppercase">
                     {header}
                   </th>
@@ -501,6 +501,19 @@ const AllOrders = () => {
                   </td>
                   <td className="py-4 text-sm font-semibold">{formatCurrency(order.amount)}</td>
                   <td className="py-4 text-sm">{order.date}</td>
+                  <td className="py-4 text-sm">
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {order.deliveryMethod === 'pickup' ? 'Pickup' : 'Delivery'}
+                      </span>
+                      {order.deliveryMethod === 'address' && (
+                        <span className="text-xs text-gray-500 truncate max-w-[120px]" 
+                              title={`${order.city}, ${order.state}`}>
+                          {order.city}, {order.state}
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="py-4">
                     <span className={`text-xs px-3 py-1 rounded-full font-medium ${getStatusBadgeStyle(order.orderStatus)}`}>
                       {order.orderStatus}
@@ -532,7 +545,7 @@ const AllOrders = () => {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan="7" className="py-12 text-center text-gray-500">
+                  <td colSpan="8" className="py-12 text-center text-gray-500">
                     <div className="text-6xl mb-4">📦</div>
                     <p className="text-lg font-medium">No orders found</p>
                     {searchQuery && (

@@ -3,7 +3,7 @@ import axios from 'axios';
 class ApiClient {
   constructor() {
     this.client = axios.create({
-      baseURL: 'https://leksycosmetics.com/api', // CORRECTED BASE URL
+      baseURL: 'https://leksycosmetics.com/api', 
       timeout: 10000,
       headers: { 'Accept': 'application/json' }
     });
