@@ -64,7 +64,7 @@ export const initiateCheckout = async (formData, deliveryMethod, cart, successRe
     // Prepare cart data according to API specification
     const cartData = prepareCartForAPI(cart);
     
-    // Prepare form data - ALWAYS include all required fields
+    // Prepare form data - include required fields based on delivery method
     const requestData = new FormData();
     requestData.append('name', formData.name.trim());
     requestData.append('email', formData.email.trim());
@@ -73,17 +73,13 @@ export const initiateCheckout = async (formData, deliveryMethod, cart, successRe
     requestData.append('cart', JSON.stringify(cartData));
     requestData.append('success_redirect', successRedirectUrl);
     
-    // ALWAYS include address fields - use appropriate values based on delivery method
+    // ONLY include address fields for delivery orders
     if (deliveryMethod === 'address') {
       requestData.append('state', formData.state.trim());
       requestData.append('city', formData.city.trim());
       requestData.append('street_address', formData.street_address.trim());
-    } else {
-      // For pickup, provide default values that satisfy API requirements
-      requestData.append('state', 'FCT'); // Use a valid state
-      requestData.append('city', 'Store Pickup');
-      requestData.append('street_address', 'Store Pickup - No Address Required');
     }
+    // For pickup orders: DO NOT send any address fields
     
     // Add notes if provided
     if (formData.notes && formData.notes.trim()) {
@@ -93,25 +89,32 @@ export const initiateCheckout = async (formData, deliveryMethod, cart, successRe
     // Build API URL
     const apiUrl = `${BASE_URL}/api/checkout/initiate`;
     
-    // Log request details for debugging
-    console.log('Initiating checkout with URL:', apiUrl);
-    console.log('Request data:', {
+    // Build debug object for logging
+    const debugData = {
       name: formData.name.trim(),
       email: formData.email.trim(),
       phone: formData.phone.trim(),
       delivery_method: deliveryMethod,
-      state: deliveryMethod === 'address' ? formData.state.trim() : 'FCT',
-      city: deliveryMethod === 'address' ? formData.city.trim() : 'Store Pickup',
-      street_address: deliveryMethod === 'address' ? formData.street_address.trim() : 'Store Pickup - No Address Required',
       cart: JSON.stringify(cartData),
       success_redirect: successRedirectUrl,
       notes: formData.notes?.trim() || ''
-    });
+    };
+    
+    // Only add address fields to debug log if it's a delivery order
+    if (deliveryMethod === 'address') {
+      debugData.state = formData.state.trim();
+      debugData.city = formData.city.trim();
+      debugData.street_address = formData.street_address.trim();
+    }
+    
+    // Log request details for debugging
+    console.log('Initiating checkout with URL:', apiUrl);
+    console.log('Request data:', debugData);
 
-    // Make API request using FormData in body instead of URL parameters
+    // Make API request using FormData in body
     const response = await fetch(apiUrl, {
       method: 'POST',
-      body: requestData, // Send as form data in body, not URL parameters
+      body: requestData, // Send as form data in body
       // Note: Don't set Content-Type header when using FormData - browser sets it automatically
     });
 
@@ -149,16 +152,13 @@ export const initiateCheckoutAlternative = async (formData, deliveryMethod, cart
     requestData.append('cart', JSON.stringify(cartData));
     requestData.append('success_redirect', successRedirectUrl);
     
-    // ALWAYS include address fields
+    // ONLY include address fields for delivery orders
     if (deliveryMethod === 'address') {
       requestData.append('state', formData.state.trim());
       requestData.append('city', formData.city.trim());
       requestData.append('street_address', formData.street_address.trim());
-    } else {
-      requestData.append('state', 'FCT');
-      requestData.append('city', 'Store Pickup');
-      requestData.append('street_address', 'Store Pickup - No Address Required');
     }
+    // For pickup orders: DO NOT send any address fields
     
     if (formData.notes && formData.notes.trim()) {
       requestData.append('notes', formData.notes.trim());

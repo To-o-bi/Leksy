@@ -1,4 +1,3 @@
-// src/api/services.js - FIXED VERSION
 import api from './axios.js';
 import { ENDPOINTS, CATEGORIES, API_CONFIG } from './config.js';
 
