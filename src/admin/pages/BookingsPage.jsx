@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Eye, RefreshCw, AlertCircle, Calendar, Phone, Mail, User, CheckCircle } from 'lucide-react';
+import { Search, Eye, RefreshCw, AlertCircle, Calendar, Phone, Mail, User, CheckCircle, Clock } from 'lucide-react';
 import api from '../../api/axios';
 
 const BookingsPage = () => {
@@ -25,6 +25,21 @@ const BookingsPage = () => {
         day: '2-digit',
         month: 'short',
         year: 'numeric'
+      });
+    } catch (e) {
+      return 'Invalid Date';
+    }
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return 'Unknown';
+    try {
+      return new Date(dateString).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
       });
     } catch (e) {
       return 'Invalid Date';
@@ -102,6 +117,7 @@ const BookingsPage = () => {
             amountPaid: consultation.amount_paid || 0,
             amountCalculated: consultation.amount_calculated || 0,
             createdAt: consultation.created_at || '',
+            bookingDate: consultation.created_at || '', // Booking date when user made the booking
             apiRef: consultation.api_ref || '',
             rawData: consultation
           };
@@ -368,7 +384,7 @@ const BookingsPage = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-gray-200">
-                {['ID', 'CUSTOMER', 'CONSULTATION', 'PAYMENT', 'SESSION', 'ACTION'].map(header => (
+                {['ID', 'BOOKING DATE', 'CUSTOMER', 'CONSULTATION', 'PAYMENT', 'SESSION', 'ACTION'].map(header => (
                   <th key={header} className="pb-3 text-sm font-medium text-gray-500 uppercase">
                     {header}
                   </th>
@@ -379,6 +395,17 @@ const BookingsPage = () => {
               {currentBookings.length > 0 ? currentBookings.map((booking) => (
                 <tr key={booking.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-4 text-sm font-mono">{booking.id}</td>
+                  <td className="py-4">
+                    <div className="flex items-center">
+                      <Clock className="h-4 w-4 mr-1 text-gray-400" />
+                      <div>
+                        <div className="text-sm font-medium">{formatDate(booking.bookingDate)}</div>
+                        <div className="text-xs text-gray-500">
+                          {booking.bookingDate ? formatDateTime(booking.bookingDate).split(', ')[1] : 'Time unknown'}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
                   <td className="py-4">
                     <div>
                       <div className="text-sm font-medium">{booking.fullName}</div>
@@ -398,7 +425,7 @@ const BookingsPage = () => {
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${getPaymentStatusStyle(booking.paymentStatus)}`}>
                         {booking.paymentStatus}
                       </span>
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-sm font-bold text-green-600 mt-1">
                         {formatPrice(booking.amountPaid)}
                       </div>
                     </div>
@@ -427,7 +454,7 @@ const BookingsPage = () => {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center text-gray-500">
+                  <td colSpan="7" className="py-12 text-center text-gray-500">
                     <div className="text-6xl mb-4">📅</div>
                     <p className="text-lg font-medium">No consultation bookings found</p>
                     <p className="text-sm mt-1">
@@ -534,7 +561,14 @@ const BookingsPage = () => {
                   </h4>
                   <div className="space-y-3">
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Date</label>
+                      <label className="text-sm font-medium text-gray-500">Booking Date</label>
+                      <div className="flex items-center">
+                        <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                        <p className="text-gray-900">{formatDateTime(selectedBooking.bookingDate)}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Consultation Date</label>
                       <p className="text-gray-900">{formatDate(selectedBooking.consultationDate)}</p>
                     </div>
                     <div>
@@ -559,7 +593,7 @@ const BookingsPage = () => {
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Amount</label>
-                      <p className="text-gray-900">{formatPrice(selectedBooking.amountPaid)}</p>
+                      <p className="text-gray-900 text-lg font-bold text-green-600">{formatPrice(selectedBooking.amountPaid)}</p>
                     </div>
                   </div>
                 </div>

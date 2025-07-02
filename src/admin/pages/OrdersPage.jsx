@@ -539,7 +539,7 @@ const AllOrders = () => {
                       onClick={() => viewOrderDetails(order)}
                     >
                       <Eye className="h-4 w-4 mr-1" />
-                      View Details
+                      View
                     </button>
                   </td>
                 </tr>
