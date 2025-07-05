@@ -818,9 +818,62 @@ curl --location --request GET '{base_url}/api/admin/fetch-newsletter-subscribers
 			"created_at": "2005-08-05"
 		},
 		...
-	]
+	],
+	"token": "68641f6750a7c"
 }
 ```
 
 
+
+# NOTIFICATIONS
+
+## Fetch All Notifications
+
+```CURL
+curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={limit|integer|optional}' \
+--header 'Authorization: Bearer {token}'
+```
+
+
+```JSON
+{
+	"code": 200,
+	"message": "Notifications fetch returned 3 results",
+	"notifications": [
+		{
+			"id": 4,
+			"type": "consultations",
+			"type_id": "bk-684e2bbe5140a",
+			"title": "New Consultation Booking",
+			"description": "omeone just booked a Video consultation.\nDate: 2025-08-01\nTime: 02:00 PM - 03:00 PM",
+			"created_at": "2025-07-05 04:25:02"
+		},
+		{
+			"id": 3,
+			"type": "orders",
+			"type_id": "pkg-686899dd0dfe7",
+			"title": "New Order Received",
+			"description": "Felicia placed an order worth of &amp;#8358;18,100. Full details available in the orders section.",
+			"created_at": "2025-07-05 04:20:57"
+		},
+		{
+			"id": 2,
+			"type": "products",
+			"type_id": "product_684d90b1e6aad",
+			"title": "Low Stock Alert",
+			"description": "Product: Abc is currently running low! Remaining: 5 qty.",
+			"created_at": "2025-07-05 04:20:48"
+		},
+		{
+			"id": 1,
+			"type": "contact_submissions",
+			"type_id": "3",
+			"title": "New Contact Form Submission",
+			"description": "Message: Hello testingg...",
+			"created_at": "2025-07-05 04:17:49"
+		}
+	],
+	"token": "68641f6750a7c"
+}
+```
 
