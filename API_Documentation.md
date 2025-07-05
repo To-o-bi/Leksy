@@ -720,6 +720,56 @@ curl --location --request POST '{base_url}/api/admin/update-consultation?consult
 ```
 
 
+## Send Consultation Link
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/send_consultation_link?consultation_id={consultation_id}&meet_link={meet_link}?override={true/false|default:false|optional}'
+```
+
+```JSON
+{
+   "code": 200,
+   "message": "Meeting link sent successfully!",
+   "consultation":    {
+      "id": 2,
+      "unique_id": "bk-685e9be65b69c",
+      "api_ref": "62h45vok5p",
+      "payment_status": 0,
+      "session_held_status": "unheld",
+      "cron_trial_count": 3,
+      "name": "Felicia H.",
+      "email": "hendersonf52@gmail.com",
+      "phone": "08011229391",
+      "age_range": "20 - 25",
+      "gender": "female",
+      "skin_type": "normal",
+      "skin_concerns": "acne",
+      "current_skincare_products": "Olive mint cream",
+      "additional_details": "I use olive mint cream",
+      "channel": "whatsapp",
+      "meet_link": "https://meet.google.com/abc",
+      "date": "2025-07-05",
+      "time_range": "2:00 PM - 3:00 PM",
+      "amount_calculated": 15000,
+      "amount_paid": 15000,
+      "created_at": "2025-06-27 14:25:59"
+   },
+   "token": "68641f6750a7c"
+}
+```
+
+
+## Send Reminders and Thank Yous (Optional - Already happens automatically)
+
+```CURL
+curl --location --request POST '{base_url}/api/cronjobs/consultation_complete'
+```
+
+```JSON
+EMPTY response
+```
+
+
 
 # NEWSLETTER SUBSCRIBERS
 
