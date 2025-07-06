@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useContext, createContext, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useContext, createContext, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { authService } from '../api/services';
-import api from '../api/axios';
+import { authService } from '../api/services.js'; // Adjust path as needed
 
 const AuthContext = createContext();
 
@@ -23,132 +22,95 @@ function useProvideAuth() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  const isInitialized = useRef(false);
+  const [authChangeCounter, setAuthChangeCounter] = useState(0); // Force re-renders
 
-  // Check if current route requires authentication
+  // Route checks
   const isProtectedRoute = useCallback(() => {
-    const protectedPaths = ['/admin'];
-    return protectedPaths.some(path => location.pathname.startsWith(path)) && 
-           !location.pathname.includes('/login');
+    return location.pathname.startsWith('/admin') && !location.pathname.includes('/login');
   }, [location.pathname]);
 
-  // Check if current route is a login page
   const isLoginPage = useCallback(() => {
-    const loginPaths = ['/login', '/admin/login', '/signin', '/auth/login'];
+    const loginPaths = ['/login', '/admin/login'];
     return loginPaths.includes(location.pathname);
   }, [location.pathname]);
 
-  // Navigate to login with proper redirect handling
+  // Navigation helpers
   const navigateToLogin = useCallback((reason = 'Authentication required') => {
-    if (isLoginPage()) {
-      console.log('Already on login page, skipping navigation');
-      return;
-    }
+    if (isLoginPage()) return;
 
-    console.log(`🔄 Redirecting to login: ${reason}`);
-    
-    // Store current location for redirect after login (only for protected routes)
     const currentPath = location.pathname;
-    const shouldSaveRedirect = isProtectedRoute() && currentPath !== '/' && currentPath !== '/admin/login';
-    
-    if (shouldSaveRedirect) {
-      sessionStorage.setItem('redirectAfterLogin', currentPath);
+    if (isProtectedRoute() && currentPath !== '/') {
+      // Store redirect path in memory instead of sessionStorage
+      window.pendingRedirect = currentPath;
     }
 
-    try {
-      navigate('/admin/login', { 
-        replace: true,
-        state: { 
-          from: shouldSaveRedirect ? currentPath : null,
-          reason 
-        }
-      });
-    } catch (error) {
-      console.error('Navigation error:', error);
-      // Fallback to hard redirect
-      window.location.href = `/admin/login?reason=${encodeURIComponent(reason)}`;
-    }
+    navigate('/admin/login', { 
+      replace: true,
+      state: { reason }
+    });
   }, [navigate, location.pathname, isLoginPage, isProtectedRoute]);
 
-  // Navigate to dashboard or saved redirect path after login
   const navigateAfterLogin = useCallback(() => {
-    const savedRedirect = sessionStorage.getItem('redirectAfterLogin');
-    sessionStorage.removeItem('redirectAfterLogin');
+    const savedRedirect = window.pendingRedirect;
+    window.pendingRedirect = null;
     
-    const targetPath = savedRedirect || '/admin/products'; // Default dashboard path
-    
-    console.log(`✅ Login successful, redirecting to: ${targetPath}`);
-    
-    try {
-      navigate(targetPath, { replace: true });
-    } catch (error) {
-      console.error('Post-login navigation error:', error);
-      navigate('/admin/products', { replace: true });
-    }
+    const targetPath = savedRedirect || '/admin/products';
+    navigate(targetPath, { replace: true });
   }, [navigate]);
 
-  const getStoredUser = useCallback(() => {
-    try {
-      const userData = localStorage.getItem('user');
-      return userData ? JSON.parse(userData) : null;
-    } catch (error) {
-      console.error('Error parsing stored user data:', error);
-      localStorage.removeItem('user');
-      return null;
-    }
-  }, []);
+  // Listen for auth errors from API client
+  useEffect(() => {
+    const handleAuthError = (event) => {
+      const { reason } = event.detail;
+      setUser(null);
+      setError(reason);
+      setAuthChangeCounter(prev => prev + 1);
+      
+      if (isProtectedRoute() && !isLoginPage()) {
+        navigateToLogin(reason);
+      }
+    };
 
-  const clearAuthData = useCallback(() => {
-    api.clearAuth();
-    localStorage.removeItem('user');
-  }, []);
+    window.addEventListener('authError', handleAuthError);
+    return () => window.removeEventListener('authError', handleAuthError);
+  }, [isProtectedRoute, isLoginPage, navigateToLogin]);
 
-  // SIMPLIFIED: Initialize auth state without client-side expiry checks
+  // Initialize auth state
   useEffect(() => {
     const initializeAuth = async () => {
-      if (isInitialized.current) return;
-      isInitialized.current = true;
-
       try {
-        const hasToken = !!api.getToken();
-        const userData = getStoredUser();
+        console.log('🚀 Initializing auth...');
         
-        console.log('Auth initialization:', { 
-          hasToken, 
-          hasUserData: !!userData,
-          currentPath: location.pathname
+        const token = authService.getToken();
+        const userData = authService.getAuthUser();
+        const isAuthenticated = authService.isAuthenticated();
+        
+        console.log('🔍 Auth initialization:', { 
+          hasToken: !!token, 
+          hasUser: !!userData, 
+          isAuthenticated,
+          pathname: location.pathname
         });
         
-        // SIMPLE CHECK: If we have both token and user data, assume valid
-        // Let the server tell us if the token is expired via 401 responses
-        if (hasToken && userData) {
+        if (isAuthenticated && userData) {
+          console.log('✅ User authenticated, setting user state');
           setUser(userData);
-          console.log('User authenticated:', userData.name || userData.username);
+          setAuthChangeCounter(prev => prev + 1);
         } else {
-          // Log specific issues
-          if (hasToken && !userData) {
-            console.log('Token exists but no user data, clearing auth');
-          } else if (!hasToken && userData) {
-            console.log('User data exists but no token, clearing user data');
-          } else {
-            console.log('No authentication data found');
-          }
-          
-          clearAuthData();
+          console.log('❌ User not authenticated, clearing auth');
+          authService.clearAuth();
           setUser(null);
           
-          // Only redirect if on a protected route and not already redirecting
           if (isProtectedRoute() && !isLoginPage()) {
+            console.log('🔒 Protected route without auth, redirecting to login');
             navigateToLogin('Authentication required');
           }
         }
       } catch (error) {
-        console.error('Auth initialization error:', error);
-        clearAuthData();
+        console.error('❌ Auth initialization error:', error);
+        authService.clearAuth();
         setUser(null);
         
-        // Navigate to login if on a protected route
         if (isProtectedRoute() && !isLoginPage()) {
           navigateToLogin('Authentication error');
         }
@@ -158,7 +120,7 @@ function useProvideAuth() {
     };
 
     initializeAuth();
-  }, [clearAuthData, getStoredUser, isProtectedRoute, isLoginPage, navigateToLogin, location.pathname]);
+  }, [isProtectedRoute, isLoginPage, navigateToLogin]);
 
   const login = useCallback(async (username, password) => {
     if (!username?.trim() || !password?.trim()) {
@@ -169,125 +131,108 @@ function useProvideAuth() {
     setError(null);
     
     try {
-      console.log('Starting login for:', username);
       const result = await authService.login(username.trim(), password);
-      console.log('Login response:', { 
-        code: result.code, 
-        hasToken: !!result.token, 
-        hasUser: !!(result.user || result.admin) 
-      });
       
-      if (result.code !== 200) {
+      if (result.code !== 200 || !result.token) {
         throw new Error(result.message || 'Login failed');
       }
       
-      if (!result.token) {
-        throw new Error('Login failed - no authentication token received');
-      }
-      
-      // Handle user data from different response formats
       const userData = result.user || result.admin;
       if (!userData) {
-        throw new Error('Login failed - no user data received');
+        throw new Error('No user data received');
       }
       
-      // Set token first, then user data
-      api.setToken(result.token);
-      localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
-      
-      console.log('Login successful for:', userData.name || userData.username);
-      
-      // Navigate to appropriate page after successful login
+      setAuthChangeCounter(prev => prev + 1);
       navigateAfterLogin();
       
       return result;
       
     } catch (err) {
-      console.error('Login error:', err.message);
-      
-      // Enhanced error handling
       let errorMessage = 'Login failed';
       
       if (err.message.includes('Network') || err.message.includes('network')) {
-        errorMessage = 'Network error. Please check your connection and try again.';
-      } else if (err.message.includes('timeout') || err.message.includes('Timeout')) {
-        errorMessage = 'Request timed out. Please try again.';
+        errorMessage = 'Network error. Please check your connection.';
       } else if (err.message.includes('Invalid') || err.message.includes('Unauthorized')) {
         errorMessage = 'Invalid username or password.';
-      } else if (err.message.includes('Too many')) {
-        errorMessage = 'Too many login attempts. Please try again later.';
       } else if (err.message) {
         errorMessage = err.message;
       }
       
       setError(errorMessage);
       setUser(null);
-      clearAuthData();
+      setAuthChangeCounter(prev => prev + 1);
+      authService.clearAuth();
       throw new Error(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  }, [clearAuthData, navigateAfterLogin]);
+  }, [navigateAfterLogin]);
 
   const logout = useCallback(async (reason = 'User logout', shouldNavigate = true) => {
-    console.log(`🚪 Logging out: ${reason}`);
     setIsLoading(true);
     
     try {
-      // Call logout API (fire and forget)
       await authService.logout();
     } catch (error) {
-      console.log('Logout API call failed (continuing with local cleanup):', error.message);
+      console.warn('Logout API failed:', error.message);
     }
     
-    clearAuthData();
     setUser(null);
     setError(null);
+    setAuthChangeCounter(prev => prev + 1);
     setIsLoading(false);
     
     if (shouldNavigate && !isLoginPage()) {
       navigateToLogin(reason);
     }
-  }, [clearAuthData, navigateToLogin, isLoginPage]);
+  }, [navigateToLogin, isLoginPage]);
 
   const updateUser = useCallback((updates) => {
     if (!user) return;
     
-    const newUserData = { ...user, ...updates };
-    localStorage.setItem('user', JSON.stringify(newUserData));
-    setUser(newUserData);
-    console.log('User data updated:', updates);
+    const updatedUser = authService.updateUser(updates);
+    if (updatedUser) {
+      setUser(updatedUser);
+      setAuthChangeCounter(prev => prev + 1);
+    }
   }, [user]);
 
   const handleAuthError = useCallback((error) => {
     if (error?.status === 401 || error?.message?.includes('Authentication')) {
-      console.log('🚨 Authentication error detected, logging out');
       logout('Authentication failed', true);
       return true;
     }
     return false;
   }, [logout]);
 
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
+  const clearError = useCallback(() => setError(null), []);
 
-  // SIMPLIFIED: Memoize values without complex token expiry checks
+  // Memoized auth values
   const authValues = useMemo(() => {
-    const hasToken = !!api.getToken();
-    const isUserAuthenticated = Boolean(user && hasToken);
-    const isUserAdmin = Boolean(user?.role === 'admin' || user?.role === 'superadmin');
+    // Get real-time authentication status
+    const hasToken = !!authService.getToken();
+    const currentUser = user || authService.getAuthUser();
+    const isUserAuthenticated = hasToken && !!currentUser;
+    
+    console.log('🔍 Auth Context Check:', { 
+      hasToken, 
+      hasUser: !!currentUser, 
+      userFromState: !!user,
+      userFromService: !!authService.getAuthUser(),
+      isAuthenticated: isUserAuthenticated,
+      pathname: location.pathname
+    });
     
     return {
       // State
-      user,
+      user: currentUser,
       isLoading,
       error,
       
       // Computed values
       isAuthenticated: isUserAuthenticated,
-      isAdmin: isUserAdmin,
+      isAdmin: Boolean(currentUser?.role === 'admin' || currentUser?.role === 'superadmin'),
       isProtectedRoute: isProtectedRoute(),
       isLoginPage: isLoginPage(),
       
@@ -304,6 +249,7 @@ function useProvideAuth() {
     user, 
     isLoading, 
     error, 
+    authChangeCounter, // This ensures re-renders when auth state changes
     isProtectedRoute,
     isLoginPage,
     login,
@@ -312,7 +258,8 @@ function useProvideAuth() {
     clearError,
     handleAuthError,
     navigateToLogin,
-    navigateAfterLogin
+    navigateAfterLogin,
+    location.pathname // Add pathname to dependencies to force re-evaluation
   ]);
 
   return authValues;
