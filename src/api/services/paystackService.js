@@ -7,7 +7,7 @@
   class PaystackService {
     constructor() {
       // Get Paystack public key from environment variables
-      this.publicKey = 'pk_test_d653398fb92b5cf790c4e7923e0fca0c120bcc19'
+      this.publicKey = ''
       this.baseURL = 'https://api.paystack.co';
       
       if (!this.publicKey) {

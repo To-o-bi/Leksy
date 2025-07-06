@@ -187,7 +187,7 @@ class ApiClient {
       
       document.cookie = `auth_token=; path=/; max-age=0; SameSite=Strict${secureFlag}`;
       document.cookie = `user_data=; path=/; max-age=0; SameSite=Strict${secureFlag}`;
-      console.log('🧹 Cookies cleared');
+     
     }
     
     // Clear axios headers
