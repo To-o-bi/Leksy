@@ -6,11 +6,12 @@ import {
   Trash2, 
   Search, 
   Calendar,
-  Plus,
   X,
   RefreshCw
 } from 'lucide-react';
-import api from '../../api/axios'; 
+
+// Import your actual API
+import api from '../../api/axios';
 
 // Toast hook implementation
 const useToast = () => {
@@ -62,99 +63,60 @@ const Toast = ({ toast, onDismiss }) => {
   );
 };
 
-// Newsletter service using your axios client - FIXED VERSION
+// Newsletter service - FIXED VERSION
 const newsletterService = {
   async fetchSubscribers(limit = null) {
     try {
       const params = {};
       if (limit) params.limit = limit;
 
+      console.log('🔄 Fetching subscribers with params:', params);
+      
       const response = await api.get('/admin/fetch-newsletter-subscribers', { params });
       
-      if (response?.data?.code === 200) {
-        return {
-          success: true,
-          subscribers: response.data.newsletter_subscribers || [],
-          message: response.data.message || 'Subscribers fetched successfully!'
-        };
-      } else {
+      console.log('📥 Full API Response:', response);
+      console.log('📥 Response Data:', response.data);
+      console.log('📥 Response Code:', response.data?.code);
+      console.log('📥 Response Submission:', response.data?.submission);
+      
+      // Check if response exists and has correct structure
+      if (!response || !response.data) {
+        console.error('❌ No response or response.data');
         return {
           success: false,
-          message: response?.data?.message || 'Failed to fetch subscribers'
+          message: 'Invalid response from server'
+        };
+      }
+
+      // Check for successful response code
+      if (response.data.code === 200) {
+        // Handle both submission and subscribers arrays (for flexibility)
+        const subscribersArray = response.data.submission || response.data.subscribers || [];
+        
+        console.log('✅ Subscribers array:', subscribersArray);
+        console.log('✅ Array length:', subscribersArray.length);
+        console.log('✅ Is array?', Array.isArray(subscribersArray));
+        
+        return {
+          success: true,
+          subscribers: subscribersArray,
+          message: response.data.message || 'Subscribers fetched successfully!',
+          total: subscribersArray.length
+        };
+      } else {
+        console.error('❌ API returned non-200 code:', response.data.code);
+        return {
+          success: false,
+          message: response.data.message || 'Failed to fetch subscribers'
         };
       }
     } catch (error) {
       console.error('❌ Newsletter fetch subscribers error:', error);
       return {
         success: false,
-        message: error.message || 'Network error. Please check your connection and try again.'
+        message: error.response?.data?.message || error.message || 'Network error. Please check your connection and try again.'
       };
     }
-  },
-
-  async addSubscriber(email) {
-    try {
-      if (!email || !email.trim()) {
-        return {
-          success: false,
-          message: 'Please enter a valid email address'
-        };
-      }
-
-      const cleanEmail = email.trim();
-      
-      // Basic email validation
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(cleanEmail)) {
-        return {
-          success: false,
-          message: 'Please enter a valid email address'
-        };
-      }
-
-      console.log('🔄 Attempting newsletter subscription for:', cleanEmail);
-
-      // According to your API docs: POST with email as query parameter and empty body
-      console.log('📤 Sending POST request with email as query parameter...');
-      
-      // Use axios directly to ensure we send an empty body
-      const response = await api.client.post(`/newsletter-subscribers/add?email=${encodeURIComponent(cleanEmail)}`, {});
-      
-      console.log('📨 Add subscriber response:', response.data);
-      
-      if (response?.data?.code === 200) {
-        return {
-          success: true,
-          message: response.data.message || 'Successfully subscribed to newsletter!'
-        };
-      } else {
-        return {
-          success: false,
-          message: response?.data?.message || 'Failed to subscribe. Please try again.'
-        };
-      }
-      } catch (error) {
-        console.error('❌ Newsletter subscription error:', error);
-        console.error('❌ Full error details:', {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
-          config: error.config
-        });
-        
-        // Check if it's a validation error from the server
-        if (error.response?.data?.message) {
-          return {
-            success: false,
-            message: error.response.data.message
-          };
-        }
-        
-        return {
-          success: false,
-          message: error.message || 'Network error. Please check your connection and try again.'
-        };
-      }
   },
 
   async removeSubscriber(email) {
@@ -179,7 +141,7 @@ const newsletterService = {
 
       console.log('🔄 Attempting newsletter unsubscription for:', cleanEmail);
 
-      // FIXED: Send email as query parameter instead of request body
+      // Send email as query parameter as per API docs
       const response = await api.post(`/newsletter-subscribers/remove?email=${encodeURIComponent(cleanEmail)}`);
       
       if (response?.data?.code === 200) {
@@ -197,7 +159,7 @@ const newsletterService = {
       console.error('❌ Newsletter unsubscribe error:', error);
       return {
         success: false,
-        message: error.message || 'Network error. Please check your connection and try again.'
+        message: error.response?.data?.message || error.message || 'Network error. Please check your connection and try again.'
       };
     }
   }
@@ -208,8 +170,6 @@ const NewsletterAdmin = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState(''); 
   const [selectedSubscribers, setSelectedSubscribers] = useState([]);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newEmail, setNewEmail] = useState('');
   const [stats, setStats] = useState({
     total: 0,
     recent: 0,
@@ -228,6 +188,7 @@ const NewsletterAdmin = () => {
       });
       // Uncomment to redirect to login
       // window.location.href = '/login';
+      setLoading(false);
     } else {
       fetchSubscribers();
     }
@@ -235,13 +196,42 @@ const NewsletterAdmin = () => {
 
   const fetchSubscribers = async () => {
     setLoading(true);
+    console.log('🔄 Starting fetchSubscribers...');
+    
     try {
       const result = await newsletterService.fetchSubscribers();
+      console.log('📋 Fetch Result:', result);
+      
       if (result.success) {
         const subscriberData = result.subscribers || [];
-        setSubscribers(subscriberData);
-        calculateStats(subscriberData);
+        console.log('📊 Processing subscriber data:', subscriberData);
+        console.log('📊 Data type:', typeof subscriberData);
+        console.log('📊 Is array:', Array.isArray(subscriberData));
+        console.log('📊 Length:', subscriberData.length);
+        
+        // Ensure we have a valid array
+        if (Array.isArray(subscriberData)) {
+          setSubscribers(subscriberData);
+          calculateStats(subscriberData);
+          console.log('✅ Subscribers set successfully');
+          
+          toast({
+            title: 'Success',
+            description: `${result.message} (${subscriberData.length} subscribers loaded)`,
+            variant: 'success'
+          });
+        } else {
+          console.error('❌ Subscriber data is not an array:', subscriberData);
+          setSubscribers([]);
+          toast({
+            title: 'Warning',
+            description: 'Received invalid data format from server',
+            variant: 'warning'
+          });
+        }
       } else {
+        console.error('❌ Fetch failed:', result.message);
+        setSubscribers([]);
         toast({
           title: 'Error',
           description: result.message || 'Failed to fetch subscribers',
@@ -249,6 +239,8 @@ const NewsletterAdmin = () => {
         });
       }
     } catch (error) {
+      console.error('❌ Fetch error:', error);
+      setSubscribers([]);
       toast({
         title: 'Error',
         description: error.message || 'Failed to fetch subscribers',
@@ -256,23 +248,35 @@ const NewsletterAdmin = () => {
       });
     } finally {
       setLoading(false);
+      console.log('🏁 fetchSubscribers completed');
     }
   };
 
   const calculateStats = (subscriberData) => {
+    console.log('📊 Calculating stats for:', subscriberData);
+    
+    if (!Array.isArray(subscriberData)) {
+      console.warn('❌ subscriberData is not an array:', subscriberData);
+      setStats({ total: 0, recent: 0, thisMonth: 0 });
+      return;
+    }
+
     const now = new Date();
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    setStats({
+    const newStats = {
       total: subscriberData.length,
       recent: subscriberData.filter(sub => 
-        new Date(sub.created_at) > lastWeek
+        sub.created_at && new Date(sub.created_at) > lastWeek
       ).length,
       thisMonth: subscriberData.filter(sub => 
-        new Date(sub.created_at) > thisMonth
+        sub.created_at && new Date(sub.created_at) > thisMonth
       ).length
-    });
+    };
+
+    console.log('📊 Calculated stats:', newStats);
+    setStats(newStats);
   };
 
   const handleRemoveSubscriber = async (email) => {
@@ -283,9 +287,11 @@ const NewsletterAdmin = () => {
     try {
       const result = await newsletterService.removeSubscriber(email);
       if (result.success) {
-        setSubscribers(prev => prev.filter(sub => sub.email !== email));
         const newData = subscribers.filter(sub => sub.email !== email);
+        setSubscribers(newData);
         calculateStats(newData);
+        // Remove from selected if it was selected
+        setSelectedSubscribers(prev => prev.filter(selectedEmail => selectedEmail !== email));
         toast({
           title: 'Success',
           description: result.message || 'Subscriber removed successfully!',
@@ -326,22 +332,32 @@ const NewsletterAdmin = () => {
         selectedSubscribers.map(email => newsletterService.removeSubscriber(email))
       );
       
-      const allSuccess = results.every(result => result.success);
-      if (allSuccess) {
+      const successCount = results.filter(result => result.success).length;
+      const errorCount = results.length - successCount;
+      
+      if (successCount > 0) {
         const newData = subscribers.filter(sub => !selectedSubscribers.includes(sub.email));
         setSubscribers(newData);
         calculateStats(newData);
         setSelectedSubscribers([]);
-        toast({
-          title: 'Success',
-          description: `${selectedSubscribers.length} subscribers removed successfully!`,
-          variant: 'success'
-        });
+        
+        if (errorCount === 0) {
+          toast({
+            title: 'Success',
+            description: `${successCount} subscribers removed successfully!`,
+            variant: 'success'
+          });
+        } else {
+          toast({
+            title: 'Partial Success',
+            description: `${successCount} subscribers removed, ${errorCount} failed`,
+            variant: 'warning'
+          });
+        }
       } else {
-        const errorMessages = results.filter(r => !r.success).map(r => r.message);
         toast({
-          title: 'Partial Error',
-          description: `Some subscribers could not be removed: ${errorMessages.join(', ')}`,
+          title: 'Error',
+          description: 'Failed to remove all selected subscribers',
           variant: 'destructive'
         });
       }
@@ -354,66 +370,21 @@ const NewsletterAdmin = () => {
     }
   };
 
-  const handleAddSubscriber = async (e) => {
-    e.preventDefault();
-    if (!newEmail.trim()) {
-      toast({
-        title: 'Warning',
-        description: 'Please enter an email address',
-        variant: 'warning'
-      });
-      return;
-    }
-
-    // Check if email already exists
-    if (subscribers.some(sub => sub.email.toLowerCase() === newEmail.toLowerCase())) {
-      toast({
-        title: 'Warning',
-        description: 'This email is already subscribed',
-        variant: 'warning'
-      });
-      return;
-    }
-
-    try {
-      const result = await newsletterService.addSubscriber(newEmail);
-      if (result.success) {
-        const newSubscriber = {
-          email: newEmail,
-          created_at: new Date().toISOString()
-        };
-        const newData = [...subscribers, newSubscriber];
-        setSubscribers(newData);
-        calculateStats(newData);
-        setNewEmail('');
-        setShowAddModal(false);
-        toast({
-          title: 'Success',
-          description: result.message || 'Subscriber added successfully!',
-          variant: 'success'
-        });
-      } else {
-        toast({
-          title: 'Error',
-          description: result.message || 'Failed to add subscriber',
-          variant: 'destructive'
-        });
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to add subscriber',
-        variant: 'destructive'
-      });
-    }
-  };
-
   const exportSubscribers = () => {
     try {
+      if (!Array.isArray(subscribers) || subscribers.length === 0) {
+        toast({
+          title: 'Warning',
+          description: 'No subscribers to export',
+          variant: 'warning'
+        });
+        return;
+      }
+
       const csvContent = [
         ['Email', 'Date Subscribed'],
         ...subscribers.map(sub => [
-          sub.email,
+          sub.email || 'N/A',
           formatDate(sub.created_at)
         ])
       ].map(row => row.join(',')).join('\n');
@@ -442,22 +413,26 @@ const NewsletterAdmin = () => {
     }
   };
 
-  const filteredSubscribers = subscribers.filter(subscriber =>
+  const filteredSubscribers = Array.isArray(subscribers) ? subscribers.filter(subscriber =>
     subscriber.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) : [];
 
   const toggleSelectAll = () => {
     if (selectedSubscribers.length === filteredSubscribers.length && filteredSubscribers.length > 0) {
       setSelectedSubscribers([]);
     } else {
-      setSelectedSubscribers(filteredSubscribers.map(sub => sub.email));
+      setSelectedSubscribers(filteredSubscribers.map(sub => sub.email).filter(Boolean));
     }
   };
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown';
-    const date = new Date(dateString);
-    return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString();
+    try {
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString();
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   if (loading) {
@@ -491,13 +466,6 @@ const NewsletterAdmin = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Subscriber</span>
-            </button>
-            <button
               onClick={exportSubscribers}
               className="flex items-center space-x-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
             >
@@ -511,6 +479,20 @@ const NewsletterAdmin = () => {
               <RefreshCw className="w-4 h-4" />
               <span>Refresh</span>
             </button>
+          </div>
+        </div>
+
+        {/* Enhanced Debug Info */}
+        <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <h3 className="font-bold text-sm text-blue-800 mb-2">Debug Info:</h3>
+          <div className="text-sm text-blue-700 space-y-1">
+            <p><strong>Loading:</strong> {loading ? 'Yes' : 'No'}</p>
+            <p><strong>Subscribers Length:</strong> {subscribers.length}</p>
+            <p><strong>Subscribers Type:</strong> {Array.isArray(subscribers) ? 'Array' : typeof subscribers}</p>
+            <p><strong>Filtered Length:</strong> {filteredSubscribers.length}</p>
+            <p><strong>Search Term:</strong> "{searchTerm}"</p>
+            <p><strong>First Subscriber:</strong> {subscribers[0] ? JSON.stringify(subscribers[0]) : 'None'}</p>
+            <p><strong>Stats:</strong> Total: {stats.total}, Recent: {stats.recent}, This Month: {stats.thisMonth}</p>
           </div>
         </div>
 
@@ -591,7 +573,16 @@ const NewsletterAdmin = () => {
                 {filteredSubscribers.length === 0 ? (
                   <tr>
                     <td colSpan="4" className="px-6 py-8 text-center text-gray-500">
-                      {searchTerm ? 'No subscribers found matching your search.' : 'No subscribers yet.'}
+                      <div className="flex flex-col items-center space-y-2">
+                        <Mail className="w-12 h-12 text-gray-300" />
+                        <div>
+                          {searchTerm ? (
+                            <p>No subscribers found matching "{searchTerm}"</p>
+                          ) : (
+                            <p>No subscribers yet. They'll appear here once someone subscribes to your newsletter.</p>
+                          )}
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ) : (
@@ -612,7 +603,7 @@ const NewsletterAdmin = () => {
                         />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {subscriber.email}
+                        {subscriber.email || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(subscriber.created_at)}
@@ -633,66 +624,6 @@ const NewsletterAdmin = () => {
             </table>
           </div>
         </div>
-
-        {/* Add Subscriber Modal */}
-        {showAddModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-              <div className="flex items-center justify-between p-4 border-b">
-                <h2 className="text-lg font-semibold text-gray-900">Add New Subscriber</h2>
-                <button
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setNewEmail('');
-                  }}
-                  className="text-gray-400 hover:text-gray-500"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="p-4">
-                <div className="mb-4">
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
-                    placeholder="Enter email address"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddSubscriber(e);
-                      }
-                    }}
-                  />
-                </div>
-                <div className="flex justify-end space-x-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddModal(false);
-                      setNewEmail('');
-                    }}
-                    className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAddSubscriber}
-                    className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500"
-                  >
-                    Add Subscriber
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
