@@ -1,83 +1,106 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
+import api from '../../api/axios';
 
 const NotificationsPage = () => {
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: 'booking',
-      title: 'New Booking for Skincare Consultation',
-      message: 'New Consultation Scheduled! I need recommendations for dry skin.',
-      time: '2 mins ago',
-      read: false,
-      date: 'Today'
-    },
-    {
-      id: 2,
-      type: 'order',
-      title: 'New Order Received',
-      message: 'Order #5678 has been placed by Jane Doe.',
-      time: '2 mins ago',
-      read: false,
-      date: 'Today'
-    },
-    {
-      id: 3,
-      type: 'order',
-      title: 'New Order Received',
-      message: 'Order #5678 has been placed by Jane Doe.',
-      time: '2 mins ago',
-      read: false,
-      date: 'Today'
-    },
-    {
-      id: 4,
-      type: 'stock',
-      title: 'Low Stock Alert',
-      message: 'Product: Vitamin C Glow Serum Stock Running Low!',
-      time: '2 mins ago',
-      read: false,
-      date: 'Today'
-    },
-    {
-      id: 5,
-      type: 'booking',
-      title: 'New Booking for Skincare Consultation',
-      message: 'New Consultation Scheduled! I need recommendations for dry skin.',
-      time: '2 mins ago',
-      read: false,
-      date: 'Today'
-    },
-    {
-      id: 6,
-      type: 'booking',
-      title: 'New Booking for Skincare Consultation',
-      message: 'New Consultation Scheduled! I need recommendations for dry skin.',
-      time: '2 mins ago',
-      read: true,
-      date: 'Yesterday'
-    },
-    {
-      id: 7,
-      type: 'order',
-      title: 'New Order Received',
-      message: 'Order #5678 has been placed by Jane Doe.',
-      time: '2 mins ago',
-      read: true,
-      date: 'Yesterday'
-    }
-  ]);
-
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
+  const [limit, setLimit] = useState(20);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Fetch notifications from API
+  const fetchNotifications = async (fetchLimit = limit, showRefreshing = false) => {
+    try {
+      if (showRefreshing) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+      
+      const response = await api.get('/admin/fetch-notifications', { limit: fetchLimit });
+      
+      if (response.data.code === 200) {
+        // Transform API data to match component structure
+        const transformedNotifications = response.data.notifications.map(notification => ({
+          id: notification.id,
+          type: notification.type,
+          type_id: notification.type_id,
+          title: notification.title,
+          message: notification.description,
+          time: formatTimeAgo(notification.created_at),
+          read: false, // API doesn't provide read status, using local state
+          date: formatDate(notification.created_at),
+          created_at: notification.created_at,
+          raw_description: notification.description
+        }));
+        
+        setNotifications(transformedNotifications);
+      } else {
+        throw new Error(response.data.message || 'Failed to fetch notifications');
+      }
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+      setError(err.response?.data?.message || err.message || 'Failed to fetch notifications');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Format time ago
+  const formatTimeAgo = (dateString) => {
+    const now = new Date();
+    const notificationDate = new Date(dateString);
+    const diffInSeconds = Math.floor((now - notificationDate) / 1000);
+    
+    if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    return notificationDate.toLocaleDateString();
+  };
+
+  // Format date for grouping
+  const formatDate = (dateString) => {
+    const today = new Date();
+    const notificationDate = new Date(dateString);
+    const diffInDays = Math.floor((today - notificationDate) / (1000 * 60 * 60 * 24));
+    
+    if (diffInDays === 0) return 'Today';
+    if (diffInDays === 1) return 'Yesterday';
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+    return notificationDate.toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  // Load notifications on component mount
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  // Auto-refresh notifications every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchNotifications(limit, true);
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [limit]);
 
   const markAsRead = (id) => {
-    setNotifications(notifications.map(notification => 
+    setNotifications(prev => prev.map(notification => 
       notification.id === id ? { ...notification, read: true } : notification
     ));
   };
 
   const markAllAsRead = () => {
-    setNotifications(notifications.map(notification => ({
+    setNotifications(prev => prev.map(notification => ({
       ...notification,
       read: true
     })));
@@ -91,22 +114,28 @@ const NotificationsPage = () => {
 
   const getNotificationIcon = (type) => {
     switch (type) {
-      case 'booking':
+      case 'consultations':
         return (
           <svg className="w-5 h-5 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         );
-      case 'order':
+      case 'orders':
         return (
           <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
           </svg>
         );
-      case 'stock':
+      case 'products':
         return (
           <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+        );
+      case 'contact_submissions':
+        return (
+          <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
         );
       default:
@@ -118,18 +147,78 @@ const NotificationsPage = () => {
     }
   };
 
-  const getNotificationAction = (type) => {
-    switch (type) {
-      case 'booking':
-        return <NavLink to="/admin/bookings" className="text-pink-500 hover:underline">View Booking</NavLink>;
-      case 'order':
-        return <NavLink to="/admin/orders" className="text-blue-500 hover:underline">View Order</NavLink>;
-      case 'stock':
-        return <NavLink to="/admin/product-stock" className="text-yellow-500 hover:underline">Manage Stock</NavLink>;
-      default:
-        return null;
+  const getNotificationAction = (type, typeId) => {
+    const getRoute = () => {
+      switch (type) {
+        case 'consultations':
+          return '/admin/bookings';
+        case 'orders':
+          return '/admin/orders';
+        case 'products':
+          return '/admin/products/stock';
+        case 'contact_submissions':
+          return '/admin/inbox';
+        default:
+          return '/admin/dashboard';
+      }
+    };
+
+    const getActionText = () => {
+      switch (type) {
+        case 'consultations':
+          return 'View Booking';
+        case 'orders':
+          return 'View Order';
+        case 'products':
+          return 'Manage Stock';
+        case 'contact_submissions':
+          return 'View Message';
+        default:
+          return 'View Details';
+      }
+    };
+
+    const getColorClass = () => {
+      switch (type) {
+        case 'consultations':
+          return 'text-pink-500 hover:text-pink-700';
+        case 'orders':
+          return 'text-blue-500 hover:text-blue-700';
+        case 'products':
+          return 'text-yellow-500 hover:text-yellow-700';
+        case 'contact_submissions':
+          return 'text-green-500 hover:text-green-700';
+        default:
+          return 'text-gray-500 hover:text-gray-700';
+      }
+    };
+
+    return (
+      <NavLink 
+        to={getRoute()} 
+        className={`${getColorClass()} hover:underline transition-colors duration-200`}
+        onClick={(e) => {
+          e.stopPropagation();
+          // You can add additional logic here if needed
+        }}
+      >
+        {getActionText()}
+      </NavLink>
+    );
+  };
+
+  const getTabDisplayName = (tab) => {
+    switch (tab) {
+      case 'consultations': return 'Consultations';
+      case 'orders': return 'Orders';
+      case 'products': return 'Products';
+      case 'contact_submissions': return 'Messages';
+      default: return tab.charAt(0).toUpperCase() + tab.slice(1);
     }
   };
+
+  // Get unique notification types for tabs
+  const uniqueTypes = [...new Set(notifications.map(n => n.type))];
 
   // Group notifications by date
   const groupedNotifications = filteredNotifications.reduce((acc, notification) => {
@@ -140,87 +229,249 @@ const NotificationsPage = () => {
     return acc;
   }, {});
 
-  return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-800">Notifications</h2>
-          <button 
-            onClick={markAllAsRead}
-            className="text-sm text-pink-500 hover:text-pink-700 font-medium"
-          >
-            Mark all as read
-          </button>
-        </div>
-      </div>
+  // Sort dates with Today first, then Yesterday, then chronologically
+  const sortedDates = Object.keys(groupedNotifications).sort((a, b) => {
+    if (a === 'Today') return -1;
+    if (b === 'Today') return 1;
+    if (a === 'Yesterday') return -1;
+    if (b === 'Yesterday') return 1;
+    return new Date(b) - new Date(a);
+  });
 
-      <div className="flex border-b border-gray-200">
-        <button
-          className={`px-6 py-3 text-sm font-medium ${activeTab === 'all' ? 'text-pink-500 border-b-2 border-pink-500' : 'text-gray-500 hover:text-gray-700'}`}
-          onClick={() => setActiveTab('all')}
-        >
-          All
-        </button>
-        <button
-          className={`px-6 py-3 text-sm font-medium ${activeTab === 'unread' ? 'text-pink-500 border-b-2 border-pink-500' : 'text-gray-500 hover:text-gray-700'}`}
-          onClick={() => setActiveTab('unread')}
-        >
-          Unread
-        </button>
-        <button
-          className={`px-6 py-3 text-sm font-medium ${activeTab === 'booking' ? 'text-pink-500 border-b-2 border-pink-500' : 'text-gray-500 hover:text-gray-700'}`}
-          onClick={() => setActiveTab('booking')}
-        >
-          Bookings
-        </button>
-        <button
-          className={`px-6 py-3 text-sm font-medium ${activeTab === 'order' ? 'text-pink-500 border-b-2 border-pink-500' : 'text-gray-500 hover:text-gray-700'}`}
-          onClick={() => setActiveTab('order')}
-        >
-          Orders
-        </button>
-        <button
-          className={`px-6 py-3 text-sm font-medium ${activeTab === 'stock' ? 'text-pink-500 border-b-2 border-pink-500' : 'text-gray-500 hover:text-gray-700'}`}
-          onClick={() => setActiveTab('stock')}
-        >
-          Stock
-        </button>
-      </div>
+  const unreadCount = notifications.filter(n => !n.read).length;
 
-      <div className="divide-y divide-gray-200">
-        {Object.entries(groupedNotifications).map(([date, dateNotifications]) => (
-          <div key={date}>
-            <div className="px-6 py-3 bg-gray-50">
-              <h3 className="text-sm font-medium text-gray-500">{date}</h3>
-            </div>
-            {dateNotifications.map(notification => (
-              <div 
-                key={notification.id} 
-                className={`px-6 py-4 hover:bg-gray-50 ${!notification.read ? 'bg-pink-50' : ''}`}
-                onClick={() => markAsRead(notification.id)}
-              >
-                <div className="flex items-start">
-                  <div className="flex-shrink-0 pt-1">
-                    {getNotificationIcon(notification.type)}
-                  </div>
-                  <div className="ml-4 flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className={`text-sm font-medium ${!notification.read ? 'text-gray-900' : 'text-gray-600'}`}>
-                        {notification.title}
-                      </p>
-                      <span className="text-xs text-gray-500">{notification.time}</span>
-                    </div>
-                    <p className="text-sm text-gray-500 mt-1">{notification.message}</p>
-                    <div className="mt-2 text-sm">
-                      {getNotificationAction(notification.type)}
-                    </div>
-                  </div>
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="animate-pulse">
+          <div className="flex items-center justify-between mb-6">
+            <div className="h-6 bg-gray-200 rounded w-1/4"></div>
+            <div className="h-4 bg-gray-200 rounded w-24"></div>
+          </div>
+          <div className="flex space-x-4 mb-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-8 bg-gray-200 rounded w-16"></div>
+            ))}
+          </div>
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-start space-x-4 p-4 border rounded-lg">
+                <div className="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/4"></div>
                 </div>
               </div>
             ))}
           </div>
-        ))}
+        </div>
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="text-center">
+          <div className="text-red-500 text-lg mb-2">⚠️ Error Loading Notifications</div>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button 
+            onClick={() => fetchNotifications()}
+            className="bg-pink-500 text-white px-4 py-2 rounded-md hover:bg-pink-600 transition-colors duration-200"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <h2 className="text-xl font-semibold text-gray-800">Notifications</h2>
+            {unreadCount > 0 && (
+              <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                {unreadCount}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center space-x-4">
+            <button 
+              onClick={() => fetchNotifications(limit, true)}
+              disabled={refreshing}
+              className={`text-sm font-medium transition-colors duration-200 ${
+                refreshing 
+                  ? 'text-gray-400 cursor-not-allowed' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {refreshing ? (
+                <span className="flex items-center space-x-1">
+                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Refreshing...</span>
+                </span>
+              ) : (
+                '🔄 Refresh'
+              )}
+            </button>
+            {unreadCount > 0 && (
+              <button 
+                onClick={markAllAsRead}
+                className="text-sm text-pink-500 hover:text-pink-700 font-medium transition-colors duration-200"
+              >
+                Mark all as read
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200 overflow-x-auto">
+        <button
+          className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-200 ${
+            activeTab === 'all' 
+              ? 'text-pink-500 border-b-2 border-pink-500 bg-pink-50' 
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+          }`}
+          onClick={() => setActiveTab('all')}
+        >
+          All ({notifications.length})
+        </button>
+        <button
+          className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-200 ${
+            activeTab === 'unread' 
+              ? 'text-pink-500 border-b-2 border-pink-500 bg-pink-50' 
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+          }`}
+          onClick={() => setActiveTab('unread')}
+        >
+          Unread ({unreadCount})
+        </button>
+        {uniqueTypes.map(type => {
+          const count = notifications.filter(n => n.type === type).length;
+          return (
+            <button
+              key={type}
+              className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-200 ${
+                activeTab === type 
+                  ? 'text-pink-500 border-b-2 border-pink-500 bg-pink-50' 
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+              onClick={() => setActiveTab(type)}
+            >
+              {getTabDisplayName(type)} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Notifications List */}
+      <div className="divide-y divide-gray-200 max-h-[600px] overflow-y-auto">
+        {sortedDates.length === 0 ? (
+          <div className="px-6 py-12 text-center">
+            <div className="text-gray-400 text-4xl mb-4">🔔</div>
+            <p className="text-gray-500 text-lg">No notifications found</p>
+            <p className="text-gray-400 text-sm mt-2">
+              {activeTab === 'all' ? 'You have no notifications yet.' : `No ${activeTab} notifications.`}
+            </p>
+          </div>
+        ) : (
+          sortedDates.map(date => (
+            <div key={date}>
+              <div className="px-6 py-3 bg-gray-50 sticky top-0 z-10 border-b border-gray-100">
+                <h3 className="text-sm font-medium text-gray-600">{date}</h3>
+              </div>
+              {groupedNotifications[date].map(notification => (
+                <div 
+                  key={notification.id} 
+                  className={`px-6 py-4 hover:bg-gray-50 cursor-pointer transition-all duration-200 ${
+                    !notification.read 
+                      ? 'bg-pink-50 border-l-4 border-pink-500' 
+                      : 'hover:border-l-4 hover:border-gray-300'
+                  }`}
+                  onClick={() => markAsRead(notification.id)}
+                >
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-shrink-0 pt-1">
+                      {getNotificationIcon(notification.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className={`text-sm font-medium truncate ${
+                          !notification.read ? 'text-gray-900' : 'text-gray-600'
+                        }`}>
+                          {notification.title}
+                        </p>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-500 whitespace-nowrap">
+                            {notification.time}
+                          </span>
+                          {!notification.read && (
+                            <div className="w-2 h-2 bg-pink-500 rounded-full"></div>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                        {notification.message.replace(/<[^>]*>/g, '')}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm">
+                          {getNotificationAction(notification.type, notification.type_id)}
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          notification.type === 'consultations' ? 'bg-pink-100 text-pink-800' :
+                          notification.type === 'orders' ? 'bg-blue-100 text-blue-800' :
+                          notification.type === 'products' ? 'bg-yellow-100 text-yellow-800' :
+                          notification.type === 'contact_submissions' ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {getTabDisplayName(notification.type)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Footer */}
+      {notifications.length > 0 && (
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-500">
+              Showing {filteredNotifications.length} of {notifications.length} notifications
+            </span>
+            <div className="flex items-center space-x-3">
+              <label className="text-sm text-gray-500">Show:</label>
+              <select 
+                value={limit} 
+                onChange={(e) => {
+                  const newLimit = parseInt(e.target.value);
+                  setLimit(newLimit);
+                  fetchNotifications(newLimit);
+                }}
+                className="text-sm border border-gray-300 rounded-md px-3 py-1 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
