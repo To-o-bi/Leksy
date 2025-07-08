@@ -209,9 +209,9 @@ const NotificationsPage = () => {
 
   const getTabDisplayName = (tab) => {
     switch (tab) {
-      case 'consultations': return 'Consultations';
+      case 'consultations': return 'Bookings';
       case 'orders': return 'Orders';
-      case 'products': return 'Products';
+      case 'products': return 'Stock';
       case 'contact_submissions': return 'Messages';
       default: return tab.charAt(0).toUpperCase() + tab.slice(1);
     }
