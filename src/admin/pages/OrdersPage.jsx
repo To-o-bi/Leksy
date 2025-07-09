@@ -2,9 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, Filter, Eye, RefreshCw, AlertCircle } from 'lucide-react';
 import { orderService } from '../../api/services';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 
 const AllOrders = () => {
   const { isAuthenticated, user, isAdmin } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // State management
   const [orders, setOrders] = useState([]);
@@ -18,8 +20,30 @@ const AllOrders = () => {
   const [showModal, setShowModal] = useState(false);
   const [notification, setNotification] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [highlightedOrderId, setHighlightedOrderId] = useState(null);
   
   const ORDERS_PER_PAGE = 9;
+
+  // Check for highlighted order in URL params on component mount
+  useEffect(() => {
+    const orderId = searchParams.get('orderId');
+    const shouldHighlight = searchParams.get('highlight') === 'true';
+    
+    if (orderId && shouldHighlight) {
+      setHighlightedOrderId(orderId);
+      
+      // Remove the highlight after 5 seconds
+      const timer = setTimeout(() => {
+        setHighlightedOrderId(null);
+        // Remove the query params without refreshing
+        searchParams.delete('orderId');
+        searchParams.delete('highlight');
+        setSearchParams(searchParams, { replace: true });
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, setSearchParams]);
 
   // Memoized configurations
   const ORDER_STATUS_OPTIONS = useMemo(() => [
@@ -490,7 +514,13 @@ const AllOrders = () => {
             </thead>
             <tbody>
               {paginationData.currentOrders.length > 0 ? paginationData.currentOrders.map((order) => (
-                <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                <tr 
+                  key={order.id} 
+                  className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                    highlightedOrderId === order.id ? 'bg-yellow-50 animate-pulse' : ''
+                  }`}
+                  id={`order-${order.id}`}
+                >
                   <td className="py-4 text-sm font-mono">{order.id}</td>
                   <td className="py-4">
                     <div>
