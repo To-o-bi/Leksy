@@ -7,7 +7,8 @@ import {
   Search, 
   Calendar,
   X,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 import api from '../../api/axios'; 
 
@@ -53,6 +54,80 @@ const Toast = ({ toast, onDismiss }) => {
       </button>
       <h3 className="font-medium pr-6">{toast.title}</h3>
       {toast.description && <p className="text-sm mt-1 pr-6">{toast.description}</p>}
+    </div>
+  );
+};
+
+// Delete Confirmation Modal
+const DeleteModal = ({ isOpen, onClose, onConfirm, subscriberEmail, isMultiple = false, count = 0 }) => {
+  if (!isOpen) return null;
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      onClick={handleBackdropClick}
+    >
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all">
+        <div className="p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="w-6 h-6 text-red-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Confirm Deletion
+              </h3>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="mb-6">
+            <p className="text-gray-600">
+              {isMultiple ? (
+                <>
+                  Are you sure you want to remove <span className="font-semibold text-red-600">{count}</span> subscribers from the newsletter?
+                </>
+              ) : (
+                <>
+                  Are you sure you want to remove <span className="font-semibold text-red-600">{subscriberEmail}</span> from the newsletter?
+                </>
+              )}
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              This action cannot be undone.
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors"
+            >
+              {isMultiple ? `Remove ${count} Subscribers` : 'Remove Subscriber'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -122,6 +197,12 @@ const NewsletterAdmin = () => {
   const [searchTerm, setSearchTerm] = useState(''); 
   const [selectedSubscribers, setSelectedSubscribers] = useState([]);
   const [stats, setStats] = useState({ total: 0, recent: 0, thisMonth: 0 });
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    email: '',
+    isMultiple: false,
+    count: 0
+  });
   const { toast, toasts, removeToast } = useToast();
 
   // Utility functions
@@ -152,6 +233,39 @@ const NewsletterAdmin = () => {
     toast({ title, description, variant: type });
   };
 
+  // Modal handlers
+  const openDeleteModal = (email) => {
+    setDeleteModal({
+      isOpen: true,
+      email,
+      isMultiple: false,
+      count: 0
+    });
+  };
+
+  const openBulkDeleteModal = () => {
+    if (selectedSubscribers.length === 0) {
+      showToast('warning', 'Warning', 'Please select subscribers to remove');
+      return;
+    }
+
+    setDeleteModal({
+      isOpen: true,
+      email: '',
+      isMultiple: true,
+      count: selectedSubscribers.length
+    });
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteModal({
+      isOpen: false,
+      email: '',
+      isMultiple: false,
+      count: 0
+    });
+  };
+
   // API handlers
   const fetchSubscribers = async () => {
     setLoading(true);
@@ -169,13 +283,11 @@ const NewsletterAdmin = () => {
     }
   };
 
-  const handleRemoveSubscriber = async (email) => {
-    if (!confirm(`Are you sure you want to remove ${email} from the newsletter?`)) return;
-
+  const handleRemoveSubscriber = async () => {
     try {
-      const result = await newsletterService.removeSubscriber(email);
+      const result = await newsletterService.removeSubscriber(deleteModal.email);
       if (result.success) {
-        const newData = subscribers.filter(sub => sub.email !== email);
+        const newData = subscribers.filter(sub => sub.email !== deleteModal.email);
         updateSubscribersList(newData);
         showToast('success', 'Success', result.message || 'Subscriber removed successfully!');
       } else {
@@ -183,17 +295,12 @@ const NewsletterAdmin = () => {
       }
     } catch (error) {
       showToast('destructive', 'Error', error.message || 'Failed to remove subscriber');
+    } finally {
+      closeDeleteModal();
     }
   };
 
   const handleBulkRemove = async () => {
-    if (selectedSubscribers.length === 0) {
-      showToast('warning', 'Warning', 'Please select subscribers to remove');
-      return;
-    }
-
-    if (!confirm(`Are you sure you want to remove ${selectedSubscribers.length} subscribers?`)) return;
-
     try {
       const results = await Promise.all(
         selectedSubscribers.map(email => newsletterService.removeSubscriber(email))
@@ -211,6 +318,8 @@ const NewsletterAdmin = () => {
       }
     } catch (error) {
       showToast('destructive', 'Error', error.message || 'Failed to remove subscribers');
+    } finally {
+      closeDeleteModal();
     }
   };
 
@@ -293,6 +402,16 @@ const NewsletterAdmin = () => {
         ))}
       </div>
 
+      {/* Delete Modal */}
+      <DeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={closeDeleteModal}
+        onConfirm={deleteModal.isMultiple ? handleBulkRemove : handleRemoveSubscriber}
+        subscriberEmail={deleteModal.email}
+        isMultiple={deleteModal.isMultiple}
+        count={deleteModal.count}
+      />
+
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
@@ -347,7 +466,7 @@ const NewsletterAdmin = () => {
           </div>
           {selectedSubscribers.length > 0 && (
             <button
-              onClick={handleBulkRemove}
+              onClick={openBulkDeleteModal}
               className="flex items-center space-x-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
@@ -401,7 +520,7 @@ const NewsletterAdmin = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <button
-                          onClick={() => handleRemoveSubscriber(subscriber.email)}
+                          onClick={() => openDeleteModal(subscriber.email)}
                           className="text-red-600 hover:text-red-800 transition-colors p-1"
                           title="Remove subscriber"
                         >

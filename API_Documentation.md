@@ -171,10 +171,10 @@ Can take (optionally):
 
 # DELIVERY FEES
 
-## Update Delivery Fees
+## Update Delivery Fees - Rapid Mode (States Level)
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/update-delivery-fees?Edo={2999}&Kogi={3100}&Cross River={5030}&Akwa Ibom={1100}&State={price}' \
+curl --location --request POST '{base_url}/api/admin/update-delivery-fees?Edo={2999}&Kogi={3100}&Cross River={5030}&Akwa Ibom={1100}&State={fee|numeric}' \
 --header 'Authorization: Bearer {token}'
 ```
 
@@ -233,7 +233,7 @@ curl --location --request GET '{base_url}/api/fetch-delivery-fees'
 ## Fetch All Delivery Fees (LGAs Based)
 
 ```CURL
-curl --location --request GET '{base_url}/api/fetch-lgas-delivery-fees'
+curl --location --request GET '{base_url}/api/fetch-lgas-delivery-fees?state={State|optional}'
 ```
 
 ```JSON
@@ -242,11 +242,75 @@ curl --location --request GET '{base_url}/api/fetch-lgas-delivery-fees'
 	"message": "Delivery fees fetch returned 41 results.",
 	"delivery_fees": [
 		{
+			"state": "Lagos",
 			"lga": "Epe",
 			"delivery_fee": 2999
 		},
 		...
 	]
+}
+```
+
+
+## Update Delivery Fees - Rapid Mode (LGAs level)
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/lgas-delivery-fees/update?Agege={2999}&Ika Ibom={3100}&Lga={fee|numeric}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Delivery fees updated successfully!",
+	"delivery_fees": [
+		{
+			"state": "Lagos",
+			"lga": "Agege",
+			"delivery_fee": 2999
+		},
+		...
+	],
+	"token": "{token}"
+}
+```
+
+
+## Add A LGA Delivery Fee
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/lgas-delivery-fees/add?state={State}&lga={Lga}&delivery_fee={fee|numeric}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "LGA delivery fee added successfully!",
+	"delivery_fees": {
+		"state": "Lagos",
+		"lga": "Eti Osa",
+		"delivery_fee": 4000
+	},
+	"token": "{token}"
+}
+```
+
+
+## Remove A LGA Delivery Fee
+
+- Feel Free: Any checkout to a non-existent LGA will fallback to charge the user the delivery fee to the state. So deleting an LGA will simply fallback to charge the user delivery fee for the state, so the users do not go scotfree of delivery fee.
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/lgas-delivery-fees/remove?state={State}&lga={Lga}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "The given LGA of the given State (if exists) has been deleted successfully!",
+	"token": "{token}"
 }
 ```
 
