@@ -201,29 +201,75 @@ class ApiClient {
     return !!(token && user);
   }
 
+  // Helper method to build URL with query parameters
+  buildUrlWithParams(url, params) {
+    if (!params || Object.keys(params).length === 0) {
+      return url;
+    }
+    const queryString = new URLSearchParams(params).toString();
+    return `${url}?${queryString}`;
+  }
+
   // API methods
   async get(url, params = {}) {
-    const queryString = new URLSearchParams(params).toString();
-    const fullUrl = queryString ? `${url}?${queryString}` : url;
+    const fullUrl = this.buildUrlWithParams(url, params);
     return await this.client.get(fullUrl);
   }
 
   async post(url, data, config = {}) {
+    // Handle query parameters in POST requests
+    if (config.params) {
+      const fullUrl = this.buildUrlWithParams(url, config.params);
+      // Remove params from config to avoid axios processing them again
+      const newConfig = { ...config };
+      delete newConfig.params;
+      return await this.client.post(fullUrl, data, newConfig);
+    }
+    
     return await this.client.post(url, data, config);
   }
 
-  async put(url, data) {
-    return await this.client.put(url, data);
+  async put(url, data, config = {}) {
+    // Handle query parameters in PUT requests
+    if (config.params) {
+      const fullUrl = this.buildUrlWithParams(url, config.params);
+      const newConfig = { ...config };
+      delete newConfig.params;
+      return await this.client.put(fullUrl, data, newConfig);
+    }
+    
+    return await this.client.put(url, data, config);
   }
 
-  async delete(url) {
-    return await this.client.delete(url);
+  async delete(url, config = {}) {
+    // Handle query parameters in DELETE requests
+    if (config.params) {
+      const fullUrl = this.buildUrlWithParams(url, config.params);
+      const newConfig = { ...config };
+      delete newConfig.params;
+      return await this.client.delete(fullUrl, newConfig);
+    }
+    
+    return await this.client.delete(url, config);
   }
 
-  async postFormData(url, formData) {
-    return await this.client.post(url, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+  async postFormData(url, formData, config = {}) {
+    const finalConfig = {
+      ...config,
+      headers: { 
+        'Content-Type': 'multipart/form-data',
+        ...config.headers
+      }
+    };
+    
+    // Handle query parameters in form data posts
+    if (finalConfig.params) {
+      const fullUrl = this.buildUrlWithParams(url, finalConfig.params);
+      delete finalConfig.params;
+      return await this.client.post(fullUrl, formData, finalConfig);
+    }
+    
+    return await this.client.post(url, formData, finalConfig);
   }
 }
 

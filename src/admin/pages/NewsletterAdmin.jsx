@@ -6,7 +6,6 @@ import {
   Trash2, 
   Search, 
   Calendar,
-  Plus,
   X,
   RefreshCw
 } from 'lucide-react';
@@ -20,16 +19,15 @@ const useToast = () => {
     const id = Math.random().toString(36).substring(2, 9);
     const newToast = { id, title, description, variant };
     
-    setToasts((prev) => [...prev, newToast]);
+    setToasts(prev => [...prev, newToast]);
     
-    // Auto-dismiss after 5 seconds
     setTimeout(() => {
-      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+      setToasts(prev => prev.filter(toast => toast.id !== id));
     }, 5000);
   };
 
   const removeToast = (id) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    setToasts(prev => prev.filter(toast => toast.id !== id));
   };
 
   return { toast, toasts, removeToast };
@@ -45,10 +43,7 @@ const Toast = ({ toast, onDismiss }) => {
   };
 
   return (
-    <div
-      className={`${variantClasses[toast.variant || 'default']} rounded-md shadow-lg p-4 max-w-xs w-full relative mb-2`}
-      role="alert"
-    >
+    <div className={`${variantClasses[toast.variant]} rounded-md shadow-lg p-4 max-w-xs w-full relative mb-2`} role="alert">
       <button
         onClick={onDismiss}
         className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
@@ -62,13 +57,20 @@ const Toast = ({ toast, onDismiss }) => {
   );
 };
 
-// Newsletter service using your axios client - FIXED VERSION
+// Validation helper
+const validateEmail = (email) => {
+  if (!email?.trim()) return { valid: false, message: 'Please enter a valid email address' };
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email.trim()) 
+    ? { valid: true } 
+    : { valid: false, message: 'Please enter a valid email address' };
+};
+
+// Newsletter service
 const newsletterService = {
   async fetchSubscribers(limit = null) {
     try {
-      const params = {};
-      if (limit) params.limit = limit;
-
+      const params = limit ? { limit } : {};
       const response = await api.get('/admin/fetch-newsletter-subscribers', { params });
       
       if (response?.data?.code === 200) {
@@ -77,128 +79,39 @@ const newsletterService = {
           subscribers: response.data.newsletter_subscribers || [],
           message: response.data.message || 'Subscribers fetched successfully!'
         };
-      } else {
-        return {
-          success: false,
-          message: response?.data?.message || 'Failed to fetch subscribers'
-        };
       }
+      return { success: false, message: response?.data?.message || 'Failed to fetch subscribers' };
     } catch (error) {
       console.error('❌ Newsletter fetch subscribers error:', error);
-      return {
-        success: false,
-        message: error.message || 'Network error. Please check your connection and try again.'
-      };
+      return { success: false, message: error.message || 'Network error. Please check your connection and try again.' };
     }
-  },
-
-  async addSubscriber(email) {
-    try {
-      if (!email || !email.trim()) {
-        return {
-          success: false,
-          message: 'Please enter a valid email address'
-        };
-      }
-
-      const cleanEmail = email.trim();
-      
-      // Basic email validation
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(cleanEmail)) {
-        return {
-          success: false,
-          message: 'Please enter a valid email address'
-        };
-      }
-
-      console.log('🔄 Attempting newsletter subscription for:', cleanEmail);
-
-      // According to your API docs: POST with email as query parameter and empty body
-      console.log('📤 Sending POST request with email as query parameter...');
-      
-      // Use axios directly to ensure we send an empty body
-      const response = await api.client.post(`/newsletter-subscribers/add?email=${encodeURIComponent(cleanEmail)}`, {});
-      
-      console.log('📨 Add subscriber response:', response.data);
-      
-      if (response?.data?.code === 200) {
-        return {
-          success: true,
-          message: response.data.message || 'Successfully subscribed to newsletter!'
-        };
-      } else {
-        return {
-          success: false,
-          message: response?.data?.message || 'Failed to subscribe. Please try again.'
-        };
-      }
-      } catch (error) {
-        console.error('❌ Newsletter subscription error:', error);
-        console.error('❌ Full error details:', {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
-          config: error.config
-        });
-        
-        // Check if it's a validation error from the server
-        if (error.response?.data?.message) {
-          return {
-            success: false,
-            message: error.response.data.message
-          };
-        }
-        
-        return {
-          success: false,
-          message: error.message || 'Network error. Please check your connection and try again.'
-        };
-      }
   },
 
   async removeSubscriber(email) {
     try {
-      if (!email || !email.trim()) {
-        return {
-          success: false,
-          message: 'Please enter a valid email address'
-        };
-      }
+      const validation = validateEmail(email);
+      if (!validation.valid) return { success: false, message: validation.message };
 
       const cleanEmail = email.trim();
-      
-      // Basic email validation
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(cleanEmail)) {
-        return {
-          success: false,
-          message: 'Please enter a valid email address'
-        };
-      }
-
       console.log('🔄 Attempting newsletter unsubscription for:', cleanEmail);
 
-      // FIXED: Send email as query parameter instead of request body
-      const response = await api.post(`/newsletter-subscribers/remove?email=${encodeURIComponent(cleanEmail)}`);
+      const formData = new FormData();
+      formData.append('email', cleanEmail);
+      
+      const response = await api.post('/newsletter-subscribers/remove', formData);
+      
+      console.log('✅ Newsletter unsubscription response:', response.data);
       
       if (response?.data?.code === 200) {
-        return {
-          success: true,
-          message: response.data.message || 'Successfully unsubscribed!'
-        };
-      } else {
-        return {
-          success: false,
-          message: response?.data?.message || 'Failed to unsubscribe. Please try again.'
-        };
+        return { success: true, message: response.data.message || 'Successfully unsubscribed!' };
       }
+      
+      return { success: false, message: response?.data?.message || 'Failed to unsubscribe' };
+      
     } catch (error) {
       console.error('❌ Newsletter unsubscribe error:', error);
-      return {
-        success: false,
-        message: error.message || 'Network error. Please check your connection and try again.'
-      };
+      const message = error.response?.data?.message || error.message || 'Network error. Please check your connection and try again.';
+      return { success: false, message };
     }
   }
 };
@@ -208,55 +121,14 @@ const NewsletterAdmin = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState(''); 
   const [selectedSubscribers, setSelectedSubscribers] = useState([]);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newEmail, setNewEmail] = useState('');
-  const [stats, setStats] = useState({
-    total: 0,
-    recent: 0,
-    thisMonth: 0
-  });
+  const [stats, setStats] = useState({ total: 0, recent: 0, thisMonth: 0 });
   const { toast, toasts, removeToast } = useToast();
 
-  // Check authentication and fetch subscribers
-  useEffect(() => {
-    const token = api.getToken();
-    if (!token) {
-      toast({
-        title: 'Authentication Required',
-        description: 'Please login to access this page',
-        variant: 'destructive'
-      });
-      // Uncomment to redirect to login
-      // window.location.href = '/login';
-    } else {
-      fetchSubscribers();
-    }
-  }, []);
-
-  const fetchSubscribers = async () => {
-    setLoading(true);
-    try {
-      const result = await newsletterService.fetchSubscribers();
-      if (result.success) {
-        const subscriberData = result.subscribers || [];
-        setSubscribers(subscriberData);
-        calculateStats(subscriberData);
-      } else {
-        toast({
-          title: 'Error',
-          description: result.message || 'Failed to fetch subscribers',
-          variant: 'destructive'
-        });
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to fetch subscribers',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-    }
+  // Utility functions
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Unknown';
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString();
   };
 
   const calculateStats = (subscriberData) => {
@@ -266,60 +138,61 @@ const NewsletterAdmin = () => {
 
     setStats({
       total: subscriberData.length,
-      recent: subscriberData.filter(sub => 
-        new Date(sub.created_at) > lastWeek
-      ).length,
-      thisMonth: subscriberData.filter(sub => 
-        new Date(sub.created_at) > thisMonth
-      ).length
+      recent: subscriberData.filter(sub => new Date(sub.created_at) > lastWeek).length,
+      thisMonth: subscriberData.filter(sub => new Date(sub.created_at) > thisMonth).length
     });
   };
 
-  const handleRemoveSubscriber = async (email) => {
-    if (!confirm(`Are you sure you want to remove ${email} from the newsletter?`)) {
-      return;
+  const updateSubscribersList = (newData) => {
+    setSubscribers(newData);
+    calculateStats(newData);
+  };
+
+  const showToast = (type, title, description) => {
+    toast({ title, description, variant: type });
+  };
+
+  // API handlers
+  const fetchSubscribers = async () => {
+    setLoading(true);
+    try {
+      const result = await newsletterService.fetchSubscribers();
+      if (result.success) {
+        updateSubscribersList(result.subscribers || []);
+      } else {
+        showToast('destructive', 'Error', result.message || 'Failed to fetch subscribers');
+      }
+    } catch (error) {
+      showToast('destructive', 'Error', error.message || 'Failed to fetch subscribers');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleRemoveSubscriber = async (email) => {
+    if (!confirm(`Are you sure you want to remove ${email} from the newsletter?`)) return;
 
     try {
       const result = await newsletterService.removeSubscriber(email);
       if (result.success) {
-        setSubscribers(prev => prev.filter(sub => sub.email !== email));
         const newData = subscribers.filter(sub => sub.email !== email);
-        calculateStats(newData);
-        toast({
-          title: 'Success',
-          description: result.message || 'Subscriber removed successfully!',
-          variant: 'success'
-        });
+        updateSubscribersList(newData);
+        showToast('success', 'Success', result.message || 'Subscriber removed successfully!');
       } else {
-        toast({
-          title: 'Error',
-          description: result.message || 'Failed to remove subscriber',
-          variant: 'destructive'
-        });
+        showToast('destructive', 'Error', result.message || 'Failed to remove subscriber');
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to remove subscriber',
-        variant: 'destructive'
-      });
+      showToast('destructive', 'Error', error.message || 'Failed to remove subscriber');
     }
   };
 
   const handleBulkRemove = async () => {
     if (selectedSubscribers.length === 0) {
-      toast({
-        title: 'Warning',
-        description: 'Please select subscribers to remove',
-        variant: 'warning'
-      });
+      showToast('warning', 'Warning', 'Please select subscribers to remove');
       return;
     }
 
-    if (!confirm(`Are you sure you want to remove ${selectedSubscribers.length} subscribers?`)) {
-      return;
-    }
+    if (!confirm(`Are you sure you want to remove ${selectedSubscribers.length} subscribers?`)) return;
 
     try {
       const results = await Promise.all(
@@ -329,82 +202,15 @@ const NewsletterAdmin = () => {
       const allSuccess = results.every(result => result.success);
       if (allSuccess) {
         const newData = subscribers.filter(sub => !selectedSubscribers.includes(sub.email));
-        setSubscribers(newData);
-        calculateStats(newData);
+        updateSubscribersList(newData);
         setSelectedSubscribers([]);
-        toast({
-          title: 'Success',
-          description: `${selectedSubscribers.length} subscribers removed successfully!`,
-          variant: 'success'
-        });
+        showToast('success', 'Success', `${selectedSubscribers.length} subscribers removed successfully!`);
       } else {
         const errorMessages = results.filter(r => !r.success).map(r => r.message);
-        toast({
-          title: 'Partial Error',
-          description: `Some subscribers could not be removed: ${errorMessages.join(', ')}`,
-          variant: 'destructive'
-        });
+        showToast('destructive', 'Partial Error', `Some subscribers could not be removed: ${errorMessages.join(', ')}`);
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to remove subscribers',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const handleAddSubscriber = async (e) => {
-    e.preventDefault();
-    if (!newEmail.trim()) {
-      toast({
-        title: 'Warning',
-        description: 'Please enter an email address',
-        variant: 'warning'
-      });
-      return;
-    }
-
-    // Check if email already exists
-    if (subscribers.some(sub => sub.email.toLowerCase() === newEmail.toLowerCase())) {
-      toast({
-        title: 'Warning',
-        description: 'This email is already subscribed',
-        variant: 'warning'
-      });
-      return;
-    }
-
-    try {
-      const result = await newsletterService.addSubscriber(newEmail);
-      if (result.success) {
-        const newSubscriber = {
-          email: newEmail,
-          created_at: new Date().toISOString()
-        };
-        const newData = [...subscribers, newSubscriber];
-        setSubscribers(newData);
-        calculateStats(newData);
-        setNewEmail('');
-        setShowAddModal(false);
-        toast({
-          title: 'Success',
-          description: result.message || 'Subscriber added successfully!',
-          variant: 'success'
-        });
-      } else {
-        toast({
-          title: 'Error',
-          description: result.message || 'Failed to add subscriber',
-          variant: 'destructive'
-        });
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to add subscriber',
-        variant: 'destructive'
-      });
+      showToast('destructive', 'Error', error.message || 'Failed to remove subscribers');
     }
   };
 
@@ -412,10 +218,7 @@ const NewsletterAdmin = () => {
     try {
       const csvContent = [
         ['Email', 'Date Subscribed'],
-        ...subscribers.map(sub => [
-          sub.email,
-          formatDate(sub.created_at)
-        ])
+        ...subscribers.map(sub => [sub.email, formatDate(sub.created_at)])
       ].map(row => row.join(',')).join('\n');
 
       const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -428,37 +231,42 @@ const NewsletterAdmin = () => {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       
-      toast({
-        title: 'Success',
-        description: 'Subscribers exported successfully!',
-        variant: 'success'
-      });
+      showToast('success', 'Success', 'Subscribers exported successfully!');
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to export subscribers',
-        variant: 'destructive'
-      });
+      showToast('destructive', 'Error', 'Failed to export subscribers');
     }
   };
 
+  // Selection handlers
   const filteredSubscribers = subscribers.filter(subscriber =>
     subscriber.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const toggleSelectAll = () => {
-    if (selectedSubscribers.length === filteredSubscribers.length && filteredSubscribers.length > 0) {
-      setSelectedSubscribers([]);
-    } else {
-      setSelectedSubscribers(filteredSubscribers.map(sub => sub.email));
-    }
+    setSelectedSubscribers(
+      selectedSubscribers.length === filteredSubscribers.length && filteredSubscribers.length > 0
+        ? []
+        : filteredSubscribers.map(sub => sub.email)
+    );
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Unknown';
-    const date = new Date(dateString);
-    return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString();
+  const toggleSubscriberSelection = (email, checked) => {
+    setSelectedSubscribers(prev => 
+      checked 
+        ? [...prev, email]
+        : prev.filter(e => e !== email)
+    );
   };
+
+  // Effects
+  useEffect(() => {
+    const token = api.getToken();
+    if (!token) {
+      showToast('destructive', 'Authentication Required', 'Please login to access this page');
+    } else {
+      fetchSubscribers();
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -469,16 +277,19 @@ const NewsletterAdmin = () => {
     );
   }
 
+  // Stats data
+  const statsData = [
+    { label: 'Total Subscribers', value: stats.total, color: 'blue', icon: Users },
+    { label: 'This Month', value: stats.thisMonth, color: 'green', icon: Calendar },
+    { label: 'Last 7 Days', value: stats.recent, color: 'purple', icon: Mail }
+  ];
+
   return (
     <div className="p-6 bg-white rounded-lg shadow-sm min-h-screen bg-gray-50">
       {/* Toast Container */}
       <div className="fixed top-4 right-4 z-50">
-        {toasts.map((toastItem) => (
-          <Toast
-            key={toastItem.id}
-            toast={toastItem}
-            onDismiss={() => removeToast(toastItem.id)}
-          />
+        {toasts.map(toastItem => (
+          <Toast key={toastItem.id} toast={toastItem} onDismiss={() => removeToast(toastItem.id)} />
         ))}
       </div>
 
@@ -490,13 +301,6 @@ const NewsletterAdmin = () => {
             <h1 className="text-2xl font-bold text-gray-900">Newsletter Subscribers</h1>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Subscriber</span>
-            </button>
             <button
               onClick={exportSubscribers}
               className="flex items-center space-x-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
@@ -516,33 +320,17 @@ const NewsletterAdmin = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-600">Total Subscribers</p>
-                <p className="text-2xl font-bold text-blue-900">{stats.total}</p>
+          {statsData.map(({ label, value, color, icon: Icon }) => (
+            <div key={label} className={`bg-${color}-50 p-4 rounded-lg border border-${color}-200`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm text-${color}-600`}>{label}</p>
+                  <p className={`text-2xl font-bold text-${color}-900`}>{value}</p>
+                </div>
+                <Icon className={`w-8 h-8 text-${color}-500`} />
               </div>
-              <Users className="w-8 h-8 text-blue-500" />
             </div>
-          </div>
-          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-green-600">This Month</p>
-                <p className="text-2xl font-bold text-green-900">{stats.thisMonth}</p>
-              </div>
-              <Calendar className="w-8 h-8 text-green-500" />
-            </div>
-          </div>
-          <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-purple-600">Last 7 Days</p>
-                <p className="text-2xl font-bold text-purple-900">{stats.recent}</p>
-              </div>
-              <Mail className="w-8 h-8 text-purple-500" />
-            </div>
-          </div>
+          ))}
         </div>
 
         {/* Search and Bulk Actions */}
@@ -601,13 +389,7 @@ const NewsletterAdmin = () => {
                         <input
                           type="checkbox"
                           checked={selectedSubscribers.includes(subscriber.email)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedSubscribers(prev => [...prev, subscriber.email]);
-                            } else {
-                              setSelectedSubscribers(prev => prev.filter(email => email !== subscriber.email));
-                            }
-                          }}
+                          onChange={(e) => toggleSubscriberSelection(subscriber.email, e.target.checked)}
                           className="rounded border-gray-300 text-pink-600 focus:ring-pink-500"
                         />
                       </td>
@@ -633,66 +415,6 @@ const NewsletterAdmin = () => {
             </table>
           </div>
         </div>
-
-        {/* Add Subscriber Modal */}
-        {showAddModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-              <div className="flex items-center justify-between p-4 border-b">
-                <h2 className="text-lg font-semibold text-gray-900">Add New Subscriber</h2>
-                <button
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setNewEmail('');
-                  }}
-                  className="text-gray-400 hover:text-gray-500"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="p-4">
-                <div className="mb-4">
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
-                    placeholder="Enter email address"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddSubscriber(e);
-                      }
-                    }}
-                  />
-                </div>
-                <div className="flex justify-end space-x-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddModal(false);
-                      setNewEmail('');
-                    }}
-                    className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAddSubscriber}
-                    className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500"
-                  >
-                    Add Subscriber
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

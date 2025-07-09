@@ -194,22 +194,22 @@ curl --location --request POST '{base_url}/api/admin/update-delivery-fees?Edo={2
 ```
 
 
-## Fetch Delivery Fee for a Single State
+## Fetch Delivery Fee for a Single State/LGA
 
 ```CURL
-curl --location --request GET '{base_url}/api/fetch-delivery-fee?state={State}'
+curl --location --request GET '{base_url}/api/fetch-delivery-fee?state={State|optional:when(isset(lga))}&lga={Lga|optional:when(isset(state))}'
 ```
 
 ```JSON
 {
 	"code": 200,
-	"message": "Delivery fee fetched!",
+	"message": "Delivery fee fetched for Alimosho!",
 	"delivery_fee": 3999
 }
 ```
 
 
-## Fetch All Delivery Fees
+## Fetch All Delivery Fees (States Based)
 
 ```CURL
 curl --location --request GET '{base_url}/api/fetch-delivery-fees'
@@ -230,6 +230,27 @@ curl --location --request GET '{base_url}/api/fetch-delivery-fees'
 ```
 
 
+## Fetch All Delivery Fees (LGAs Based)
+
+```CURL
+curl --location --request GET '{base_url}/api/fetch-lgas-delivery-fees'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Delivery fees fetch returned 41 results.",
+	"delivery_fees": [
+		{
+			"lga": "Epe",
+			"delivery_fee": 2999
+		},
+		...
+	]
+}
+```
+
+
 
 # ORDERS
 
@@ -240,7 +261,7 @@ There are two key steps:
 ### 1. Initiate Checkout (This will alert and prepare the payment gateway for the next step)
 
 ```CURL
-curl --location --request POST '{base_url}/api/checkout/initiate?name={name}&email={email}&phone={phone}&delivery_method={pickup/address}&state={state|optional}&city={city|optional}&street_address={street_address|optional}&cart={a_valid_json_encoded_cart_object|see_sample_below}&success_redirect={https://leksycosmetics.com/path/to/your-successful-order-page}'
+curl --location --request POST '{base_url}/api/checkout/initiate?name={name}&email={email}&phone={phone}&delivery_method={pickup/address}&state={state|optional}&lga={lga|optional|required:if(state=lagos)}&city={city|optional}&street_address={street_address|optional}&cart={a_valid_json_encoded_cart_object|see_sample_below}&success_redirect={https://leksycosmetics.com/path/to/your-successful-order-page}'
 ```
 
 ```
@@ -315,6 +336,7 @@ curl --location --request GET '{base_url}/api/fetch-order?order_id={order_id}'
 		"phone": "07012312131",
 		"delivery_method": "address|pickup",
 		"state": "Kogi",
+		"lga": null,
 		"city": "Lokoja",
 		"street address": "1, My Street",
 		"amount_calculated": 25000, // Must be exactly equal to amount_paid, else a fraud has happened. 
@@ -367,6 +389,7 @@ curl --location --request GET '{base_url}/api/fetch-orders?&order_status={order_
 			"phone": "07012312131",
 			"delivery_method": "address|pickup",
 			"state": "Kogi",
+			"lga": null,
 			"city": "Lokoja",
 			"street address": "1, My Street",
 			"amount_calculated": 25000, // Must be exactly equal to amount_paid, else a fraud has happened. 
