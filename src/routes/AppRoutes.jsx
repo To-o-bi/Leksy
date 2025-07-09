@@ -36,8 +36,6 @@ const EditProductPage = lazy(() => import('../admin/pages/products/EditProductPa
 const NotificationsPage = lazy(() => import('../admin/pages/Notifications'));
 const InboxPage = lazy(() => import('../admin/pages/InboxPage'));
 const BookingsPage = lazy(() => import('../admin/pages/BookingsPage'));
-const NewBookingPage = lazy(() => import('../admin/pages/NewBookingPage'));
-const EditBookingPage = lazy(() => import('../admin/pages/EditBookingPage'));
 const NewsletterAdmin = lazy(() => import('../admin/pages/NewsletterAdmin'));
 const DeliveryFees = lazy(() => import('../admin/pages/DeliveryFees'));
 
@@ -99,9 +97,7 @@ const AppRoutes = () => {
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="inbox" element={<InboxPage />} />
           <Route path="bookings" element={<BookingsPage />} />
-          <Route path="bookings/:id" element={<BookingsPage />} />
-          <Route path="bookings/new" element={<NewBookingPage />} />
-          <Route path="bookings/edit/:id" element={<EditBookingPage />} />
+          <Route path="bookings/:id" element={<BookingsPage />} />       
 
           <Route path="newletter" element={<NewsletterAdmin />} />
           <Route path="delivery" element={<DeliveryFees />} />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Eye, RefreshCw, AlertCircle, Calendar, Phone, Mail, User, CheckCircle, Clock } from 'lucide-react';
 import api from '../../api/axios';
+import { useLocation } from 'react-router-dom';
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState([]);
@@ -14,7 +15,9 @@ const BookingsPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [notification, setNotification] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [targetedBookingId, setTargetedBookingId] = useState(null);
   
+  const location = useLocation();
   const bookingsPerPage = 10;
 
   // Utility functions
@@ -253,6 +256,19 @@ const BookingsPage = () => {
     filterBookings();
   }, [bookings, activeTab, searchTerm]);
 
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const bookingId = urlParams.get('bookingId') || urlParams.get('highlight');
+    if (bookingId) {
+      setTargetedBookingId(bookingId);
+      // Auto-scroll logic here
+      setTimeout(() => {
+        setTargetedBookingId(null);
+        window.history.replaceState({}, '', window.location.pathname);
+      }, 5000);
+    }
+  }, [location.search]);
+
   // Pagination calculations
   const totalPages = Math.ceil(filteredBookings.length / bookingsPerPage);
   const indexOfLastBooking = currentPage * bookingsPerPage;
@@ -393,7 +409,14 @@ const BookingsPage = () => {
             </thead>
             <tbody>
               {currentBookings.length > 0 ? currentBookings.map((booking) => (
-                <tr key={booking.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <tr 
+                  key={booking.id} 
+                  className={`border-b border-gray-100 hover:bg-gray-50 ${
+                    targetedBookingId === booking.id || targetedBookingId === booking.uniqueId
+                      ? 'bg-pink-50 border-pink-300 shadow-md ring-2 ring-pink-200' 
+                      : ''
+                  }`}
+                >
                   <td className="py-4 text-sm font-mono">{booking.id}</td>
                   <td className="py-4">
                     <div className="flex items-center">

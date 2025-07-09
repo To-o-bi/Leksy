@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Trash2, Edit, Plus, ChevronLeft, ChevronRight, ShoppingBag, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { productService } from '../../../api';
 
 const ProductStockPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -13,6 +14,9 @@ const ProductStockPage = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [activeProduct, setActiveProduct] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Targeting state
+  const [targetedProductId, setTargetedProductId] = useState(null);
   
   // Bulk selection states
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -25,6 +29,31 @@ const ProductStockPage = () => {
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  // Check for URL parameters to target specific product
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const productId = urlParams.get('productId');
+    const highlightId = urlParams.get('highlight');
+    
+    if (productId || highlightId) {
+      const targetId = productId || highlightId;
+      setTargetedProductId(targetId);
+      
+      // Auto-scroll to the targeted product after data loads
+      if (products.length > 0) {
+        scrollToProduct(targetId);
+      }
+      
+      // Clear highlighting after 5 seconds
+      setTimeout(() => {
+        setTargetedProductId(null);
+        // Clean up URL without page reload
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }, 5000);
+    }
+  }, [location.search, products]);
 
   const fetchProducts = async () => {
     try {
@@ -45,6 +74,31 @@ const ProductStockPage = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const scrollToProduct = (productId) => {
+    // Find the product index
+    const productIndex = products.findIndex(p => p.product_id === productId);
+    if (productIndex === -1) return;
+    
+    // Calculate which page the product is on
+    const targetPage = Math.floor(productIndex / itemsPerPage) + 1;
+    
+    // Navigate to the correct page
+    if (targetPage !== currentPage) {
+      setCurrentPage(targetPage);
+    }
+    
+    // Scroll to the product row after a brief delay
+    setTimeout(() => {
+      const element = document.getElementById(`product-row-${productId}`);
+      if (element) {
+        element.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }
+    }, 100);
   };
 
   const handleDelete = async () => {
@@ -304,7 +358,15 @@ const ProductStockPage = () => {
               </tr>
             ) : (
               currentProducts.map((product) => (
-                <tr key={product.product_id} className="border-b hover:bg-gray-50">
+                <tr 
+                  key={product.product_id} 
+                  id={`product-row-${product.product_id}`}
+                  className={`border-b hover:bg-gray-50 transition-all duration-300 ${
+                    targetedProductId === product.product_id 
+                      ? 'bg-blue-50 border-blue-300 shadow-md ring-2 ring-blue-200' 
+                      : ''
+                  }`}
+                >
                   {isSelectionMode && (
                     <td className="px-4 py-3">
                       <input
@@ -316,7 +378,9 @@ const ProductStockPage = () => {
                     </td>
                   )}
                   <td className="px-4 py-3">
-                    <div className="w-12 h-12 rounded-md overflow-hidden bg-gray-100">
+                    <div className={`w-12 h-12 rounded-md overflow-hidden bg-gray-100 transition-all duration-300 ${
+                      targetedProductId === product.product_id ? 'ring-2 ring-blue-400' : ''
+                    }`}>
                       <img 
                         src={product.images?.[0] || '/placeholder.jpg'} 
                         alt={product.name} 
@@ -326,7 +390,11 @@ const ProductStockPage = () => {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">{product.name}</div>
+                    <div className={`font-medium transition-all duration-300 ${
+                      targetedProductId === product.product_id ? 'text-blue-900' : 'text-gray-900'
+                    }`}>
+                      {product.name}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="text-gray-600 capitalize">{product.category}</div>
