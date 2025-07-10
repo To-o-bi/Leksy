@@ -797,7 +797,8 @@ curl --location --request GET '{base_url}/api/admin/fetch-consultations?&payment
 ## Update Consultation
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/update-consultation?consultation_id={consultation_id}&session_held_status={session_held_status|optional}&name={name|optional}&email={email|optional}&phone={phone|optional}&age_range={age_range|optional}&gender={gender|optional}&skin_type={skin_type|optional}&skin_concerns={skin_concern_1,skin_concern_2,skin_concern_n|optional}&current_skincare_products={current_skincare_products|optional}&additional_details={additional_details|optional}&channel={a_valid_channel|optional}&date={yyyy-mm-dd|optional}&time_range={a_valid_time_range|optional}'
+curl --location --request POST '{base_url}/api/admin/update-consultation?consultation_id={consultation_id}&session_held_status={session_held_status|optional}&name={name|optional}&email={email|optional}&phone={phone|optional}&age_range={age_range|optional}&gender={gender|optional}&skin_type={skin_type|optional}&skin_concerns={skin_concern_1,skin_concern_2,skin_concern_n|optional}&current_skincare_products={current_skincare_products|optional}&additional_details={additional_details|optional}&channel={a_valid_channel|optional}&date={yyyy-mm-dd|optional}&time_range={a_valid_time_range|optional}' \
+--header 'Authorization: Bearer {token}'
 ```
 
 ```
@@ -841,7 +842,8 @@ curl --location --request POST '{base_url}/api/admin/update-consultation?consult
 ## Send Consultation Link
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/send_consultation_link?consultation_id={consultation_id}&meet_link={meet_link}?override={true/false|default:false|optional}'
+curl --location --request POST '{base_url}/api/admin/send_consultation_link?consultation_id={consultation_id}&meet_link={meet_link}?override={true/false|default:false|optional}' \
+--header 'Authorization: Bearer {token}'
 ```
 
 ```JSON
