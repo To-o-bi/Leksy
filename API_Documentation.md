@@ -252,6 +252,37 @@ curl --location --request GET '{base_url}/api/fetch-lgas-delivery-fees?state={St
 ```
 
 
+## Fetch Bus Park Delivery Fee
+
+```CURL
+curl --location --request GET '{base_url}/api/fetch-bus-park-delivery-fee'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Delivery fee fetched for Lagos Parks!",
+	"delivery_fee": 2000
+}
+```
+
+
+## Update Bus Park Delivery Fee
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/bus-park-delivery-fee/update?delivery_fee={fee|numeric}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Bus park delivery fee updated to 2000 successfully!",
+	"token": "{token}"
+}
+```
+
+
 ## Update Delivery Fees - Rapid Mode (LGAs level)
 
 ```CURL
@@ -325,7 +356,7 @@ There are two key steps:
 ### 1. Initiate Checkout (This will alert and prepare the payment gateway for the next step)
 
 ```CURL
-curl --location --request POST '{base_url}/api/checkout/initiate?name={name}&email={email}&phone={phone}&delivery_method={pickup/address}&state={state|optional}&lga={lga|optional|required:if(state=lagos)}&city={city|optional}&street_address={street_address|optional}&cart={a_valid_json_encoded_cart_object|see_sample_below}&success_redirect={https://leksycosmetics.com/path/to/your-successful-order-page}'
+curl --location --request POST '{base_url}/api/checkout/initiate?name={name}&email={email}&phone={phone}&delivery_method={pickup/address/bus-park}&state={state|optional}&lga={lga|optional|required:if(state=lagos)}&city={city|optional}&street_address={street_address|optional}&cart={a_valid_json_encoded_cart_object|see_sample_below}&success_redirect={https://leksycosmetics.com/path/to/your-successful-order-page}'
 ```
 
 ```
