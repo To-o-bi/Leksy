@@ -25,98 +25,98 @@ const DeliveryFeeAdmin = () => {
   };
 
   const fetchData = async () => {
-  setLoading(true);
-  try {
-    const [feesResponse, lgasResponse] = await Promise.allSettled([
-      api.get('/fetch-delivery-fees'),
-      api.get('/fetch-lgas-delivery-fees?state=Lagos')
-    ]);
+    setLoading(true);
+    try {
+      const [feesResponse, lgasResponse] = await Promise.allSettled([
+        api.get('/fetch-delivery-fees'),
+        api.get('/fetch-lgas-delivery-fees?state=Lagos')
+      ]);
 
-    if (feesResponse.status === 'fulfilled' && feesResponse.value.data.code === 200) {
-      const data = feesResponse.value.data;
-      
-      // Enhanced debugging
-      console.log('=== API DEBUG INFO ===');
-      console.log('Full API Response:', JSON.stringify(data, null, 2));
-      console.log('Response Code:', data.code);
-      console.log('Response Message:', data.message);
-      console.log('Raw delivery_fees array:', data.delivery_fees);
-      console.log('Array length:', data.delivery_fees?.length || 0);
-      
-      // Check first few items in detail
-      if (data.delivery_fees && data.delivery_fees.length > 0) {
-        console.log('First 3 items detailed:');
-        data.delivery_fees.slice(0, 3).forEach((item, index) => {
-          console.log(`Item ${index}:`, item);
-          console.log(`  - Keys:`, Object.keys(item));
-          console.log(`  - Values:`, Object.values(item));
-          console.log(`  - Has state:`, !!item.state);
-          console.log(`  - Has delivery_fee:`, !!item.delivery_fee);
-          console.log(`  - State value:`, item.state);
-          console.log(`  - Fee value:`, item.delivery_fee);
-        });
-      }
-      
-      // Check if items have different property names
-      const sampleItem = data.delivery_fees?.[0];
-      if (sampleItem) {
-        console.log('Sample item properties:', Object.keys(sampleItem));
-        console.log('Sample item:', sampleItem);
-      }
-      
-      // More flexible filtering - check for different possible property names
-      const validFees = data.delivery_fees?.filter(fee => {
-        if (!fee) return false;
+      if (feesResponse.status === 'fulfilled' && feesResponse.value.data.code === 200) {
+        const data = feesResponse.value.data;
         
-        // Check for common property variations
-        const hasState = fee.state || fee.name || fee.State || fee.location;
-        const hasFee = fee.delivery_fee !== undefined || fee.fee !== undefined || fee.price !== undefined;
+        // Enhanced debugging
+        console.log('=== API DEBUG INFO ===');
+        console.log('Full API Response:', JSON.stringify(data, null, 2));
+        console.log('Response Code:', data.code);
+        console.log('Response Message:', data.message);
+        console.log('Raw delivery_fees array:', data.delivery_fees);
+        console.log('Array length:', data.delivery_fees?.length || 0);
         
-        console.log('Item validation:', { fee, hasState, hasFee });
-        return hasState && hasFee;
-      }) || [];
-      
-      console.log('Valid fees after filtering:', validFees);
-      console.log('=== END DEBUG INFO ===');
-      
-      if (validFees.length === 0 && data.delivery_fees?.length > 0) {
-        console.error('❌ API DATA ISSUE: All items filtered out');
-        console.error('This suggests the API is returning empty objects or using different property names');
+        // Check first few items in detail
+        if (data.delivery_fees && data.delivery_fees.length > 0) {
+          console.log('First 3 items detailed:');
+          data.delivery_fees.slice(0, 3).forEach((item, index) => {
+            console.log(`Item ${index}:`, item);
+            console.log(`  - Keys:`, Object.keys(item));
+            console.log(`  - Values:`, Object.values(item));
+            console.log(`  - Has state:`, !!item.state);
+            console.log(`  - Has delivery_fee:`, !!item.delivery_fee);
+            console.log(`  - State value:`, item.state);
+            console.log(`  - Fee value:`, item.delivery_fee);
+          });
+        }
         
-        // Try to use raw data if it exists
-        const rawData = data.delivery_fees || [];
-        setDeliveryFees(rawData);
-        showNotification('error', `API returned ${rawData.length} items but they appear to be empty. Check console for details.`);
+        // Check if items have different property names
+        const sampleItem = data.delivery_fees?.[0];
+        if (sampleItem) {
+          console.log('Sample item properties:', Object.keys(sampleItem));
+          console.log('Sample item:', sampleItem);
+        }
+        
+        // More flexible filtering - check for different possible property names
+        const validFees = data.delivery_fees?.filter(fee => {
+          if (!fee) return false;
+          
+          // Check for common property variations
+          const hasState = fee.state || fee.name || fee.State || fee.location;
+          const hasFee = fee.delivery_fee !== undefined || fee.fee !== undefined || fee.price !== undefined;
+          
+          console.log('Item validation:', { fee, hasState, hasFee });
+          return hasState && hasFee;
+        }) || [];
+        
+        console.log('Valid fees after filtering:', validFees);
+        console.log('=== END DEBUG INFO ===');
+        
+        if (validFees.length === 0 && data.delivery_fees?.length > 0) {
+          console.error('❌ API DATA ISSUE: All items filtered out');
+          console.error('This suggests the API is returning empty objects or using different property names');
+          
+          // Try to use raw data if it exists
+          const rawData = data.delivery_fees || [];
+          setDeliveryFees(rawData);
+          showNotification('error', `API returned ${rawData.length} items but they appear to be empty. Check console for details.`);
+        } else {
+          setDeliveryFees(validFees);
+          showNotification('success', data.message || `Loaded ${validFees.length} delivery fees`);
+        }
       } else {
-        setDeliveryFees(validFees);
-        showNotification('success', data.message || `Loaded ${validFees.length} delivery fees`);
+        throw new Error('Failed to fetch delivery fees');
       }
-    } else {
-      throw new Error('Failed to fetch delivery fees');
-    }
 
-    // Similar debugging for LGAs
-    if (lgasResponse.status === 'fulfilled' && lgasResponse.value.data.code === 200) {
-      const lgaData = lgasResponse.value.data;
-      console.log('Lagos LGAs Response:', JSON.stringify(lgaData, null, 2));
-      
-      const validLGAs = lgaData.delivery_fees?.filter(lga => {
-        const hasLGA = lga && (lga.lga || lga.name);
-        const hasFee = lga.delivery_fee !== undefined;
-        return hasLGA && hasFee;
-      }) || [];
-      
-      console.log('Valid LGAs after filtering:', validLGAs);
-      setLagosLGAs(validLGAs);
-    } else {
-      setLagosLGAs([]);
+      // Similar debugging for LGAs
+      if (lgasResponse.status === 'fulfilled' && lgasResponse.value.data.code === 200) {
+        const lgaData = lgasResponse.value.data;
+        console.log('Lagos LGAs Response:', JSON.stringify(lgaData, null, 2));
+        
+        const validLGAs = lgaData.delivery_fees?.filter(lga => {
+          const hasLGA = lga && (lga.lga || lga.name);
+          const hasFee = lga.delivery_fee !== undefined;
+          return hasLGA && hasFee;
+        }) || [];
+        
+        console.log('Valid LGAs after filtering:', validLGAs);
+        setLagosLGAs(validLGAs);
+      } else {
+        setLagosLGAs([]);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      showNotification('error', error.response?.data?.message || 'Failed to load data');
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    showNotification('error', error.response?.data?.message || 'Failed to load data');
-  } finally {
-    setLoading(false);
-  }
   };
 
   const handleEdit = (identifier, isLGA = false) => {
@@ -171,34 +171,68 @@ const DeliveryFeeAdmin = () => {
         ? '/admin/lgas-delivery-fees/update' 
         : '/admin/update-delivery-fees';
       
+      // Send data in POST body instead of query parameters
       const requestData = { [identifier]: newFee };
+      console.log('Sending POST request to:', endpoint);
+      console.log('Request data:', requestData);
+      
       const response = await api.post(endpoint, requestData);
       
       const data = response.data;
       console.log('API Response:', data);
       
       if (data.code === 200) {
-        // Always update the local state immediately with the new value
-        // Don't rely on the API response data structure since it seems inconsistent
-        if (isLGA) {
-          setLagosLGAs(prev => prev.map(item => 
-            item.lga === identifier 
-              ? { ...item, delivery_fee: parseInt(newFee) } 
-              : item
-          ));
+        // Check if the response contains updated delivery fees
+        if (data.delivery_fees && Array.isArray(data.delivery_fees)) {
+          console.log('Using updated data from API response');
+          
+          if (isLGA) {
+            // Update LGAs with response data
+            const updatedLGAs = data.delivery_fees.filter(item => item.lga);
+            if (updatedLGAs.length > 0) {
+              setLagosLGAs(updatedLGAs);
+            } else {
+              // Fallback to manual update
+              setLagosLGAs(prev => prev.map(item => 
+                item.lga === identifier 
+                  ? { ...item, delivery_fee: parseInt(newFee) } 
+                  : item
+              ));
+            }
+          } else {
+            // Update states with response data
+            const updatedStates = data.delivery_fees.filter(item => item.state);
+            if (updatedStates.length > 0) {
+              setDeliveryFees(updatedStates);
+            } else {
+              // Fallback to manual update
+              setDeliveryFees(prev => prev.map(fee => 
+                fee.state === identifier 
+                  ? { ...fee, delivery_fee: parseInt(newFee) } 
+                  : fee
+              ));
+            }
+          }
         } else {
-          setDeliveryFees(prev => prev.map(fee => 
-            fee.state === identifier 
-              ? { ...fee, delivery_fee: parseInt(newFee) } 
-              : fee
-          ));
+          // Fallback: manually update local state
+          console.log('No updated data in response, updating locally');
+          if (isLGA) {
+            setLagosLGAs(prev => prev.map(item => 
+              item.lga === identifier 
+                ? { ...item, delivery_fee: parseInt(newFee) } 
+                : item
+            ));
+          } else {
+            setDeliveryFees(prev => prev.map(fee => 
+              fee.state === identifier 
+                ? { ...fee, delivery_fee: parseInt(newFee) } 
+                : fee
+            ));
+          }
         }
         
         handleCancel(identifier, isLGA);
         showNotification('success', data.message || `Updated ${isLGA ? 'LGA' : 'state'} delivery fee successfully`);
-        
-        // Don't auto-refresh since we've already updated the state
-        // Only refresh manually if user clicks refresh button
         
       } else {
         throw new Error(data.message || 'Failed to update delivery fee');
@@ -225,36 +259,75 @@ const DeliveryFeeAdmin = () => {
         ? '/admin/lgas-delivery-fees/update' 
         : '/admin/update-delivery-fees';
       
+      // Send data in POST body instead of query parameters
+      console.log('Sending bulk POST request to:', endpoint);
+      console.log('Request data:', values);
+      
       const response = await api.post(endpoint, values);
       
       const data = response.data;
       console.log('Bulk Update API Response:', data);
       
       if (data.code === 200) {
-        // Always update the local state immediately with the new values
-        // Don't rely on the API response data structure since it seems inconsistent
+        // Check if the response contains updated delivery fees
+        if (data.delivery_fees && Array.isArray(data.delivery_fees)) {
+          console.log('Using updated data from bulk API response');
+          
+          if (isLGA) {
+            // Update LGAs with response data
+            const updatedLGAs = data.delivery_fees.filter(item => item.lga);
+            if (updatedLGAs.length > 0) {
+              setLagosLGAs(updatedLGAs);
+            } else {
+              // Fallback to manual update
+              setLagosLGAs(prev => prev.map(item => 
+                values[item.lga] !== undefined 
+                  ? { ...item, delivery_fee: parseInt(values[item.lga]) } 
+                  : item
+              ));
+            }
+          } else {
+            // Update states with response data
+            const updatedStates = data.delivery_fees.filter(item => item.state);
+            if (updatedStates.length > 0) {
+              setDeliveryFees(updatedStates);
+            } else {
+              // Fallback to manual update
+              setDeliveryFees(prev => prev.map(fee => 
+                values[fee.state] !== undefined 
+                  ? { ...fee, delivery_fee: parseInt(values[fee.state]) } 
+                  : fee
+              ));
+            }
+          }
+        } else {
+          // Fallback: manually update local state
+          console.log('No updated data in bulk response, updating locally');
+          if (isLGA) {
+            setLagosLGAs(prev => prev.map(item => 
+              values[item.lga] !== undefined 
+                ? { ...item, delivery_fee: parseInt(values[item.lga]) } 
+                : item
+            ));
+          } else {
+            setDeliveryFees(prev => prev.map(fee => 
+              values[fee.state] !== undefined 
+                ? { ...fee, delivery_fee: parseInt(values[fee.state]) } 
+                : fee
+            ));
+          }
+        }
+        
+        // Clear editing states
         if (isLGA) {
-          setLagosLGAs(prev => prev.map(item => 
-            values[item.lga] !== undefined 
-              ? { ...item, delivery_fee: parseInt(values[item.lga]) } 
-              : item
-          ));
           setEditingLGAs(new Set());
           setTempLGAValues({});
         } else {
-          setDeliveryFees(prev => prev.map(fee => 
-            values[fee.state] !== undefined 
-              ? { ...fee, delivery_fee: parseInt(values[fee.state]) } 
-              : fee
-          ));
           setEditingStates(new Set());
           setTempValues({});
         }
         
         showNotification('success', data.message || `All ${isLGA ? 'LGA' : 'state'} fees updated successfully`);
-        
-        // Don't auto-refresh since we've already updated the state
-        // Only refresh manually if user clicks refresh button
         
       } else {
         throw new Error(data.message || 'Failed to update fees');
