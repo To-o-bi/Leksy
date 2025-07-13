@@ -11,7 +11,9 @@ import {
   storeOrderDetails, 
   nigerianStates, 
   calculateShipping, 
-  getSuccessRedirectUrl 
+  getSuccessRedirectUrl,
+  getDeliveryMethodDisplayName,
+  fetchLGADeliveryFees
 } from '../../api/CheckoutService';
 
 const CheckoutPage = () => {
@@ -20,6 +22,10 @@ const CheckoutPage = () => {
   const [notification, setNotification] = useState(null);
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
   const [deliveryMethod, setDeliveryMethod] = useState('address');
+  const [shipping, setShipping] = useState(0);
+  const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
+  const [availableLGAs, setAvailableLGAs] = useState([]);
+  const [isLoadingLGAs, setIsLoadingLGAs] = useState(false);
   
   // Form state matches API requirements
   const [formData, setFormData] = useState({
@@ -27,16 +33,59 @@ const CheckoutPage = () => {
     email: '',
     phone: '',
     state: '',
-    city: '',
+    city: '', // This will be used for both LGA (Lagos) and city (other states)
     street_address: '',
     notes: '',
     agreeToTerms: false
   });
   
   const [formErrors, setFormErrors] = useState({});
-  const shipping = calculateShipping(deliveryMethod);
   const finalTotal = totalPrice + shipping;
   const SUCCESS_REDIRECT_URL = getSuccessRedirectUrl();
+
+  // Calculate shipping cost whenever delivery method or location changes
+  useEffect(() => {
+    const updateShipping = async () => {
+      setIsCalculatingShipping(true);
+      try {
+        const cost = await calculateShipping(
+          deliveryMethod, 
+          formData.state || null, 
+          formData.state === 'Lagos' ? formData.city : null // Only pass LGA for Lagos
+        );
+        setShipping(cost);
+      } catch (error) {
+        console.error('Error calculating shipping:', error);
+        setShipping(deliveryMethod === 'pickup' ? 0 : 5000); // Fallback
+      } finally {
+        setIsCalculatingShipping(false);
+      }
+    };
+
+    updateShipping();
+  }, [deliveryMethod, formData.state, formData.city]);
+
+  // Load LGAs when Lagos state is selected AND delivery method is address
+  useEffect(() => {
+    const loadLGAs = async () => {
+      if (formData.state === 'Lagos' && deliveryMethod === 'address') {
+        setIsLoadingLGAs(true);
+        try {
+          const lgas = await fetchLGADeliveryFees(formData.state);
+          setAvailableLGAs(lgas);
+        } catch (error) {
+          console.error('Error loading LGAs:', error);
+          setAvailableLGAs([]);
+        } finally {
+          setIsLoadingLGAs(false);
+        }
+      } else {
+        setAvailableLGAs([]);
+      }
+    };
+
+    loadLGAs();
+  }, [formData.state, deliveryMethod]);
 
   useEffect(() => {
     if (cart.length === 0) {
@@ -46,9 +95,17 @@ const CheckoutPage = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value
+    const newValue = type === 'checkbox' ? checked : value;
+    
+    setFormData(prev => {
+      const updated = { ...prev, [name]: newValue };
+      
+      // Clear city when state changes
+      if (name === 'state') {
+        updated.city = '';
+      }
+      
+      return updated;
     });
     
     if (formErrors[name]) {
@@ -62,7 +119,7 @@ const CheckoutPage = () => {
   const handleDeliveryMethodChange = (method) => {
     setDeliveryMethod(method);
     if (method === 'pickup') {
-      // Clear address-related form data and errors for pickup
+      // Clear address-related form data and errors for pickup only
       setFormData(prev => ({
         ...prev,
         state: '',
@@ -75,6 +132,11 @@ const CheckoutPage = () => {
       delete newErrors.city;
       delete newErrors.street_address;
       setFormErrors(newErrors);
+      setAvailableLGAs([]);
+    }
+    // For bus_park, keep the address fields visible but clear LGAs
+    else if (method === 'bus_park') {
+      setAvailableLGAs([]);
     }
   };
 
@@ -94,8 +156,8 @@ const CheckoutPage = () => {
       agreeToTerms: formData.agreeToTerms
     };
     
-    // Only add address fields for delivery orders
-    if (deliveryMethod === 'address') {
+    // Add address fields for delivery orders (both address and bus_park)
+    if (deliveryMethod === 'address' || deliveryMethod === 'bus_park') {
       // For delivery orders, ensure state is valid
       if (!formData.state || !nigerianStates.includes(formData.state)) {
         throw new Error('Please select a valid delivery state');
@@ -103,7 +165,19 @@ const CheckoutPage = () => {
       
       checkoutData.state = formData.state;
       checkoutData.city = formData.city;
-      checkoutData.street_address = formData.street_address;
+      
+      // Street address is required for home delivery but optional for bus park
+      if (deliveryMethod === 'address') {
+        checkoutData.street_address = formData.street_address;
+        
+        // Add LGA if it's Lagos state
+        if (formData.state === 'Lagos' && formData.city) {
+          checkoutData.lga = formData.city;
+        }
+      } else if (deliveryMethod === 'bus_park') {
+        // For bus park, street address is optional (for additional location info)
+        checkoutData.street_address = formData.street_address || '';
+      }
     }
     
     return checkoutData;
@@ -164,6 +238,8 @@ const CheckoutPage = () => {
       if (error.message.includes('Invalid/No delivery found')) {
         errorMessage = deliveryMethod === 'pickup' 
           ? 'Store pickup is currently unavailable. Please try home delivery or contact support.'
+          : deliveryMethod === 'bus_park'
+          ? 'Bus park delivery is currently unavailable. Please try home delivery or contact support.'
           : 'Delivery not available for the selected location. Please choose a different state or contact support.';
       } else if (error.message.includes('valid delivery state')) {
         errorMessage = 'Please select a valid delivery state from the dropdown.';
@@ -186,6 +262,12 @@ const CheckoutPage = () => {
       return () => clearTimeout(timer);
     }
   }, [notification]);
+
+  const getDeliveryPrice = () => {
+    if (isCalculatingShipping) return 'Calculating...';
+    if (deliveryMethod === 'pickup') return 'Free';
+    return formatPrice(shipping);
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -217,7 +299,7 @@ const CheckoutPage = () => {
               <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-6">Delivery Method</h2>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div 
                     className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
                       deliveryMethod === 'address' 
@@ -240,7 +322,35 @@ const CheckoutPage = () => {
                           Home Delivery
                         </div>
                         <div className="text-sm text-gray-500">
-                          Delivery to your address ({formatPrice(5000)})
+                          Delivery to your address ({getDeliveryPrice()})
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div 
+                    className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
+                      deliveryMethod === 'bus_park' 
+                        ? 'border-pink-500 bg-pink-50' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => handleDeliveryMethodChange('bus_park')}
+                  >
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        name="deliveryMethod"
+                        value="bus_park"
+                        checked={deliveryMethod === 'bus_park'}
+                        onChange={() => handleDeliveryMethodChange('bus_park')}
+                        className="h-4 w-4 text-pink-600 focus:ring-pink-500"
+                      />
+                      <div className="ml-3">
+                        <div className="text-sm font-medium text-gray-900">
+                          Bus Park Delivery
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          Delivery to bus park ({getDeliveryPrice()})
                         </div>
                       </div>
                     </div>
@@ -349,10 +459,12 @@ const CheckoutPage = () => {
                 </div>
               </div>
 
-              {/* Delivery Address - Only show if delivery method is address */}
-              {deliveryMethod === 'address' && (
+              {/* Delivery Address - Show for both address and bus_park delivery */}
+              {(deliveryMethod === 'address' || deliveryMethod === 'bus_park') && (
                 <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-                  <h2 className="text-xl font-semibold text-gray-800 mb-6">Delivery Address</h2>
+                  <h2 className="text-xl font-semibold text-gray-800 mb-6">
+                    {deliveryMethod === 'address' ? 'Delivery Address' : 'Bus Park Location'}
+                  </h2>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
@@ -383,20 +495,46 @@ const CheckoutPage = () => {
                     <div>
                       <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
                         City <span className="text-red-500">*</span>
+                        {deliveryMethod === 'address' && formData.state === 'Lagos' && availableLGAs.length > 0 && (
+                          <span className="text-xs text-gray-500 ml-1">- Select LGA for precise delivery cost</span>
+                        )}
                       </label>
-                      <input
-                        type="text"
-                        id="city"
-                        name="city"
-                        value={formData.city}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${
-                          formErrors.city ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                        placeholder="Your city"
-                        disabled={isProcessingOrder}
-                        required
-                      />
+                      {deliveryMethod === 'address' && formData.state === 'Lagos' ? (
+                        <select
+                          id="city"
+                          name="city"
+                          value={formData.city}
+                          onChange={handleInputChange}
+                          className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${
+                            formErrors.city ? 'border-red-500' : 'border-gray-300'
+                          }`}
+                          disabled={isProcessingOrder || isLoadingLGAs}
+                          required
+                        >
+                          <option value="">
+                            {isLoadingLGAs ? 'Loading LGAs...' : 'Select LGA'}
+                          </option>
+                          {availableLGAs.map(lga => (
+                            <option key={lga.lga} value={lga.lga}>
+                              {lga.lga} - {formatPrice(lga.delivery_fee)}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          id="city"
+                          name="city"
+                          value={formData.city}
+                          onChange={handleInputChange}
+                          className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${
+                            formErrors.city ? 'border-red-500' : 'border-gray-300'
+                          }`}
+                          placeholder="Enter your city"
+                          disabled={isProcessingOrder}
+                          required
+                        />
+                      )}
                       {formErrors.city && (
                         <p className="mt-1 text-sm text-red-500">{formErrors.city}</p>
                       )}
@@ -405,7 +543,9 @@ const CheckoutPage = () => {
                   
                   <div className="mb-6">
                     <label htmlFor="street_address" className="block text-sm font-medium text-gray-700 mb-1">
-                      Street Address <span className="text-red-500">*</span>
+                      {deliveryMethod === 'address' ? 'Street Address' : 'Specific Location/Landmark'} 
+                      {deliveryMethod === 'address' && <span className="text-red-500">*</span>}
+                      {deliveryMethod === 'bus_park' && <span className="text-gray-500 text-xs ml-1">(Optional)</span>}
                     </label>
                     <input
                       type="text"
@@ -416,9 +556,13 @@ const CheckoutPage = () => {
                       className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${
                         formErrors.street_address ? 'border-red-500' : 'border-gray-300'
                       }`}
-                      placeholder="Your full address"
+                      placeholder={
+                        deliveryMethod === 'address' 
+                          ? "Your full address" 
+                          : "Bus park name or nearest landmark (optional)"
+                      }
                       disabled={isProcessingOrder}
-                      required
+                      required={deliveryMethod === 'address'}
                     />
                     {formErrors.street_address && (
                       <p className="mt-1 text-sm text-red-500">{formErrors.street_address}</p>
@@ -489,16 +633,18 @@ const CheckoutPage = () => {
                   
                   <div className="flex justify-between">
                     <span className="text-gray-600">
-                      {deliveryMethod === 'pickup' ? 'Pickup:' : 'Shipping:'}
+                      {getDeliveryMethodDisplayName(deliveryMethod)}:
                     </span>
                     <span className="font-medium">
-                      {deliveryMethod === 'pickup' ? 'Free' : formatPrice(shipping)}
+                      {getDeliveryPrice()}
                     </span>
                   </div>
                   
                   <div className="flex justify-between text-lg font-semibold pt-2 border-t border-gray-200">
                     <span>Total:</span>
-                    <span className="text-pink-600">{formatPrice(finalTotal)}</span>
+                    <span className="text-pink-600">
+                      {isCalculatingShipping ? 'Calculating...' : formatPrice(finalTotal)}
+                    </span>
                   </div>
                 </div>
                 
@@ -537,9 +683,9 @@ const CheckoutPage = () => {
                   
                   <Button
                     type="submit"
-                    disabled={isProcessingOrder}
+                    disabled={isProcessingOrder || isCalculatingShipping}
                     className={`w-full py-3 rounded-md font-medium transition-colors ${
-                      isProcessingOrder
+                      isProcessingOrder || isCalculatingShipping
                         ? 'bg-gray-400 cursor-not-allowed text-gray-200'
                         : 'bg-pink-500 hover:bg-pink-600 text-white'
                     }`}
@@ -552,6 +698,8 @@ const CheckoutPage = () => {
                         </svg>
                         Initiating Payment...
                       </div>
+                    ) : isCalculatingShipping ? (
+                      'Calculating Total...'
                     ) : (
                       `Proceed to Payment - ${formatPrice(finalTotal)}`
                     )}

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const ConsultationCTA = () => {
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const navigate = useNavigate();
   
   // Sample video URL - replace with your actual video path
   const videoUrl = "/assets/video/skincare-2.mp4";
@@ -21,8 +23,8 @@ const ConsultationCTA = () => {
   };
 
   const handleConsultationClick = () => {
-    // Handle navigation to consultation page
-    console.log('Navigate to consultation page');
+    // Navigate to consultation page
+    navigate('/consultation');
   };
 
   return (

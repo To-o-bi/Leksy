@@ -1,14 +1,133 @@
-import React, { useState, useEffect, useRef } from 'react';
+// EditProductPage.js
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Save, Upload, X, AlertCircle, CheckCircle } from 'lucide-react';
 import { productService } from '../../../api';
+
+// Constants
+const PRODUCT_CATEGORIES = [
+  'serums', 'moisturizers', 'bathe and body', 
+  'sunscreens', 'toners', 'face cleansers'
+];
+
+const IMAGE_CONFIG = {
+  maxSize: 2 * 1024 * 1024, // 2MB
+  validTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+  maxCount: 5
+};
+
+const FALLBACK_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
+
+// Utility functions
+const formatCategoryName = (category) => 
+  category.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+
+const parseApiResponse = (response) => {
+  if (typeof response === 'string' && response.includes('<br />')) {
+    try {
+      const jsonMatch = response.match(/\{.*\}$/);
+      if (jsonMatch) return JSON.parse(jsonMatch[0]);
+      
+      if (response.includes('"code":200') && response.includes('updated successfully')) {
+        return { code: 200, message: 'Product updated successfully!' };
+      }
+    } catch (parseError) {
+      console.warn('Could not parse response JSON:', parseError);
+    }
+  }
+  return response;
+};
+
+// Move FormField component outside to prevent unnecessary re-renders
+const FormField = React.memo(({ 
+  label, 
+  name, 
+  type = 'text', 
+  required = false, 
+  placeholder, 
+  currency = false,
+  rows,
+  options,
+  className = '',
+  value,
+  error,
+  onChange,
+  disabled,
+  ...props 
+}) => {
+  const baseClasses = `w-full px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+    error ? 'border-red-300' : 'border-gray-300'
+  }`;
+  
+  return (
+    <div className={className}>
+      <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-2">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      
+      {type === 'select' ? (
+        <select
+          id={name}
+          name={name}
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          className={baseClasses}
+          {...props}
+        >
+          <option value="">{placeholder}</option>
+          {options?.map((option) => (
+            <option key={option} value={option}>
+              {formatCategoryName(option)}
+            </option>
+          ))}
+        </select>
+      ) : type === 'textarea' ? (
+        <textarea
+          id={name}
+          name={name}
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          rows={rows || 4}
+          className={baseClasses}
+          placeholder={placeholder}
+          {...props}
+        />
+      ) : (
+        <div className={currency ? 'relative' : ''}>
+          {currency && (
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <span className="text-gray-500">₦</span>
+            </div>
+          )}
+          <input
+            type={type}
+            id={name}
+            name={name}
+            value={value}
+            onChange={onChange}
+            disabled={disabled}
+            className={`${baseClasses} ${currency ? 'pl-8' : ''}`}
+            placeholder={placeholder}
+            {...props}
+          />
+        </div>
+      )}
+      
+      {error && (
+        <p className="mt-1 text-sm text-red-600">{error}</p>
+      )}
+    </div>
+  );
+});
 
 const EditProductPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   
-  // State management
+  // State variables
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -17,12 +136,13 @@ const EditProductPage = () => {
   const [originalData, setOriginalData] = useState(null);
   const [errors, setErrors] = useState({});
   
+  // Form data state
   const [formData, setFormData] = useState({
     name: '',
     price: '',
     slashed_price: '',
     description: '',
-    quantity: '',
+    quantity: '', // Using quantity as the field name
     category: '',
   });
   
@@ -30,60 +150,8 @@ const EditProductPage = () => {
   const [newImagePreviews, setNewImagePreviews] = useState([]);
   const [existingImages, setExistingImages] = useState([]);
   
-  // Constants
-  const PRODUCT_CATEGORIES = [
-    'serums', 'moisturizers', 'bathe and body', 
-    'sunscreens', 'toners', 'face cleansers'
-  ];
-  
-  const IMAGE_CONFIG = {
-    maxSize: 2 * 1024 * 1024, // 2MB
-    validTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
-    maxCount: 5
-  };
-  
-  const FALLBACK_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
-  
-  // Utility functions
-  const formatCategoryName = (category) => 
-    category.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-  
-  const parseApiResponse = (response) => {
-    if (typeof response === 'string' && response.includes('<br />')) {
-      try {
-        const jsonMatch = response.match(/\{.*\}$/);
-        if (jsonMatch) return JSON.parse(jsonMatch[0]);
-        
-        if (response.includes('"code":200') && response.includes('updated successfully')) {
-          return { code: 200, message: 'Product updated successfully!' };
-        }
-      } catch (parseError) {
-        console.warn('Could not parse response JSON:', parseError);
-      }
-    }
-    return response;
-  };
-  
-  const clearErrors = (field = null) => {
-    if (field) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    } else {
-      setErrors({});
-    }
-    if (submitError) setSubmitError('');
-  };
-  
-  const validateImageFile = (file) => {
-    if (!IMAGE_CONFIG.validTypes.includes(file.type)) {
-      return { valid: false, error: 'Only JPEG, PNG, and WebP images are allowed' };
-    }
-    if (file.size > IMAGE_CONFIG.maxSize) {
-      return { valid: false, error: 'File size must be less than 2MB' };
-    }
-    return { valid: true };
-  };
-  
-  const hasChanges = () => {
+  // Memoized functions
+  const hasChanges = useCallback(() => {
     if (!originalData) return false;
     
     return (
@@ -91,13 +159,26 @@ const EditProductPage = () => {
       parseFloat(formData.price) !== originalData.price ||
       parseFloat(formData.slashed_price || 0) !== (originalData.slashed_price || 0) ||
       formData.description !== originalData.description ||
-      parseInt(formData.quantity) !== originalData.available_qty ||
+      parseInt(formData.quantity, 10) !== originalData.available_qty || // Compare with available_qty
       formData.category !== originalData.category ||
       newImages.length > 0 ||
       existingImages.length !== (originalData.images?.length || 0)
     );
-  };
-  
+  }, [formData, originalData, newImages, existingImages]);
+
+  const handleError = useCallback((error, defaultMessage) => {
+    console.error('Error:', error);
+    
+    if (error.message?.includes('Authentication')) {
+      setSubmitError('Please log in again to continue.');
+      setTimeout(() => navigate('/admin/login'), 2000);
+    } else if (error.message?.includes('not found') || error.status === 404) {
+      setProductNotFound(true);
+    } else {
+      setSubmitError(error.message || defaultMessage);
+    }
+  }, [navigate]);
+
   // Fetch product data
   useEffect(() => {
     const fetchProductData = async () => {
@@ -112,54 +193,55 @@ const EditProductPage = () => {
         
         if (!response || response.code !== 200 || !response.product) {
           setProductNotFound(true);
+          setLoading(false);
           return;
         }
         
         const productData = response.product;
         setOriginalData(productData);
-        
         setFormData({
           name: productData.name || '',
           price: productData.price?.toString() || '',
           slashed_price: productData.slashed_price?.toString() || '',
           category: productData.category || '',
-          quantity: productData.available_qty?.toString() || '',
+          quantity: productData.available_qty?.toString() || '', // Map to quantity field
           description: productData.description || '',
         });
-        
         setExistingImages(Array.isArray(productData.images) ? productData.images : []);
+        setLoading(false);
         
       } catch (error) {
-        console.error('Error fetching product:', error);
-        
-        if (error.message.includes('not found') || error.status === 404) {
-          setProductNotFound(true);
-        } else if (error.message.includes('Authentication')) {
-          setSubmitError('Please log in again to continue.');
-          setTimeout(() => navigate('/admin/login'), 2000);
-        } else {
-          setSubmitError('Failed to load product data. Please try again.');
-        }
-      } finally {
+        handleError(error, 'Failed to load product data. Please try again.');
         setLoading(false);
       }
     };
 
     fetchProductData();
-  }, [id, navigate]);
+  }, [id, handleError]);
   
   // Event handlers
-  const handleChange = (e) => {
+  const handleChange = useCallback((e) => {
     const { name, value } = e.target;
+    
     setFormData(prev => ({ ...prev, [name]: value }));
-    clearErrors(name);
-  };
-  
-  const handleImageChange = (e) => {
+    
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+    
+    if (submitError) {
+      setSubmitError('');
+    }
+  }, [errors, submitError]);
+
+  const handleImageChange = useCallback((e) => {
     const files = Array.from(e.target.files);
     
     if (existingImages.length + newImages.length + files.length > IMAGE_CONFIG.maxCount) {
-      setErrors(prev => ({ ...prev, images: `Maximum ${IMAGE_CONFIG.maxCount} images allowed per product` }));
+      setErrors(prev => ({ 
+        ...prev, 
+        images: `Maximum ${IMAGE_CONFIG.maxCount} images allowed per product` 
+      }));
       return;
     }
     
@@ -183,31 +265,43 @@ const EditProductPage = () => {
     if (validFiles.length > 0) {
       setNewImages(prev => [...prev, ...validFiles]);
       
+      if (errors.images) {
+        setErrors(prev => ({ ...prev, images: '' }));
+      }
+      
+      if (submitError) {
+        setSubmitError('');
+      }
+      
+      // Create previews
+      const newPreviews = [];
       validFiles.forEach(file => {
         const reader = new FileReader();
-        reader.onloadend = () => setNewImagePreviews(prev => [...prev, reader.result]);
+        reader.onloadend = () => {
+          newPreviews.push(reader.result);
+          if (newPreviews.length === validFiles.length) {
+            setNewImagePreviews(prev => [...prev, ...newPreviews]);
+          }
+        };
         reader.readAsDataURL(file);
       });
-      
-      if (errors.images) clearErrors('images');
     }
     
     if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-  
-  const handleRemoveImage = (index, type) => {
+  }, [existingImages.length, newImages.length, errors, submitError]);
+
+  const handleRemoveImage = useCallback((index, type) => {
     if (type === 'new') {
       setNewImages(prev => prev.filter((_, i) => i !== index));
       setNewImagePreviews(prev => prev.filter((_, i) => i !== index));
     } else {
       setExistingImages(prev => prev.filter((_, i) => i !== index));
     }
-  };
-  
-  const validateForm = () => {
+  }, []);
+
+  const validateForm = useCallback(() => {
     const newErrors = {};
     
-    // Required field validations
     const validations = {
       name: {
         required: true,
@@ -225,7 +319,7 @@ const EditProductPage = () => {
         minLength: 10,
         message: 'Description is required and must be at least 10 characters'
       },
-      quantity: {
+      quantity: { // Keep as quantity for validation
         required: true,
         type: 'integer',
         min: 0,
@@ -251,7 +345,7 @@ const EditProductPage = () => {
           newErrors[field] = rules.message;
         } else if (rules.type === 'number' && (isNaN(value) || parseFloat(value) < (rules.min || 0))) {
           newErrors[field] = rules.message;
-        } else if (rules.type === 'integer' && (isNaN(value) || parseInt(value) < (rules.min || 0))) {
+        } else if (rules.type === 'integer' && (isNaN(value) || parseInt(value, 10) < (rules.min || 0))) {
           newErrors[field] = rules.message;
         } else if (rules.enum && !rules.enum.includes(value)) {
           newErrors[field] = rules.message;
@@ -261,9 +355,10 @@ const EditProductPage = () => {
     
     // Slashed price validation
     if (formData.slashed_price) {
-      if (isNaN(formData.slashed_price) || parseFloat(formData.slashed_price) <= 0) {
+      const slashedPrice = parseFloat(formData.slashed_price);
+      if (isNaN(slashedPrice) || slashedPrice <= 0) {
         newErrors.slashed_price = 'Please enter a valid original price';
-      } else if (formData.price && parseFloat(formData.slashed_price) <= parseFloat(formData.price)) {
+      } else if (formData.price && slashedPrice <= parseFloat(formData.price)) {
         newErrors.slashed_price = 'Original price must be greater than current price';
       }
     }
@@ -275,9 +370,9 @@ const EditProductPage = () => {
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
-  
-  const handleSubmit = async (e) => {
+  }, [formData, existingImages.length, newImages.length]);
+
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     
     if (!validateForm()) {
@@ -301,16 +396,24 @@ const EditProductPage = () => {
       if (formData.name !== originalData.name) productData.name = formData.name.trim();
       if (parseFloat(formData.price) !== originalData.price) productData.price = parseFloat(formData.price);
       if (formData.description !== originalData.description) productData.description = formData.description.trim();
-      if (parseInt(formData.quantity) !== originalData.available_qty) productData.quantity = parseInt(formData.quantity, 10);
+      
+      // CORRECTED: Use 'quantity' for API parameter
+      if (parseInt(formData.quantity, 10) !== originalData.available_qty) {
+        productData.quantity = parseInt(formData.quantity, 10);
+      }
+      
       if (formData.category !== originalData.category) productData.category = formData.category;
       
       const newSlashedPrice = formData.slashed_price ? parseFloat(formData.slashed_price) : null;
       const originalSlashedPrice = originalData.slashed_price || null;
-      if (newSlashedPrice !== originalSlashedPrice && newSlashedPrice) {
+      if (newSlashedPrice !== originalSlashedPrice) {
         productData.slashed_price = newSlashedPrice;
       }
       
       if (newImages.length > 0) productData.images = newImages;
+      
+      // DEBUG: Log the payload being sent
+      console.log('Updating product with data:', productData);
       
       const response = await productService.updateProduct(id, productData);
       const parsedResponse = parseApiResponse(response);
@@ -332,31 +435,19 @@ const EditProductPage = () => {
       }
       
     } catch (error) {
-      console.error('Error updating product:', error);
-      
-      if (error.message?.includes('Authentication')) {
-        setSubmitError('Please log in again to continue.');
-        setTimeout(() => navigate('/admin/login'), 2000);
-      } else {
-        const errorMessage = error.message || 'An error occurred while updating the product.';
-        if (errorMessage === 'Failed to update product' && error.stack?.includes('code":200')) {
-          setSubmitError('Product may have been updated. Please check the products list to confirm.');
-        } else {
-          setSubmitError(errorMessage);
-        }
-      }
+      handleError(error, 'An error occurred while updating the product.');
     } finally {
       setSubmitting(false);
     }
-  };
-  
-  const handleGoBack = () => {
+  }, [validateForm, hasChanges, formData, originalData, newImages, id, navigate, handleError]);
+
+  const handleGoBack = useCallback(() => {
     if (hasChanges() && !window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
       return;
     }
     navigate('/admin/products');
-  };
-  
+  }, [hasChanges, navigate]);
+
   // Render components
   const LoadingSpinner = () => (
     <div className="min-h-screen bg-gray-50 py-6">
@@ -437,90 +528,13 @@ const EditProductPage = () => {
     </div>
   );
   
-  const FormField = ({ 
-    label, 
-    name, 
-    type = 'text', 
-    required = false, 
-    placeholder, 
-    currency = false,
-    rows,
-    options,
-    className = '',
-    ...props 
-  }) => (
-    <div className={className}>
-      <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-2">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
-      {type === 'select' ? (
-        <select
-          id={name}
-          name={name}
-          value={formData[name]}
-          onChange={handleChange}
-          disabled={submitting}
-          className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-            errors[name] ? 'border-red-300' : 'border-gray-300'
-          }`}
-          {...props}
-        >
-          <option value="">{placeholder}</option>
-          {options?.map((option) => (
-            <option key={option} value={option}>
-              {formatCategoryName(option)}
-            </option>
-          ))}
-        </select>
-      ) : type === 'textarea' ? (
-        <textarea
-          id={name}
-          name={name}
-          value={formData[name]}
-          onChange={handleChange}
-          disabled={submitting}
-          rows={rows || 4}
-          className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-            errors[name] ? 'border-red-300' : 'border-gray-300'
-          }`}
-          placeholder={placeholder}
-          {...props}
-        />
-      ) : (
-        <div className={currency ? 'relative' : ''}>
-          {currency && (
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-gray-500">₦</span>
-            </div>
-          )}
-          <input
-            type={type}
-            id={name}
-            name={name}
-            value={formData[name]}
-            onChange={handleChange}
-            disabled={submitting}
-            className={`w-full ${currency ? 'pl-8' : 'pl-3'} pr-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-              errors[name] ? 'border-red-300' : 'border-gray-300'
-            }`}
-            placeholder={placeholder}
-            {...props}
-          />
-        </div>
-      )}
-      {errors[name] && (
-        <p className="mt-1 text-sm text-red-600">{errors[name]}</p>
-      )}
-    </div>
-  );
-  
-  const ImageGrid = ({ images, type, onRemove }) => (
+  const ImageGrid = React.memo(({ images, type, onRemove, submitting }) => (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
       {images.map((image, index) => (
         <div key={`${type}-${index}`} className="relative group">
           <div className="aspect-square w-full overflow-hidden rounded-lg bg-gray-100">
             <img
-              src={type === 'new' ? image : image}
+              src={image}
               alt={`${type === 'new' ? 'New' : 'Product'} image ${index + 1}`}
               className="h-full w-full object-cover"
               onError={(e) => { e.target.src = FALLBACK_IMAGE; }}
@@ -543,8 +557,8 @@ const EditProductPage = () => {
         </div>
       ))}
     </div>
-  );
-  
+  ));
+
   // Main render
   if (loading) return <LoadingSpinner />;
   if (productNotFound) return <NotFoundPage />;
@@ -586,22 +600,33 @@ const EditProductPage = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
+                  key="name"
                   label="Product Name"
                   name="name"
                   required
                   placeholder="Enter product name"
+                  value={formData.name}
+                  error={errors.name}
+                  onChange={handleChange}
+                  disabled={submitting}
                 />
                 
                 <FormField
+                  key="category"
                   label="Category"
                   name="category"
                   type="select"
                   required
                   placeholder="Select Category"
                   options={PRODUCT_CATEGORIES}
+                  value={formData.category}
+                  error={errors.category}
+                  onChange={handleChange}
+                  disabled={submitting}
                 />
                 
                 <FormField
+                  key="price"
                   label="Price"
                   name="price"
                   type="number"
@@ -610,9 +635,14 @@ const EditProductPage = () => {
                   placeholder="0.00"
                   min="0"
                   step="0.01"
+                  value={formData.price}
+                  error={errors.price}
+                  onChange={handleChange}
+                  disabled={submitting}
                 />
                 
                 <FormField
+                  key="slashed_price"
                   label="Original Price (Optional)"
                   name="slashed_price"
                   type="number"
@@ -620,28 +650,42 @@ const EditProductPage = () => {
                   placeholder="0.00"
                   min="0"
                   step="0.01"
+                  value={formData.slashed_price}
+                  error={errors.slashed_price}
+                  onChange={handleChange}
+                  disabled={submitting}
                 />
                 
                 <FormField
+                  key="quantity" // Using quantity as field name
                   label="Quantity"
-                  name="quantity"
+                  name="quantity" // Using quantity as field name
                   type="number"
                   required
                   placeholder="Enter available quantity"
                   min="0"
                   className="md:col-span-2"
+                  value={formData.quantity}
+                  error={errors.quantity}
+                  onChange={handleChange}
+                  disabled={submitting}
                 />
                 
                 <FormField
+                  key="description"
                   label="Description"
                   name="description"
                   type="textarea"
                   required
                   placeholder="Enter product description"
                   className="md:col-span-2"
+                  value={formData.description}
+                  error={errors.description}
+                  onChange={handleChange}
+                  disabled={submitting}
                 />
                 
-                {/* Existing Images */}
+                {/* Images Section */}
                 {existingImages.length > 0 && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -650,12 +694,12 @@ const EditProductPage = () => {
                     <ImageGrid 
                       images={existingImages} 
                       type="existing" 
-                      onRemove={handleRemoveImage} 
+                      onRemove={handleRemoveImage}
+                      submitting={submitting}
                     />
                   </div>
                 )}
                 
-                {/* Upload New Images */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     {existingImages.length > 0 ? 'Add More Images' : 'Product Images'}{' '}
@@ -692,7 +736,6 @@ const EditProductPage = () => {
                     <p className="mt-2 text-sm text-red-600">{errors.images}</p>
                   )}
                   
-                  {/* New Image Previews */}
                   {newImagePreviews.length > 0 && (
                     <div className="mt-4">
                       <p className="text-sm font-medium text-gray-700 mb-3">
@@ -701,7 +744,8 @@ const EditProductPage = () => {
                       <ImageGrid 
                         images={newImagePreviews} 
                         type="new" 
-                        onRemove={handleRemoveImage} 
+                        onRemove={handleRemoveImage}
+                        submitting={submitting}
                       />
                     </div>
                   )}
@@ -752,4 +796,4 @@ const EditProductPage = () => {
   );
 };
 
-export default EditProductPage;
+export default EditProductPage

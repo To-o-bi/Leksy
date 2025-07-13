@@ -29,7 +29,7 @@ export const prepareCartForAPI = (cart) => {
 /**
  * Validates checkout form data
  * @param {Object} formData - Form data object
- * @param {string} deliveryMethod - Delivery method ('address' or 'pickup')
+ * @param {string} deliveryMethod - Delivery method ('address', 'pickup', or 'bus_park')
  * @returns {Object} Validation errors object
  */
 export const validateCheckoutForm = (formData, deliveryMethod) => {
@@ -52,9 +52,198 @@ export const validateCheckoutForm = (formData, deliveryMethod) => {
 };
 
 /**
+ * Fetches delivery fee for a specific state
+ * @param {string} state - State name
+ * @returns {Promise<number>} Delivery fee in Naira
+ */
+export const fetchDeliveryFeeForState = async (state) => {
+  try {
+    const response = await fetch(`${BASE_URL}/api/fetch-delivery-fee?state=${encodeURIComponent(state)}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.code === 200) {
+      return result.delivery_fee;
+    } else {
+      throw new Error(result.message || 'Failed to fetch delivery fee');
+    }
+    
+  } catch (error) {
+    console.error('Error fetching delivery fee for state:', error);
+    // Fallback to default delivery fee if API fails
+    return 5000;
+  }
+};
+
+/**
+ * Fetches delivery fee for a specific LGA
+ * @param {string} state - State name
+ * @param {string} lga - LGA name
+ * @returns {Promise<number>} Delivery fee in Naira
+ */
+export const fetchDeliveryFeeForLGA = async (state, lga) => {
+  try {
+    const response = await fetch(`${BASE_URL}/api/fetch-delivery-fee?state=${encodeURIComponent(state)}&lga=${encodeURIComponent(lga)}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.code === 200) {
+      return result.delivery_fee;
+    } else {
+      // If LGA not found, fallback to state delivery fee
+      return await fetchDeliveryFeeForState(state);
+    }
+    
+  } catch (error) {
+    console.error('Error fetching delivery fee for LGA:', error);
+    // Fallback to state delivery fee if LGA API fails
+    return await fetchDeliveryFeeForState(state);
+  }
+};
+
+/**
+ * Fetches bus park delivery fee
+ * @returns {Promise<number>} Bus park delivery fee in Naira
+ */
+export const fetchBusParkDeliveryFee = async () => {
+  try {
+    const response = await fetch(`${BASE_URL}/api/fetch-bus-park-delivery-fee`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.code === 200) {
+      return result.delivery_fee;
+    } else {
+      throw new Error(result.message || 'Failed to fetch bus park delivery fee');
+    }
+    
+  } catch (error) {
+    console.error('Error fetching bus park delivery fee:', error);
+    // Fallback to default bus park delivery fee
+    return 2000;
+  }
+};
+
+/**
+ * Fetches all delivery fees (states based)
+ * @returns {Promise<Array>} Array of delivery fees by state
+ */
+export const fetchAllDeliveryFees = async () => {
+  try {
+    const response = await fetch(`${BASE_URL}/api/fetch-delivery-fees`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.code === 200) {
+      return result.delivery_fees;
+    } else {
+      throw new Error(result.message || 'Failed to fetch delivery fees');
+    }
+    
+  } catch (error) {
+    console.error('Error fetching all delivery fees:', error);
+    return [];
+  }
+};
+
+/**
+ * Fetches all LGA delivery fees for a state
+ * @param {string} state - State name (optional)
+ * @returns {Promise<Array>} Array of delivery fees by LGA
+ */
+export const fetchLGADeliveryFees = async (state = null) => {
+  try {
+    const url = state 
+      ? `${BASE_URL}/api/fetch-lgas-delivery-fees?state=${encodeURIComponent(state)}`
+      : `${BASE_URL}/api/fetch-lgas-delivery-fees`;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.code === 200) {
+      return result.delivery_fees;
+    } else {
+      throw new Error(result.message || 'Failed to fetch LGA delivery fees');
+    }
+    
+  } catch (error) {
+    console.error('Error fetching LGA delivery fees:', error);
+    return [];
+  }
+};
+
+/**
+ * Calculates shipping cost based on delivery method and location
+ * @param {string} deliveryMethod - Delivery method ('address', 'pickup', or 'bus_park')
+ * @param {string} state - State name (required for address delivery)
+ * @param {string} lga - LGA name (optional for more specific pricing)
+ * @returns {Promise<number>} Shipping cost in Naira
+ */
+export const calculateShipping = async (deliveryMethod, state = null, lga = null) => {
+  try {
+    switch (deliveryMethod) {
+      case 'pickup':
+        return 0;
+        
+      case 'bus_park':
+        return await fetchBusParkDeliveryFee();
+        
+      case 'address':
+        if (!state) {
+          throw new Error('State is required for address delivery');
+        }
+        
+        // If LGA is provided, try to get LGA-specific fee, otherwise use state fee
+        if (lga) {
+          return await fetchDeliveryFeeForLGA(state, lga);
+        } else {
+          return await fetchDeliveryFeeForState(state);
+        }
+        
+      default:
+        throw new Error('Invalid delivery method');
+    }
+  } catch (error) {
+    console.error('Error calculating shipping:', error);
+    // Fallback to default fees based on delivery method
+    switch (deliveryMethod) {
+      case 'pickup':
+        return 0;
+      case 'bus_park':
+        return 2000;
+      case 'address':
+        return 5000;
+      default:
+        return 5000;
+    }
+  }
+};
+
+/**
  * Initiates checkout process with the API
  * @param {Object} formData - Customer form data
- * @param {string} deliveryMethod - Delivery method ('address' or 'pickup')
+ * @param {string} deliveryMethod - Delivery method ('address', 'pickup', or 'bus_park')
  * @param {Array} cart - Cart items
  * @param {string} successRedirectUrl - URL to redirect after successful payment
  * @returns {Promise<Object>} API response
@@ -212,7 +401,8 @@ export const storeOrderDetails = (formData, deliveryMethod, cart, totalPrice, sh
     },
     deliveryInfo: {
       method: deliveryMethod,
-      address: deliveryMethod === 'address' ? formData.street_address : 'Store Pickup',
+      address: deliveryMethod === 'address' ? formData.street_address : 
+               deliveryMethod === 'bus_park' ? 'Bus Park Delivery' : 'Store Pickup',
       city: deliveryMethod === 'address' ? formData.city : 'N/A',
       state: deliveryMethod === 'address' ? formData.state : 'N/A'
     },
@@ -238,18 +428,27 @@ export const nigerianStates = [
 ];
 
 /**
- * Calculates shipping cost based on delivery method
- * @param {string} deliveryMethod - Delivery method ('address' or 'pickup')
- * @returns {number} Shipping cost in Naira
- */
-export const calculateShipping = (deliveryMethod) => {
-  return deliveryMethod === 'pickup' ? 0 : 5000; // Fixed shipping cost
-};
-
-/**
  * Generates success redirect URL
  * @returns {string} Success redirect URL
  */
 export const getSuccessRedirectUrl = () => {
   return `${window.location.origin}/checkout/checkout-success`;
+};
+
+/**
+ * Utility function to get delivery method display name
+ * @param {string} deliveryMethod - Delivery method code
+ * @returns {string} Display name for delivery method
+ */
+export const getDeliveryMethodDisplayName = (deliveryMethod) => {
+  switch (deliveryMethod) {
+    case 'pickup':
+      return 'Store Pickup';
+    case 'bus_park':
+      return 'Bus Park Delivery';
+    case 'address':
+      return 'Home Delivery';
+    default:
+      return 'Unknown';
+  }
 };

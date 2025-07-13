@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Edit2, Save, X, Truck, MapPin, AlertCircle, CheckCircle, ChevronDown, ChevronRight, Building2 } from 'lucide-react';
 import api from '../../api/axios';
 
-const BASE_URL = 'https://leksycosmetics.com/api'; 
-
 const DeliveryFeeAdmin = () => {
   const [deliveryFees, setDeliveryFees] = useState([]);
   const [lagosLGAs, setLagosLGAs] = useState([]);
@@ -17,18 +15,8 @@ const DeliveryFeeAdmin = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedLagos, setExpandedLagos] = useState(false);
 
-  // Lagos State LGAs
-  const LAGOS_LGAS = [
-    'Agege', 'Ajeromi-Ifelodun', 'Alimosho', 'Amuwo-Odofin', 'Apapa',
-    'Badagry', 'Epe', 'Eti-Osa', 'Ibeju-Lekki', 'Ifako-Ijaiye',
-    'Ikeja', 'Ikorodu', 'Kosofe', 'Lagos Island', 'Lagos Mainland',
-    'Mushin', 'Ojo', 'Oshodi-Isolo', 'Shomolu', 'Surulere'
-  ];
-
-  // Fetch all delivery fees on component mount
   useEffect(() => {
-    fetchDeliveryFees();
-    fetchLagosLGAs();
+    fetchData();
   }, []);
 
   const showNotification = (type, message) => {
@@ -36,148 +24,141 @@ const DeliveryFeeAdmin = () => {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  const fetchDeliveryFees = async () => {
-    setLoading(true);
-    try {
-      console.log('Fetching delivery fees...');
-      const response = await api.get('/fetch-delivery-fees');
-      console.log('API Response:', response.data);
+  const fetchData = async () => {
+  setLoading(true);
+  try {
+    const [feesResponse, lgasResponse] = await Promise.allSettled([
+      api.get('/fetch-delivery-fees'),
+      api.get('/fetch-lgas-delivery-fees?state=Lagos')
+    ]);
+
+    if (feesResponse.status === 'fulfilled' && feesResponse.value.data.code === 200) {
+      const data = feesResponse.value.data;
       
-      const data = response.data;
+      // Enhanced debugging
+      console.log('=== API DEBUG INFO ===');
+      console.log('Full API Response:', JSON.stringify(data, null, 2));
+      console.log('Response Code:', data.code);
+      console.log('Response Message:', data.message);
+      console.log('Raw delivery_fees array:', data.delivery_fees);
+      console.log('Array length:', data.delivery_fees?.length || 0);
       
-      if (data.code === 200) {
-        setDeliveryFees(data.delivery_fees || []);
-        showNotification('success', data.message || `Loaded ${data.delivery_fees?.length || 0} delivery fees`);
-      } else {
-        throw new Error(data.message || 'Failed to fetch delivery fees');
+      // Check first few items in detail
+      if (data.delivery_fees && data.delivery_fees.length > 0) {
+        console.log('First 3 items detailed:');
+        data.delivery_fees.slice(0, 3).forEach((item, index) => {
+          console.log(`Item ${index}:`, item);
+          console.log(`  - Keys:`, Object.keys(item));
+          console.log(`  - Values:`, Object.values(item));
+          console.log(`  - Has state:`, !!item.state);
+          console.log(`  - Has delivery_fee:`, !!item.delivery_fee);
+          console.log(`  - State value:`, item.state);
+          console.log(`  - Fee value:`, item.delivery_fee);
+        });
       }
-    } catch (error) {
-      console.error('Error fetching delivery fees:', error);
-      showNotification('error', error.response?.data?.message || error.message || 'Failed to load delivery fees');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchLagosLGAs = async () => {
-    try {
-      console.log('Fetching Lagos LGAs...');
-      // For now, we'll use a mock endpoint that follows your API pattern
-      // You'll need to implement: GET /api/fetch-lagos-lgas
-      const response = await api.get('/fetch-lagos-lgas');
-      console.log('Lagos LGAs Response:', response.data);
       
-      const data = response.data;
-      
-      if (data.code === 200) {
-        setLagosLGAs(data.lgas || []);
-      } else {
-        throw new Error(data.message || 'Failed to fetch Lagos LGAs');
+      // Check if items have different property names
+      const sampleItem = data.delivery_fees?.[0];
+      if (sampleItem) {
+        console.log('Sample item properties:', Object.keys(sampleItem));
+        console.log('Sample item:', sampleItem);
       }
-    } catch (error) {
-      console.error('Error fetching Lagos LGAs:', error);
-      // Initialize with default LGAs if API doesn't exist yet
-      const defaultLGAs = LAGOS_LGAS.map(lga => ({
-        lga: lga,
-        delivery_fee: 0
-      }));
-      setLagosLGAs(defaultLGAs);
-      console.log('Using default Lagos LGAs - API endpoint may not be implemented yet');
-    }
-  };
-
-  const handleEdit = (state) => {
-    const currentFee = deliveryFees.find(fee => fee.state === state)?.delivery_fee || 0;
-    setEditingStates(prev => new Set([...prev, state]));
-    setTempValues(prev => ({
-      ...prev,
-      [state]: currentFee
-    }));
-  };
-
-  const handleLGAEdit = (lga) => {
-    const currentFee = lagosLGAs.find(item => item.lga === lga)?.delivery_fee || 0;
-    setEditingLGAs(prev => new Set([...prev, lga]));
-    setTempLGAValues(prev => ({
-      ...prev,
-      [lga]: currentFee
-    }));
-  };
-
-  const handleCancel = (state) => {
-    setEditingStates(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(state);
-      return newSet;
-    });
-    setTempValues(prev => {
-      const newValues = { ...prev };
-      delete newValues[state];
-      return newValues;
-    });
-  };
-
-  const handleLGACancel = (lga) => {
-    setEditingLGAs(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(lga);
-      return newSet;
-    });
-    setTempLGAValues(prev => {
-      const newValues = { ...prev };
-      delete newValues[lga];
-      return newValues;
-    });
-  };
-
-  const handleSave = async (state) => {
-    const newFee = tempValues[state];
-    
-    if (!newFee || newFee < 0) {
-      showNotification('error', 'Please enter a valid delivery fee');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      console.log(`Updating delivery fee for ${state} to ${newFee}`);
-      // Following your API pattern: POST /api/admin/update-delivery-fees?State={price}
-      const params = { [state]: newFee };
-      const response = await api.post('/admin/update-delivery-fees', null, { params });
-      console.log('Update response:', response.data);
       
-      const data = response.data;
-      
-      if (data.code === 200) {
-        if (data.delivery_fees) {
-          setDeliveryFees(data.delivery_fees);
-        } else {
-          // Fallback: update local state manually
-          setDeliveryFees(prev => 
-            prev.map(fee => 
-              fee.state === state 
-                ? { ...fee, delivery_fee: parseInt(newFee) }
-                : fee
-            )
-          );
-        }
+      // More flexible filtering - check for different possible property names
+      const validFees = data.delivery_fees?.filter(fee => {
+        if (!fee) return false;
         
-        // Clear editing state
-        handleCancel(state);
-        showNotification('success', data.message || `Updated delivery fee for ${state} successfully`);
+        // Check for common property variations
+        const hasState = fee.state || fee.name || fee.State || fee.location;
+        const hasFee = fee.delivery_fee !== undefined || fee.fee !== undefined || fee.price !== undefined;
+        
+        console.log('Item validation:', { fee, hasState, hasFee });
+        return hasState && hasFee;
+      }) || [];
+      
+      console.log('Valid fees after filtering:', validFees);
+      console.log('=== END DEBUG INFO ===');
+      
+      if (validFees.length === 0 && data.delivery_fees?.length > 0) {
+        console.error('❌ API DATA ISSUE: All items filtered out');
+        console.error('This suggests the API is returning empty objects or using different property names');
+        
+        // Try to use raw data if it exists
+        const rawData = data.delivery_fees || [];
+        setDeliveryFees(rawData);
+        showNotification('error', `API returned ${rawData.length} items but they appear to be empty. Check console for details.`);
       } else {
-        throw new Error(data.message || 'Failed to update delivery fee');
+        setDeliveryFees(validFees);
+        showNotification('success', data.message || `Loaded ${validFees.length} delivery fees`);
       }
-    } catch (error) {
-      console.error('Error updating delivery fee:', error);
-      showNotification('error', error.response?.data?.message || error.message || `Failed to update delivery fee for ${state}`);
-    } finally {
-      setSaving(false);
+    } else {
+      throw new Error('Failed to fetch delivery fees');
+    }
+
+    // Similar debugging for LGAs
+    if (lgasResponse.status === 'fulfilled' && lgasResponse.value.data.code === 200) {
+      const lgaData = lgasResponse.value.data;
+      console.log('Lagos LGAs Response:', JSON.stringify(lgaData, null, 2));
+      
+      const validLGAs = lgaData.delivery_fees?.filter(lga => {
+        const hasLGA = lga && (lga.lga || lga.name);
+        const hasFee = lga.delivery_fee !== undefined;
+        return hasLGA && hasFee;
+      }) || [];
+      
+      console.log('Valid LGAs after filtering:', validLGAs);
+      setLagosLGAs(validLGAs);
+    } else {
+      setLagosLGAs([]);
+    }
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    showNotification('error', error.response?.data?.message || 'Failed to load data');
+  } finally {
+    setLoading(false);
+  }
+  };
+
+  const handleEdit = (identifier, isLGA = false) => {
+    const collection = isLGA ? lagosLGAs : deliveryFees;
+    const key = isLGA ? 'lga' : 'state';
+    const currentFee = collection.find(item => item[key] === identifier)?.delivery_fee || 0;
+    
+    if (isLGA) {
+      setEditingLGAs(prev => new Set([...prev, identifier]));
+      setTempLGAValues(prev => ({ ...prev, [identifier]: currentFee }));
+    } else {
+      setEditingStates(prev => new Set([...prev, identifier]));
+      setTempValues(prev => ({ ...prev, [identifier]: currentFee }));
     }
   };
 
-  const handleLGASave = async (lga) => {
-    const newFee = tempLGAValues[lga];
+  const handleCancel = (identifier, isLGA = false) => {
+    if (isLGA) {
+      setEditingLGAs(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(identifier);
+        return newSet;
+      });
+      setTempLGAValues(prev => {
+        const { [identifier]: _, ...rest } = prev;
+        return rest;
+      });
+    } else {
+      setEditingStates(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(identifier);
+        return newSet;
+      });
+      setTempValues(prev => {
+        const { [identifier]: _, ...rest } = prev;
+        return rest;
+      });
+    }
+  };
+
+  const handleSave = async (identifier, isLGA = false) => {
+    const newFee = isLGA ? tempLGAValues[identifier] : tempValues[identifier];
     
     if (newFee < 0) {
       showNotification('error', 'Please enter a valid delivery fee');
@@ -186,119 +167,101 @@ const DeliveryFeeAdmin = () => {
 
     setSaving(true);
     try {
-      console.log(`Updating LGA delivery fee for ${lga} to ${newFee}`);
-      // Following your API pattern, this would be: POST /api/admin/update-lagos-lgas?{LGA}={fee}
-      const params = { [lga]: newFee };
-      const response = await api.post('/admin/update-lagos-lgas', null, { params });
-      console.log('LGA Update response:', response.data);
+      const endpoint = isLGA 
+        ? '/admin/lgas-delivery-fees/update' 
+        : '/admin/update-delivery-fees';
+      
+      const requestData = { [identifier]: newFee };
+      const response = await api.post(endpoint, requestData);
       
       const data = response.data;
+      console.log('API Response:', data);
       
       if (data.code === 200) {
-        if (data.lgas) {
-          setLagosLGAs(data.lgas);
+        // Always update the local state immediately with the new value
+        // Don't rely on the API response data structure since it seems inconsistent
+        if (isLGA) {
+          setLagosLGAs(prev => prev.map(item => 
+            item.lga === identifier 
+              ? { ...item, delivery_fee: parseInt(newFee) } 
+              : item
+          ));
         } else {
-          // Fallback: update local state manually
-          setLagosLGAs(prev => 
-            prev.map(item => 
-              item.lga === lga 
-                ? { ...item, delivery_fee: parseInt(newFee) }
-                : item
-            )
-          );
+          setDeliveryFees(prev => prev.map(fee => 
+            fee.state === identifier 
+              ? { ...fee, delivery_fee: parseInt(newFee) } 
+              : fee
+          ));
         }
         
-        handleLGACancel(lga);
-        showNotification('success', data.message || `Updated delivery fee for ${lga} LGA successfully`);
+        handleCancel(identifier, isLGA);
+        showNotification('success', data.message || `Updated ${isLGA ? 'LGA' : 'state'} delivery fee successfully`);
+        
+        // Don't auto-refresh since we've already updated the state
+        // Only refresh manually if user clicks refresh button
+        
       } else {
-        throw new Error(data.message || 'Failed to update LGA delivery fee');
+        throw new Error(data.message || 'Failed to update delivery fee');
       }
     } catch (error) {
-      console.error('Error updating LGA delivery fee:', error);
-      showNotification('error', error.response?.data?.message || error.message || `Failed to update delivery fee for ${lga}`);
+      console.error('Error updating delivery fee:', error);
+      showNotification('error', error.response?.data?.message || 'Failed to update delivery fee');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleBulkUpdate = async () => {
-    if (Object.keys(tempValues).length === 0) {
-      showNotification('error', 'No changes to save');
+  const handleBulkUpdate = async (isLGA = false) => {
+    const values = isLGA ? tempLGAValues : tempValues;
+    
+    if (Object.keys(values).length === 0) {
+      showNotification('error', `No ${isLGA ? 'LGA' : 'state'} changes to save`);
       return;
     }
 
     setSaving(true);
     try {
-      console.log('Bulk updating delivery fees:', tempValues);
-      const response = await api.post('/admin/update-delivery-fees', null, { params: tempValues });
-      console.log('Bulk update response:', response.data);
+      const endpoint = isLGA 
+        ? '/admin/lgas-delivery-fees/update' 
+        : '/admin/update-delivery-fees';
+      
+      const response = await api.post(endpoint, values);
       
       const data = response.data;
+      console.log('Bulk Update API Response:', data);
       
       if (data.code === 200) {
-        if (data.delivery_fees) {
-          setDeliveryFees(data.delivery_fees);
+        // Always update the local state immediately with the new values
+        // Don't rely on the API response data structure since it seems inconsistent
+        if (isLGA) {
+          setLagosLGAs(prev => prev.map(item => 
+            values[item.lga] !== undefined 
+              ? { ...item, delivery_fee: parseInt(values[item.lga]) } 
+              : item
+          ));
+          setEditingLGAs(new Set());
+          setTempLGAValues({});
         } else {
-          setDeliveryFees(prev => 
-            prev.map(fee => 
-              tempValues[fee.state] !== undefined
-                ? { ...fee, delivery_fee: parseInt(tempValues[fee.state]) }
-                : fee
-            )
-          );
+          setDeliveryFees(prev => prev.map(fee => 
+            values[fee.state] !== undefined 
+              ? { ...fee, delivery_fee: parseInt(values[fee.state]) } 
+              : fee
+          ));
+          setEditingStates(new Set());
+          setTempValues({});
         }
-        setEditingStates(new Set());
-        setTempValues({});
         
-        showNotification('success', 'All delivery fees updated successfully');
+        showNotification('success', data.message || `All ${isLGA ? 'LGA' : 'state'} fees updated successfully`);
+        
+        // Don't auto-refresh since we've already updated the state
+        // Only refresh manually if user clicks refresh button
+        
       } else {
-        throw new Error(data.message || 'Failed to update delivery fees');
+        throw new Error(data.message || 'Failed to update fees');
       }
     } catch (error) {
-      console.error('Error updating delivery fees:', error);
-      showNotification('error', error.message || 'Failed to update delivery fees');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleBulkLGAUpdate = async () => {
-    if (Object.keys(tempLGAValues).length === 0) {
-      showNotification('error', 'No LGA changes to save');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      console.log('Bulk updating Lagos LGA fees:', tempLGAValues);
-      // Following your API pattern: POST /api/admin/update-lagos-lgas?LGA1={price1}&LGA2={price2}
-      const response = await api.post('/admin/update-lagos-lgas', null, { params: tempLGAValues });
-      console.log('Bulk LGA update response:', response.data);
-      
-      const data = response.data;
-      
-      if (data.code === 200) {
-        if (data.lgas) {
-          setLagosLGAs(data.lgas);
-        } else {
-          // Fallback: update local state manually if API doesn't return updated data
-          setLagosLGAs(prev => 
-            prev.map(item => 
-              tempLGAValues[item.lga] !== undefined
-                ? { ...item, delivery_fee: parseInt(tempLGAValues[item.lga]) }
-                : item
-            )
-          );
-        }
-        setEditingLGAs(new Set());
-        setTempLGAValues({});
-        showNotification('success', data.message || 'All Lagos LGA fees updated successfully');
-      } else {
-        throw new Error(data.message || 'Failed to update LGA fees');
-      }
-    } catch (error) {
-      console.error('Error updating LGA fees:', error);
-      showNotification('error', error.response?.data?.message || error.message || 'Failed to update LGA fees');
+      console.error('Error updating fees:', error);
+      showNotification('error', error.response?.data?.message || 'Failed to update fees');
     } finally {
       setSaving(false);
     }
@@ -320,10 +283,39 @@ const DeliveryFeeAdmin = () => {
     lga.lga.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totalStatesEditing = editingStates.size;
-  const totalLGAsEditing = editingLGAs.size;
-
+  const totalEditing = editingStates.size + editingLGAs.size;
   const isLagosState = (state) => state.toLowerCase() === 'lagos';
+
+  const EditableField = ({ value, tempValue, onChange, onSave, onCancel, onEdit, isEditing, disabled }) => (
+    <div className="flex items-center gap-2">
+      {isEditing ? (
+        <>
+          <span className="text-gray-500 text-xs">₦</span>
+          <input
+            type="number"
+            value={tempValue || ''}
+            onChange={(e) => onChange(parseInt(e.target.value) || 0)}
+            className="w-16 text-xs px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+            min="0"
+            step="100"
+          />
+          <button onClick={onSave} disabled={disabled} className="text-green-600 hover:text-green-700 disabled:opacity-50">
+            <Save className="w-3 h-3" />
+          </button>
+          <button onClick={onCancel} disabled={disabled} className="text-gray-400 hover:text-gray-600 disabled:opacity-50">
+            <X className="w-3 h-3" />
+          </button>
+        </>
+      ) : (
+        <>
+          <span className="text-xs font-medium text-gray-900">{formatPrice(value)}</span>
+          <button onClick={onEdit} className="text-blue-600 hover:text-blue-700">
+            <Edit2 className="w-3 h-3" />
+          </button>
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen">
@@ -334,16 +326,9 @@ const DeliveryFeeAdmin = () => {
             ? 'bg-green-100 text-green-800 border border-green-200' 
             : 'bg-red-100 text-red-800 border border-red-200'
         }`}>
-          {notification.type === 'success' ? (
-            <CheckCircle className="w-5 h-5" />
-          ) : (
-            <AlertCircle className="w-5 h-5" />
-          )}
+          {notification.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
           <span>{notification.message}</span>
-          <button 
-            onClick={() => setNotification(null)}
-            className="ml-2 text-gray-500 hover:text-gray-700"
-          >
+          <button onClick={() => setNotification(null)} className="ml-2 text-gray-500 hover:text-gray-700">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -376,35 +361,32 @@ const DeliveryFeeAdmin = () => {
 
           <div className="flex gap-2">
             <button
-              onClick={() => {
-                fetchDeliveryFees();
-                fetchLagosLGAs();
-              }}
+              onClick={fetchData}
               disabled={loading}
               className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
             >
               {loading ? 'Loading...' : 'Refresh'}
             </button>
 
-            {totalLGAsEditing > 0 && (
+            {editingLGAs.size > 0 && (
               <button
-                onClick={handleBulkLGAUpdate}
+                onClick={() => handleBulkUpdate(true)}
                 disabled={saving}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
               >
                 <Building2 className="w-4 h-4" />
-                {saving ? 'Saving...' : `Save LGA Changes (${totalLGAsEditing})`}
+                {saving ? 'Saving...' : `Save LGA Changes (${editingLGAs.size})`}
               </button>
             )}
 
-            {totalStatesEditing > 0 && (
+            {editingStates.size > 0 && (
               <button
-                onClick={handleBulkUpdate}
+                onClick={() => handleBulkUpdate(false)}
                 disabled={saving}
                 className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 disabled:opacity-50 flex items-center gap-2"
               >
                 <Save className="w-4 h-4" />
-                {saving ? 'Saving...' : `Save State Changes (${totalStatesEditing})`}
+                {saving ? 'Saving...' : `Save State Changes (${editingStates.size})`}
               </button>
             )}
           </div>
@@ -412,75 +394,24 @@ const DeliveryFeeAdmin = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total States</p>
-              <p className="text-2xl font-bold text-gray-900">{deliveryFees.length}</p>
-            </div>
-            <div className="p-3 bg-blue-100 rounded-full">
-              <MapPin className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Lagos LGAs</p>
-              <p className="text-2xl font-bold text-gray-900">{lagosLGAs.length}</p>
-            </div>
-            <div className="p-3 bg-purple-100 rounded-full">
-              <Building2 className="w-6 h-6 text-purple-600" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        {[
+          { label: 'Total States', value: deliveryFees.length, icon: MapPin, color: 'blue' },
+          { label: 'Lagos LGAs', value: lagosLGAs.length, icon: Building2, color: 'purple' },
+          { label: 'Pending Changes', value: totalEditing, icon: Edit2, color: 'yellow' }
+        ].map((stat, index) => (
+          <div key={index} className="bg-white p-6 rounded-lg shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">{stat.label}</p>
+                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+              </div>
+              <div className={`p-3 bg-${stat.color}-100 rounded-full`}>
+                <stat.icon className={`w-6 h-6 text-${stat.color}-600`} />
+              </div>
             </div>
           </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Average State Fee</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {deliveryFees.length > 0 
-                  ? formatPrice(deliveryFees.reduce((sum, fee) => sum + fee.delivery_fee, 0) / deliveryFees.length)
-                  : formatPrice(0)
-                }
-              </p>
-            </div>
-            <div className="p-3 bg-green-100 rounded-full">
-              <Truck className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Pending Changes</p>
-              <p className="text-2xl font-bold text-gray-900">{totalStatesEditing + totalLGAsEditing}</p>
-            </div>
-            <div className="p-3 bg-yellow-100 rounded-full">
-              <Edit2 className="w-6 h-6 text-yellow-600" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Instructions */}
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-blue-800">
-            <p className="font-medium mb-1">How to use:</p>
-            <ul className="list-disc list-inside space-y-1 text-blue-700">
-              <li>Click the edit icon to modify a delivery fee for any state</li>
-              <li>You can edit multiple states at once and save all changes together</li>
-              <li>Use the search box to quickly find specific states</li>
-              <li>Changes will be immediately reflected on the checkout page</li>
-            </ul>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Delivery Fees Table */}
@@ -505,21 +436,23 @@ const DeliveryFeeAdmin = () => {
           <div className="p-8 text-center text-gray-500">
             <MapPin className="w-12 h-12 mx-auto mb-4 text-gray-300" />
             <p>No delivery fees found{searchTerm && ` matching "${searchTerm}"`}</p>
+            {deliveryFees.length === 0 && (
+              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-700">
+                  <strong>Troubleshooting:</strong> If you're seeing this message, the API may be returning empty objects. 
+                  Check the browser console for debugging information.
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    State
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Delivery Fee
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">State</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delivery Fee</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -533,24 +466,16 @@ const DeliveryFeeAdmin = () => {
                               onClick={() => setExpandedLagos(!expandedLagos)}
                               className="p-1 hover:bg-gray-200 rounded mr-2"
                             >
-                              {expandedLagos ? (
-                                <ChevronDown className="w-4 h-4 text-gray-600" />
-                              ) : (
-                                <ChevronRight className="w-4 h-4 text-gray-600" />
-                              )}
+                              {expandedLagos ? <ChevronDown className="w-4 h-4 text-gray-600" /> : <ChevronRight className="w-4 h-4 text-gray-600" />}
                             </button>
                           )}
                           <div className="p-1 bg-gray-100 rounded mr-3">
                             <MapPin className="w-4 h-4 text-gray-600" />
                           </div>
                           <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {fee.state}
-                            </div>
+                            <div className="text-sm font-medium text-gray-900">{fee.state}</div>
                             {isLagosState(fee.state) && (
-                              <div className="text-xs text-gray-500">
-                                {lagosLGAs.length} LGAs available
-                              </div>
+                              <div className="text-xs text-gray-500">{lagosLGAs.length} LGAs available</div>
                             )}
                           </div>
                         </div>
@@ -562,10 +487,7 @@ const DeliveryFeeAdmin = () => {
                             <input
                               type="number"
                               value={tempValues[fee.state] || ''}
-                              onChange={(e) => setTempValues(prev => ({
-                                ...prev,
-                                [fee.state]: parseInt(e.target.value) || 0
-                              }))}
+                              onChange={(e) => setTempValues(prev => ({ ...prev, [fee.state]: parseInt(e.target.value) || 0 }))}
                               className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
                               min="0"
                               step="100"
@@ -574,9 +496,7 @@ const DeliveryFeeAdmin = () => {
                         ) : (
                           <div className="text-sm text-gray-900 font-medium">
                             {formatPrice(fee.delivery_fee)}
-                            {isLagosState(fee.state) && (
-                              <span className="ml-2 text-xs text-gray-500">(Base rate)</span>
-                            )}
+                            {isLagosState(fee.state) && <span className="ml-2 text-xs text-gray-500">(Base rate)</span>}
                           </div>
                         )}
                       </td>
@@ -615,62 +535,35 @@ const DeliveryFeeAdmin = () => {
                         <td colSpan="3" className="px-6 py-4 bg-gray-50">
                           <div className="space-y-2">
                             <h4 className="text-sm font-medium text-gray-700 mb-3">Lagos State LGAs</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                              {filteredLGAs.map((lgaItem) => (
-                                <div key={lgaItem.lga} className="bg-white p-3 rounded border border-gray-200">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center">
-                                      <Building2 className="w-4 h-4 text-gray-500 mr-2" />
-                                      <span className="text-sm font-medium text-gray-700">{lgaItem.lga}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      {editingLGAs.has(lgaItem.lga) ? (
-                                        <div className="flex items-center gap-1">
-                                          <span className="text-gray-500 text-xs">₦</span>
-                                          <input
-                                            type="number"
-                                            value={tempLGAValues[lgaItem.lga] || ''}
-                                            onChange={(e) => setTempLGAValues(prev => ({
-                                              ...prev,
-                                              [lgaItem.lga]: parseInt(e.target.value) || 0
-                                            }))}
-                                            className="w-16 text-xs px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                                            min="0"
-                                            step="100"
-                                          />
-                                          <button
-                                            onClick={() => handleLGASave(lgaItem.lga)}
-                                            disabled={saving}
-                                            className="text-green-600 hover:text-green-700 disabled:opacity-50"
-                                          >
-                                            <Save className="w-3 h-3" />
-                                          </button>
-                                          <button
-                                            onClick={() => handleLGACancel(lgaItem.lga)}
-                                            disabled={saving}
-                                            className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
-                                          >
-                                            <X className="w-3 h-3" />
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-xs font-medium text-gray-900">
-                                            {formatPrice(lgaItem.delivery_fee)}
-                                          </span>
-                                          <button
-                                            onClick={() => handleLGAEdit(lgaItem.lga)}
-                                            className="text-blue-600 hover:text-blue-700"
-                                          >
-                                            <Edit2 className="w-3 h-3" />
-                                          </button>
-                                        </div>
-                                      )}
+                            {lagosLGAs.length === 0 ? (
+                              <div className="text-center py-8 text-gray-500">
+                                <Building2 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                                <p>No Lagos LGAs found. They may not be configured yet.</p>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {filteredLGAs.map((lgaItem) => (
+                                  <div key={lgaItem.lga} className="bg-white p-3 rounded border border-gray-200">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center">
+                                        <Building2 className="w-4 h-4 text-gray-500 mr-2" />
+                                        <span className="text-sm font-medium text-gray-700">{lgaItem.lga}</span>
+                                      </div>
+                                      <EditableField
+                                        value={lgaItem.delivery_fee}
+                                        tempValue={tempLGAValues[lgaItem.lga]}
+                                        onChange={(value) => setTempLGAValues(prev => ({ ...prev, [lgaItem.lga]: value }))}
+                                        onSave={() => handleSave(lgaItem.lga, true)}
+                                        onCancel={() => handleCancel(lgaItem.lga, true)}
+                                        onEdit={() => handleEdit(lgaItem.lga, true)}
+                                        isEditing={editingLGAs.has(lgaItem.lga)}
+                                        disabled={saving}
+                                      />
                                     </div>
                                   </div>
-                                </div>
-                              ))}
-                            </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>

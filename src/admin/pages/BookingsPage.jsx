@@ -98,9 +98,22 @@ const BookingsPage = () => {
         
         const formattedBookings = allConsultations.map((consultation) => {
           const nameParts = consultation.name?.split(' ') || ['Unknown'];
+          
+          // Use unique_id as the primary identifier - this is the "bk-xxxxx" value
+          const primaryId = consultation.unique_id || consultation.consultation_id;
+          
+          console.log('Mapping consultation:', {
+            id: consultation.id,
+            unique_id: consultation.unique_id,
+            consultation_id: consultation.consultation_id,
+            using_as_primary: primaryId
+          });
+          
           return {
-            id: consultation.consultation_id || consultation.unique_id,
+            id: primaryId, // This is the "bk-xxxxx" value we need for API calls
             uniqueId: consultation.unique_id,
+            consultationId: consultation.consultation_id,
+            databaseId: consultation.id,
             firstName: nameParts[0],
             lastName: nameParts.slice(1).join(' '),
             fullName: consultation.name || 'Unknown Customer',
@@ -116,13 +129,15 @@ const BookingsPage = () => {
             consultationDate: consultation.date || '',
             timeRange: consultation.time_range || '',
             sessionStatus: consultation.session_held_status || 'unheld',
-            paymentStatus: consultation.payment_status?.toLowerCase() || 'unsuccessful',
+            paymentStatus: consultation.payment_status === 'SUCCESSFUL' || consultation.payment_status === 1 
+              ? 'successful' 
+              : 'unsuccessful',
             amountPaid: consultation.amount_paid || 0,
             amountCalculated: consultation.amount_calculated || 0,
             createdAt: consultation.created_at || '',
-            bookingDate: consultation.created_at || '', // Booking date when user made the booking
+            bookingDate: consultation.created_at || '',
             apiRef: consultation.api_ref || '',
-            rawData: consultation
+            rawData: consultation // Keep the raw API response for debugging
           };
         });
         
@@ -183,40 +198,119 @@ const BookingsPage = () => {
     try {
       setIsUpdating(true);
       
-      // Update local state immediately for better UX
-      const updateBooking = booking => 
-        booking.id === id ? { ...booking, sessionStatus: newStatus } : booking;
-      
-      setBookings(prev => prev.map(updateBooking));
-      
-      if (selectedBooking?.id === id) {
-        setSelectedBooking({ ...selectedBooking, sessionStatus: newStatus });
+      // Find the booking to get the correct consultation_id
+      const booking = bookings.find(b => b.id === id);
+      if (!booking) {
+        throw new Error('Booking not found');
       }
       
-      setNotification({
-        type: 'success',
-        message: `Session status updated to "${newStatus}"`
+      // The key fix: Use the booking.id directly since it's already the unique_id
+      // From your mapping, booking.id is set to the unique_id (like "bk-685eba7dc2bd3")
+      const consultationId = booking.id;
+      
+      console.log('Updating consultation with:', {
+        bookingId: id,
+        consultationId: consultationId,
+        newStatus: newStatus,
+        rawData: booking.rawData
       });
       
-      // TODO: Implement actual API call to update the status
-      // const response = await api.put(`/admin/consultation/${id}/status`, {
-      //   session_held_status: newStatus
-      // });
+      // Validate that we have a consultation ID and it looks correct
+      if (!consultationId || !consultationId.startsWith('bk-')) {
+        throw new Error(`Invalid consultation ID: ${consultationId}`);
+      }
+      
+      // Make API call to update session status
+      const response = await api.post(`admin/update-consultation`, null, {
+        params: {
+          consultation_id: consultationId,
+          session_held_status: newStatus
+        }
+      });
+      
+      console.log('API Response:', response.data);
+      
+      if (response.data?.code === 200) {
+        // Update local state with the response data
+        const updatedConsultation = response.data.consultation;
+        
+        const updateBooking = booking => {
+          if (booking.id === id) {
+            return {
+              ...booking,
+              sessionStatus: updatedConsultation.session_held_status || newStatus,
+              paymentStatus: updatedConsultation.payment_status === 'SUCCESSFUL' || updatedConsultation.payment_status === 1 
+                ? 'successful' 
+                : 'unsuccessful',
+              amountPaid: updatedConsultation.amount_paid || booking.amountPaid,
+              amountCalculated: updatedConsultation.amount_calculated || booking.amountCalculated,
+            };
+          }
+          return booking;
+        };
+        
+        setBookings(prev => prev.map(updateBooking));
+        
+        // Update selected booking if it's the one being modified
+        if (selectedBooking?.id === id) {
+          setSelectedBooking(prev => ({
+            ...prev,
+            sessionStatus: updatedConsultation.session_held_status || newStatus,
+            paymentStatus: updatedConsultation.payment_status === 'SUCCESSFUL' || updatedConsultation.payment_status === 1 
+              ? 'successful' 
+              : 'unsuccessful',
+            amountPaid: updatedConsultation.amount_paid || prev.amountPaid,
+            amountCalculated: updatedConsultation.amount_calculated || prev.amountCalculated,
+          }));
+        }
+        
+        setNotification({
+          type: 'success',
+          message: `Session status updated to "${newStatus}"`
+        });
+      } else {
+        throw new Error(response.data?.message || 'Failed to update session status');
+      }
       
     } catch (err) {
       console.error('Error updating session status:', err);
+      console.error('Error response:', err.response?.data);
+      
+      let errorMessage = 'Failed to update session status';
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
       setNotification({
         type: 'error',
-        message: 'Failed to update session status'
+        message: errorMessage
       });
       
-      // Revert the local state change
-      setBookings(prev => prev.map(booking => 
-        booking.id === id ? { ...booking, sessionStatus: booking.sessionStatus } : booking
-      ));
+      // Don't refetch on client-side validation errors
+      if (!err.message.includes('Invalid consultation ID')) {
+        // Revert the local state change by refetching data
+        fetchBookings();
+      }
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  // Add this function to your component to debug consultation IDs
+  const debugConsultationIds = () => {
+    console.log('=== CONSULTATION ID DEBUG ===');
+    bookings.forEach((booking, index) => {
+      console.log(`Booking ${index + 1}:`, {
+        id: booking.id,
+        uniqueId: booking.uniqueId,
+        consultationId: booking.consultationId,
+        rawData_consultation_id: booking.rawData?.consultation_id,
+        rawData_unique_id: booking.rawData?.unique_id
+      });
+    });
+    console.log('=== END DEBUG ===');
   };
 
   const viewBookingDetails = (booking) => {
@@ -239,7 +333,7 @@ const BookingsPage = () => {
       message: `Reminder sent to ${email}`
     });
   };
-
+  
   // Effects
   useEffect(() => {
     if (notification) {
@@ -350,14 +444,23 @@ const BookingsPage = () => {
               {loading ? 'Loading...' : `${filteredBookings.length} of ${bookings.length} consultations`}
             </p>
           </div>
-          <button 
-            onClick={fetchBookings}
-            className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-md flex items-center"
-            disabled={loading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+          <div className="flex space-x-2">
+            <button 
+              onClick={fetchBookings}
+              className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-md flex items-center"
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            {/* Debug button - remove in production */}
+            <button 
+              onClick={debugConsultationIds} 
+              className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+            >
+              Debug IDs
+            </button>
+          </div>
         </div>
 
         {/* Search and Filters */}
