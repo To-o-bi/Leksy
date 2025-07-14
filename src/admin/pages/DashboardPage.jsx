@@ -4,6 +4,7 @@ import { ArrowUp, ArrowDown, ArrowUpRight, Users, ShoppingBag, DollarSign, Clock
 import { orderService, contactService, productService, authService } from '../../api/services';
 import { useAuth } from '../../contexts/AuthContext'; // Import auth context
 
+
 // Dashboard Stats Component (keeping the same)
 const DashboardStats = ({ dashboardData, isLoading }) => {
   const formatCurrency = (amount) => {
