@@ -60,27 +60,38 @@ const CheckoutPage = () => {
   }, []); // Empty dependency array ensures it runs only once
 
   // Calculate shipping cost whenever delivery method or location changes
-  useEffect(() => {
-    const updateShipping = async () => {
-      setIsCalculatingShipping(true);
-      try {
-        const cost = await calculateShipping(
-          deliveryMethod,
-          formData.state || null,
-          formData.state === 'Lagos' ? formData.city : null // Only pass LGA for Lagos
-        );
-        setShipping(cost);
-      } catch (error) {
-        console.error('Error calculating shipping:', error);
-        setShipping(deliveryMethod === 'pickup' ? 0 : 5000); // Fallback
-      } finally {
-        setIsCalculatingShipping(false);
-      }
-    };
+ useEffect(() => {
+  const updateShipping = async () => {
+    setIsCalculatingShipping(true);
+    try {
+      // --- Add this console.log BEFORE the calculation ---
+      console.log(`%cCALCULATING WITH: State -> [${formData.state}], City/LGA -> [${formData.city}]`, 'color: blue; font-weight: bold;');
 
+      const cost = await calculateShipping(
+        deliveryMethod,
+        formData.state || null,
+        formData.city || null
+      );
+
+      // --- Add this console.log AFTER the calculation ---
+      console.log(`%cRECEIVED COST: [${cost}]`, 'color: green; font-weight: bold;');
+
+      setShipping(cost);
+    } catch (error) {
+      console.error('Error calculating shipping:', error);
+      setShipping(deliveryMethod === 'pickup' ? 0 : 5000); // Fallback
+    } finally {
+      setIsCalculatingShipping(false);
+    }
+  };
+
+  // Only run the calculation if a delivery method is chosen
+  if (deliveryMethod !== 'pickup') {
     updateShipping();
-  }, [deliveryMethod, formData.state, formData.city]);
-
+  } else {
+    setShipping(0); // Ensure pickup is always free
+  }
+}, [deliveryMethod, formData.state, formData.city]);
   // Load LGAs when Lagos state is selected AND delivery method is address
   useEffect(() => {
     const loadLGAs = async () => {
@@ -150,8 +161,8 @@ const CheckoutPage = () => {
       setFormErrors(newErrors);
       setAvailableLGAs([]);
     }
-    // For bus_park, keep the address fields visible but clear LGAs
-    else if (method === 'bus_park') {
+    // For bus-park, keep the address fields visible but clear LGAs
+    else if (method === 'bus-park') {
       setAvailableLGAs([]);
     }
   };
@@ -172,8 +183,8 @@ const CheckoutPage = () => {
       agreeToTerms: formData.agreeToTerms
     };
 
-    // Add address fields for delivery orders (both address and bus_park)
-    if (deliveryMethod === 'address' || deliveryMethod === 'bus_park') {
+    // Add address fields for delivery orders (both address and bus-park)
+    if (deliveryMethod === 'address' || deliveryMethod === 'bus-park') {
       // For delivery orders, ensure state is valid
       if (!formData.state || !nigerianStates.includes(formData.state)) {
         throw new Error('Please select a valid delivery state');
@@ -190,7 +201,7 @@ const CheckoutPage = () => {
         if (formData.state === 'Lagos' && formData.city) {
           checkoutData.lga = formData.city;
         }
-      } else if (deliveryMethod === 'bus_park') {
+      } else if (deliveryMethod === 'bus-park') {
         // For bus park, street address is optional (for additional location info)
         checkoutData.street_address = formData.street_address || '';
       }
@@ -254,7 +265,7 @@ const CheckoutPage = () => {
       if (error.message.includes('Invalid/No delivery found')) {
         errorMessage = deliveryMethod === 'pickup'
           ? 'Store pickup is currently unavailable. Please try home delivery or contact support.'
-          : deliveryMethod === 'bus_park'
+          : deliveryMethod === 'bus-park'
             ? 'Bus park delivery is currently unavailable. Please try home delivery or contact support.'
             : 'Delivery not available for the selected location. Please choose a different state or contact support.';
       } else if (error.message.includes('valid delivery state')) {
@@ -348,19 +359,19 @@ const CheckoutPage = () => {
                   </div>
 
                   <div
-                    className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${deliveryMethod === 'bus_park'
+                    className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${deliveryMethod === 'bus-park'
                       ? 'border-pink-500 bg-pink-50'
                       : 'border-gray-200 hover:border-gray-300'
                       }`}
-                    onClick={() => handleDeliveryMethodChange('bus_park')}
+                    onClick={() => handleDeliveryMethodChange('bus-park')}
                   >
                     <div className="flex items-center">
                       <input
                         type="radio"
                         name="deliveryMethod"
-                        value="bus_park"
-                        checked={deliveryMethod === 'bus_park'}
-                        onChange={() => handleDeliveryMethodChange('bus_park')}
+                        value="bus-park"
+                        checked={deliveryMethod === 'bus-park'}
+                        onChange={() => handleDeliveryMethodChange('bus-park')}
                         className="h-4 w-4 text-pink-600 focus:ring-pink-500"
                       />
                       <div className="ml-3">
@@ -473,8 +484,8 @@ const CheckoutPage = () => {
                 </div>
               </div>
 
-              {/* Delivery Address - Show for both address and bus_park delivery */}
-              {(deliveryMethod === 'address' || deliveryMethod === 'bus_park') && (
+              {/* Delivery Address - Show for both address and bus-park delivery */}
+              {(deliveryMethod === 'address' || deliveryMethod === 'bus-park') && (
                 <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                   <h2 className="text-xl font-semibold text-gray-800 mb-6">
                     {deliveryMethod === 'address' ? 'Delivery Address' : 'Bus Park Location'}
@@ -556,7 +567,7 @@ const CheckoutPage = () => {
                     <label htmlFor="street_address" className="block text-sm font-medium text-gray-700 mb-1">
                       {deliveryMethod === 'address' ? 'Street Address' : 'Specific Location/Landmark'}
                       {deliveryMethod === 'address' && <span className="text-red-500">*</span>}
-                      {deliveryMethod === 'bus_park' && <span className="text-gray-500 text-xs ml-1">(Optional)</span>}
+                      {deliveryMethod === 'bus-park' && <span className="text-gray-500 text-xs ml-1">(Optional)</span>}
                     </label>
                     <input
                       type="text"

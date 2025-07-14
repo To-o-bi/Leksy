@@ -29,7 +29,7 @@ export const prepareCartForAPI = (cart) => {
 /**
  * Validates checkout form data
  * @param {Object} formData - Form data object
- * @param {string} deliveryMethod - Delivery method ('address', 'pickup', or 'bus_park')
+ * @param {string} deliveryMethod - Delivery method ('address', 'pickup', or 'bus-park')
  * @returns {Object} Validation errors object
  */
 export const validateCheckoutForm = (formData, deliveryMethod) => {
@@ -195,56 +195,43 @@ export const fetchLGADeliveryFees = async (state = null) => {
 
 /**
  * Calculates shipping cost based on delivery method and location
- * @param {string} deliveryMethod - Delivery method ('address', 'pickup', or 'bus_park')
+ * @param {string} deliveryMethod - Delivery method ('address', 'pickup', or 'bus-park')
  * @param {string} state - State name (required for address delivery)
  * @param {string} lga - LGA name (optional for more specific pricing)
  * @returns {Promise<number>} Shipping cost in Naira
  */
 
-export const calculateShipping = async (deliveryMethod, state = null, lga = null) => {
+// src/api/CheckoutService.js
+
+export const fetchDeliveryFeeForLGA = async (state, lga) => {
   try {
-    switch (deliveryMethod) {
-      case 'pickup':
-        return 0;
+    const fetchUrl = `${BASE_URL}/api/fetch-delivery-fee?state=${encodeURIComponent(state)}&lga=${encodeURIComponent(lga)}`;
+    
+    // --- Add this console.log to see the exact URL being called ---
+    console.log(`%cFETCHING LGA FEE FROM: ${fetchUrl}`, 'color: orange;');
 
-      case 'bus_park':
-        return await fetchBusParkDeliveryFee();
+    const response = await fetch(fetchUrl);
+    const result = await response.json();
+    
+    // --- Add this console.log to see the RAW API response ---
+    console.log('%cAPI Response for LGA:', 'color: orange;', result);
 
-      case 'address':
-        if (!state) {
-          return null; // Return null instead of throwing an error
-        }
-
-        // If LGA is provided, try to get LGA-specific fee, otherwise use state fee
-        if (lga) {
-          return await fetchDeliveryFeeForLGA(state, lga);
-        } else {
-          return await fetchDeliveryFeeForState(state);
-        }
-
-      default:
-        throw new Error('Invalid delivery method');
+    if (result.code === 200 && result.delivery_fee) {
+      return result.delivery_fee;
+    } else {
+      console.warn('LGA fee not found or API error, falling back to state fee.');
+      return await fetchDeliveryFeeForState(state);
     }
   } catch (error) {
-    console.error('Error calculating shipping:', error);
-    // Fallback to default fees based on delivery method
-    switch (deliveryMethod) {
-      case 'pickup':
-        return 0;
-      case 'bus_park':
-        return 2000;
-      case 'address':
-        return 5000;
-      default:
-        return 5000;
-    }
+    console.error('Error fetching delivery fee for LGA:', error);
+    return await fetchDeliveryFeeForState(state);
   }
 };
 
 /**
  * Initiates checkout process with the API
  * @param {Object} formData - Customer form data
- * @param {string} deliveryMethod - Delivery method ('address', 'pickup', or 'bus_park')
+ * @param {string} deliveryMethod - Delivery method ('address', 'pickup', or 'bus-park')
  * @param {Array} cart - Cart items
  * @param {string} successRedirectUrl - URL to redirect after successful payment
  * @returns {Promise<Object>} API response
@@ -403,7 +390,7 @@ export const storeOrderDetails = (formData, deliveryMethod, cart, totalPrice, sh
     deliveryInfo: {
       method: deliveryMethod,
       address: deliveryMethod === 'address' ? formData.street_address :
-        deliveryMethod === 'bus_park' ? 'Bus Park Delivery' : 'Store Pickup',
+        deliveryMethod === 'bus-park' ? 'Bus Park Delivery' : 'Store Pickup',
       city: deliveryMethod === 'address' ? formData.city : 'N/A',
       state: deliveryMethod === 'address' ? formData.state : 'N/A'
     },
@@ -445,7 +432,7 @@ export const getDeliveryMethodDisplayName = (deliveryMethod) => {
   switch (deliveryMethod) {
     case 'pickup':
       return 'Store Pickup';
-    case 'bus_park':
+    case 'bus-park':
       return 'Bus Park Delivery';
     case 'address':
       return 'Home Delivery';
