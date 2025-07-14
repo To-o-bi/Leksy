@@ -28,85 +28,24 @@ const DeliveryFeeAdmin = () => {
     setLoading(true);
     try {
       const [feesResponse, lgasResponse] = await Promise.allSettled([
-        api.get('/fetch-delivery-fees'),
-        api.get('/fetch-lgas-delivery-fees?state=Lagos')
+        api.post('/fetch-delivery-fees'),
+        api.post('/fetch-lgas-delivery-fees', { state: 'Lagos' })
       ]);
 
       if (feesResponse.status === 'fulfilled' && feesResponse.value.data.code === 200) {
         const data = feesResponse.value.data;
-        
-        // Enhanced debugging
-        console.log('=== API DEBUG INFO ===');
-        console.log('Full API Response:', JSON.stringify(data, null, 2));
-        console.log('Response Code:', data.code);
-        console.log('Response Message:', data.message);
-        console.log('Raw delivery_fees array:', data.delivery_fees);
-        console.log('Array length:', data.delivery_fees?.length || 0);
-        
-        // Check first few items in detail
-        if (data.delivery_fees && data.delivery_fees.length > 0) {
-          console.log('First 3 items detailed:');
-          data.delivery_fees.slice(0, 3).forEach((item, index) => {
-            console.log(`Item ${index}:`, item);
-            console.log(`  - Keys:`, Object.keys(item));
-            console.log(`  - Values:`, Object.values(item));
-            console.log(`  - Has state:`, !!item.state);
-            console.log(`  - Has delivery_fee:`, !!item.delivery_fee);
-            console.log(`  - State value:`, item.state);
-            console.log(`  - Fee value:`, item.delivery_fee);
-          });
-        }
-        
-        // Check if items have different property names
-        const sampleItem = data.delivery_fees?.[0];
-        if (sampleItem) {
-          console.log('Sample item properties:', Object.keys(sampleItem));
-          console.log('Sample item:', sampleItem);
-        }
-        
-        // More flexible filtering - check for different possible property names
-        const validFees = data.delivery_fees?.filter(fee => {
-          if (!fee) return false;
-          
-          // Check for common property variations
-          const hasState = fee.state || fee.name || fee.State || fee.location;
-          const hasFee = fee.delivery_fee !== undefined || fee.fee !== undefined || fee.price !== undefined;
-          
-          console.log('Item validation:', { fee, hasState, hasFee });
-          return hasState && hasFee;
-        }) || [];
-        
-        console.log('Valid fees after filtering:', validFees);
-        console.log('=== END DEBUG INFO ===');
-        
-        if (validFees.length === 0 && data.delivery_fees?.length > 0) {
-          console.error('❌ API DATA ISSUE: All items filtered out');
-          console.error('This suggests the API is returning empty objects or using different property names');
-          
-          // Try to use raw data if it exists
-          const rawData = data.delivery_fees || [];
-          setDeliveryFees(rawData);
-          showNotification('error', `API returned ${rawData.length} items but they appear to be empty. Check console for details.`);
-        } else {
-          setDeliveryFees(validFees);
+        const validFees = data.delivery_fees?.filter(fee => fee && fee.state && fee.delivery_fee !== undefined) || [];
+        setDeliveryFees(validFees);
+        if (validFees.length > 0) {
           showNotification('success', data.message || `Loaded ${validFees.length} delivery fees`);
         }
       } else {
         throw new Error('Failed to fetch delivery fees');
       }
 
-      // Similar debugging for LGAs
       if (lgasResponse.status === 'fulfilled' && lgasResponse.value.data.code === 200) {
         const lgaData = lgasResponse.value.data;
-        console.log('Lagos LGAs Response:', JSON.stringify(lgaData, null, 2));
-        
-        const validLGAs = lgaData.delivery_fees?.filter(lga => {
-          const hasLGA = lga && (lga.lga || lga.name);
-          const hasFee = lga.delivery_fee !== undefined;
-          return hasLGA && hasFee;
-        }) || [];
-        
-        console.log('Valid LGAs after filtering:', validLGAs);
+        const validLGAs = lgaData.delivery_fees?.filter(lga => lga && lga.lga && lga.delivery_fee !== undefined) || [];
         setLagosLGAs(validLGAs);
       } else {
         setLagosLGAs([]);
@@ -125,10 +64,10 @@ const DeliveryFeeAdmin = () => {
     const currentFee = collection.find(item => item[key] === identifier)?.delivery_fee || 0;
     
     if (isLGA) {
-      setEditingLGAs(prev => new Set([...prev, identifier]));
+      setEditingLGAs(prev => new Set(prev).add(identifier));
       setTempLGAValues(prev => ({ ...prev, [identifier]: currentFee }));
     } else {
-      setEditingStates(prev => new Set([...prev, identifier]));
+      setEditingStates(prev => new Set(prev).add(identifier));
       setTempValues(prev => ({ ...prev, [identifier]: currentFee }));
     }
   };
@@ -160,7 +99,7 @@ const DeliveryFeeAdmin = () => {
   const handleSave = async (identifier, isLGA = false) => {
     const newFee = isLGA ? tempLGAValues[identifier] : tempValues[identifier];
     
-    if (newFee < 0) {
+    if (newFee === undefined || newFee < 0) {
       showNotification('error', 'Please enter a valid delivery fee');
       return;
     }
@@ -171,75 +110,23 @@ const DeliveryFeeAdmin = () => {
         ? '/admin/lgas-delivery-fees/update' 
         : '/admin/update-delivery-fees';
       
-      // Send data in POST body instead of query parameters
-      const requestData = { [identifier]: newFee };
-      console.log('Sending POST request to:', endpoint);
-      console.log('Request data:', requestData);
-      
-      const response = await api.post(endpoint, requestData);
-      
+      const formData = new FormData();
+      formData.append(identifier, newFee);
+
+      const response = await api.postFormData(endpoint, formData);
       const data = response.data;
-      console.log('API Response:', data);
-      
-      if (data.code === 200) {
-        // Check if the response contains updated delivery fees
-        if (data.delivery_fees && Array.isArray(data.delivery_fees)) {
-          console.log('Using updated data from API response');
-          
-          if (isLGA) {
-            // Update LGAs with response data
-            const updatedLGAs = data.delivery_fees.filter(item => item.lga);
-            if (updatedLGAs.length > 0) {
-              setLagosLGAs(updatedLGAs);
-            } else {
-              // Fallback to manual update
-              setLagosLGAs(prev => prev.map(item => 
-                item.lga === identifier 
-                  ? { ...item, delivery_fee: parseInt(newFee) } 
-                  : item
-              ));
-            }
-          } else {
-            // Update states with response data
-            const updatedStates = data.delivery_fees.filter(item => item.state);
-            if (updatedStates.length > 0) {
-              setDeliveryFees(updatedStates);
-            } else {
-              // Fallback to manual update
-              setDeliveryFees(prev => prev.map(fee => 
-                fee.state === identifier 
-                  ? { ...fee, delivery_fee: parseInt(newFee) } 
-                  : fee
-              ));
-            }
-          }
-        } else {
-          // Fallback: manually update local state
-          console.log('No updated data in response, updating locally');
-          if (isLGA) {
-            setLagosLGAs(prev => prev.map(item => 
-              item.lga === identifier 
-                ? { ...item, delivery_fee: parseInt(newFee) } 
-                : item
-            ));
-          } else {
-            setDeliveryFees(prev => prev.map(fee => 
-              fee.state === identifier 
-                ? { ...fee, delivery_fee: parseInt(newFee) } 
-                : fee
-            ));
-          }
-        }
-        
-        handleCancel(identifier, isLGA);
-        showNotification('success', data.message || `Updated ${isLGA ? 'LGA' : 'state'} delivery fee successfully`);
-        
-      } else {
-        throw new Error(data.message || 'Failed to update delivery fee');
+
+      if (data.code !== 200) {
+        throw new Error(data.message || 'Update failed');
       }
+
+      showNotification('success', data.message || 'Update successful');
+      handleCancel(identifier, isLGA);
+      fetchData();
+
     } catch (error) {
       console.error('Error updating delivery fee:', error);
-      showNotification('error', error.response?.data?.message || 'Failed to update delivery fee');
+      showNotification('error', error.response?.data?.message || error.message || 'Failed to update delivery fee');
     } finally {
       setSaving(false);
     }
@@ -259,82 +146,33 @@ const DeliveryFeeAdmin = () => {
         ? '/admin/lgas-delivery-fees/update' 
         : '/admin/update-delivery-fees';
       
-      // Send data in POST body instead of query parameters
-      console.log('Sending bulk POST request to:', endpoint);
-      console.log('Request data:', values);
-      
-      const response = await api.post(endpoint, values);
-      
+      const formData = new FormData();
+      Object.entries(values).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+
+      const response = await api.postFormData(endpoint, formData);
       const data = response.data;
-      console.log('Bulk Update API Response:', data);
-      
-      if (data.code === 200) {
-        // Check if the response contains updated delivery fees
-        if (data.delivery_fees && Array.isArray(data.delivery_fees)) {
-          console.log('Using updated data from bulk API response');
-          
-          if (isLGA) {
-            // Update LGAs with response data
-            const updatedLGAs = data.delivery_fees.filter(item => item.lga);
-            if (updatedLGAs.length > 0) {
-              setLagosLGAs(updatedLGAs);
-            } else {
-              // Fallback to manual update
-              setLagosLGAs(prev => prev.map(item => 
-                values[item.lga] !== undefined 
-                  ? { ...item, delivery_fee: parseInt(values[item.lga]) } 
-                  : item
-              ));
-            }
-          } else {
-            // Update states with response data
-            const updatedStates = data.delivery_fees.filter(item => item.state);
-            if (updatedStates.length > 0) {
-              setDeliveryFees(updatedStates);
-            } else {
-              // Fallback to manual update
-              setDeliveryFees(prev => prev.map(fee => 
-                values[fee.state] !== undefined 
-                  ? { ...fee, delivery_fee: parseInt(values[fee.state]) } 
-                  : fee
-              ));
-            }
-          }
-        } else {
-          // Fallback: manually update local state
-          console.log('No updated data in bulk response, updating locally');
-          if (isLGA) {
-            setLagosLGAs(prev => prev.map(item => 
-              values[item.lga] !== undefined 
-                ? { ...item, delivery_fee: parseInt(values[item.lga]) } 
-                : item
-            ));
-          } else {
-            setDeliveryFees(prev => prev.map(fee => 
-              values[fee.state] !== undefined 
-                ? { ...fee, delivery_fee: parseInt(values[fee.state]) } 
-                : fee
-            ));
-          }
-        }
-        
-        // Clear editing states
-        if (isLGA) {
-          setEditingLGAs(new Set());
-          setTempLGAValues({});
-        } else {
-          setEditingStates(new Set());
-          setTempValues({});
-        }
-        
-        showNotification('success', data.message || `All ${isLGA ? 'LGA' : 'state'} fees updated successfully`);
-        
-      } else {
-        throw new Error(data.message || 'Failed to update fees');
+
+      if (data.code !== 200) {
+        throw new Error(data.message || 'Bulk update failed');
       }
+
+      showNotification('success', data.message || 'Bulk update successful');
+      
+      if (isLGA) {
+        setEditingLGAs(new Set());
+        setTempLGAValues({});
+      } else {
+        setEditingStates(new Set());
+        setTempValues({});
+      }
+      
+      fetchData();
+
     } catch (error) {
-      console.error('Error updating fees:', error);
-      showNotification('error', error.response?.data?.message || 'Failed to update fees');
+      console.error('Error bulk updating fees:', error);
+      showNotification('error', error.response?.data?.message || error.message || 'Failed to bulk update fees');
     } finally {
       setSaving(false);
     }
@@ -349,28 +187,30 @@ const DeliveryFeeAdmin = () => {
   };
 
   const filteredFees = deliveryFees.filter(fee =>
-    fee.state.toLowerCase().includes(searchTerm.toLowerCase())
+    fee.state && fee.state.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredLGAs = lagosLGAs.filter(lga =>
-    lga.lga.toLowerCase().includes(searchTerm.toLowerCase())
+    lga.lga && lga.lga.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalEditing = editingStates.size + editingLGAs.size;
   const isLagosState = (state) => state.toLowerCase() === 'lagos';
 
-  const EditableField = ({ value, tempValue, onChange, onSave, onCancel, onEdit, isEditing, disabled }) => (
+  const EditableField = ({ value, tempValue, onChange, onSave, onCancel, onEdit, isEditing, disabled, identifier }) => (
     <div className="flex items-center gap-2">
       {isEditing ? (
         <>
           <span className="text-gray-500 text-xs">₦</span>
           <input
+            key={`input-${identifier}`} // Add unique key to prevent React from reusing elements
             type="number"
             value={tempValue || ''}
-            onChange={(e) => onChange(parseInt(e.target.value) || 0)}
-            className="w-16 text-xs px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+            onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
+            className="w-20 text-xs px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
             min="0"
             step="100"
+            autoFocus
           />
           <button onClick={onSave} disabled={disabled} className="text-green-600 hover:text-green-700 disabled:opacity-50">
             <Save className="w-3 h-3" />
@@ -391,37 +231,47 @@ const DeliveryFeeAdmin = () => {
   );
 
   return (
-    <div className="max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen">
-      {/* Notification */}
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 bg-gray-50 min-h-screen">
       {notification && (
-        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg flex items-center gap-2 ${
+        <div className={`fixed top-5 right-5 z-50 p-4 rounded-lg shadow-lg flex items-center gap-2 text-sm ${
           notification.type === 'success' 
             ? 'bg-green-100 text-green-800 border border-green-200' 
             : 'bg-red-100 text-red-800 border border-red-200'
         }`}>
           {notification.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
           <span>{notification.message}</span>
-          <button onClick={() => setNotification(null)} className="ml-2 text-gray-500 hover:text-gray-700">
+          <button onClick={() => setNotification(null)} className="ml-4 text-gray-500 hover:text-gray-700">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Header */}
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-pink-100 rounded-lg">
+        <div className="flex items-center gap-4 mb-4">
+          <div className="p-3 bg-pink-100 rounded-lg">
             <Truck className="w-6 h-6 text-pink-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Delivery Fee Management</h1>
-            <p className="text-gray-600">Manage delivery fees for all Nigerian states and Lagos LGAs</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Delivery Fee Management</h1>
+            <p className="text-sm text-gray-600">Manage delivery fees for all Nigerian states and Lagos LGAs</p>
           </div>
         </div>
 
-        {/* Search and Actions */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <h3 className="text-sm font-semibold text-blue-900 mb-2 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            How to Use This Admin Panel
+          </h3>
+          <div className="text-sm text-blue-800 space-y-1">
+            <p><strong>1.</strong> Hello sleeping beauty, here are three (3) points on how to use this Delivery Fee Management panel</p>
+            <p><strong>1.</strong> Click the edit icon (✏️) next to any state or Lagos LGA to modify its delivery fee</p>
+            <p><strong>2.</strong> Enter the new fee amount and click save (✓) to update individually, or make multiple changes and use bulk save buttons</p>
+            <p><strong>3.</strong> For Lagos LGAs, click the arrow (▶️) next to Lagos state to expand and view all local government areas</p>
+          </div>
+        </div>
+
         <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-          <div className="relative flex-1 max-w-md">
+          <div className="relative w-full sm:w-auto flex-grow max-w-md">
             <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
@@ -432,20 +282,20 @@ const DeliveryFeeAdmin = () => {
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button
               onClick={fetchData}
               disabled={loading}
-              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
             >
-              {loading ? 'Loading...' : 'Refresh'}
+              {loading ? 'Refreshing...' : 'Refresh'}
             </button>
 
             {editingLGAs.size > 0 && (
               <button
                 onClick={() => handleBulkUpdate(true)}
                 disabled={saving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
               >
                 <Building2 className="w-4 h-4" />
                 {saving ? 'Saving...' : `Save LGA Changes (${editingLGAs.size})`}
@@ -456,7 +306,7 @@ const DeliveryFeeAdmin = () => {
               <button
                 onClick={() => handleBulkUpdate(false)}
                 disabled={saving}
-                className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 text-sm bg-pink-600 text-white rounded-lg hover:bg-pink-700 disabled:opacity-50 flex items-center gap-2"
               >
                 <Save className="w-4 h-4" />
                 {saving ? 'Saving...' : `Save State Changes (${editingStates.size})`}
@@ -466,14 +316,13 @@ const DeliveryFeeAdmin = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         {[
           { label: 'Total States', value: deliveryFees.length, icon: MapPin, color: 'blue' },
           { label: 'Lagos LGAs', value: lagosLGAs.length, icon: Building2, color: 'purple' },
           { label: 'Pending Changes', value: totalEditing, icon: Edit2, color: 'yellow' }
         ].map((stat, index) => (
-          <div key={index} className="bg-white p-6 rounded-lg shadow-sm">
+          <div key={index} className={`bg-white p-5 rounded-lg shadow-sm border-l-4 border-${stat.color}-500`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">{stat.label}</p>
@@ -487,40 +336,39 @@ const DeliveryFeeAdmin = () => {
         ))}
       </div>
 
-      {/* Delivery Fees Table */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">
             Delivery Fees by State
-            {filteredFees.length !== deliveryFees.length && (
-              <span className="ml-2 text-sm text-gray-500">
-                ({filteredFees.length} of {deliveryFees.length})
+            {searchTerm && (
+              <span className="ml-2 text-sm font-normal text-gray-500">
+                (showing results for "{searchTerm}")
               </span>
             )}
           </h2>
-        </div>        
+        </div>
 
         {loading ? (
           <div className="p-8 text-center">
             <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-gray-600">Loading delivery fees...</p>
           </div>
-        ) : filteredFees.length === 0 ? (
+        ) : filteredFees.length === 0 && deliveryFees.length > 0 ? (
           <div className="p-8 text-center text-gray-500">
             <MapPin className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>No delivery fees found{searchTerm && ` matching "${searchTerm}"`}</p>
-            {deliveryFees.length === 0 && (
-              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-700">
-                  <strong>Troubleshooting:</strong> If you're seeing this message, the API may be returning empty objects. 
-                  Check the browser console for debugging information.
-                </p>
-              </div>
-            )}
+            <p>No states found matching "{searchTerm}"</p>
+          </div>
+        ) : deliveryFees.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">
+            <MapPin className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <p>No delivery fees found.</p>
+            <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+              <strong>Note:</strong> The API did not return any delivery fee data. Please check the backend configuration.
+            </div>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">State</th>
@@ -537,20 +385,12 @@ const DeliveryFeeAdmin = () => {
                           {isLagosState(fee.state) && (
                             <button
                               onClick={() => setExpandedLagos(!expandedLagos)}
-                              className="p-1 hover:bg-gray-200 rounded mr-2"
+                              className="p-1 hover:bg-gray-200 rounded-full mr-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
                             >
                               {expandedLagos ? <ChevronDown className="w-4 h-4 text-gray-600" /> : <ChevronRight className="w-4 h-4 text-gray-600" />}
                             </button>
                           )}
-                          <div className="p-1 bg-gray-100 rounded mr-3">
-                            <MapPin className="w-4 h-4 text-gray-600" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{fee.state}</div>
-                            {isLagosState(fee.state) && (
-                              <div className="text-xs text-gray-500">{lagosLGAs.length} LGAs available</div>
-                            )}
-                          </div>
+                          <div className="text-sm font-medium text-gray-900">{fee.state}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -558,70 +398,57 @@ const DeliveryFeeAdmin = () => {
                           <div className="flex items-center">
                             <span className="text-gray-500 mr-1">₦</span>
                             <input
+                              key={`state-${fee.state}`}
                               type="number"
                               value={tempValues[fee.state] || ''}
-                              onChange={(e) => setTempValues(prev => ({ ...prev, [fee.state]: parseInt(e.target.value) || 0 }))}
+                              onChange={(e) => setTempValues(prev => ({ ...prev, [fee.state]: parseInt(e.target.value, 10) || 0 }))}
                               className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
                               min="0"
                               step="100"
+                              autoFocus
                             />
                           </div>
                         ) : (
                           <div className="text-sm text-gray-900 font-medium">
                             {formatPrice(fee.delivery_fee)}
-                            {isLagosState(fee.state) && <span className="ml-2 text-xs text-gray-500">(Base rate)</span>}
+                            {isLagosState(fee.state) && <span className="ml-2 text-xs text-gray-500">(Base)</span>}
                           </div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         {editingStates.has(fee.state) ? (
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => handleSave(fee.state)}
-                              disabled={saving}
-                              className="text-green-600 hover:text-green-700 disabled:opacity-50"
-                            >
+                          <div className="flex justify-end gap-3">
+                            <button onClick={() => handleSave(fee.state)} disabled={saving} className="text-green-600 hover:text-green-800 disabled:opacity-50" title="Save">
                               <Save className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => handleCancel(fee.state)}
-                              disabled={saving}
-                              className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
-                            >
+                            <button onClick={() => handleCancel(fee.state)} disabled={saving} className="text-gray-500 hover:text-gray-700 disabled:opacity-50" title="Cancel">
                               <X className="w-4 h-4" />
                             </button>
                           </div>
                         ) : (
-                          <button
-                            onClick={() => handleEdit(fee.state)}
-                            className="text-pink-600 hover:text-pink-700"
-                          >
+                          <button onClick={() => handleEdit(fee.state)} className="text-pink-600 hover:text-pink-800" title="Edit">
                             <Edit2 className="w-4 h-4" />
                           </button>
                         )}
                       </td>
                     </tr>
                     
-                    {/* Lagos LGAs Sub-table */}
                     {isLagosState(fee.state) && expandedLagos && (
                       <tr>
-                        <td colSpan="3" className="px-6 py-4 bg-gray-50">
-                          <div className="space-y-2">
-                            <h4 className="text-sm font-medium text-gray-700 mb-3">Lagos State LGAs</h4>
+                        <td colSpan="3" className="p-0">
+                          <div className="px-4 py-4 bg-pink-50/50">
+                            <h4 className="text-sm font-semibold text-gray-800 mb-3 ml-2">Lagos State LGAs</h4>
                             {lagosLGAs.length === 0 ? (
-                              <div className="text-center py-8 text-gray-500">
-                                <Building2 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                                <p>No Lagos LGAs found. They may not be configured yet.</p>
+                              <div className="text-center py-4 text-gray-500">
+                                <Building2 className="w-10 h-10 mx-auto mb-2 text-gray-400" />
+                                <p>No Lagos LGAs found.</p>
                               </div>
                             ) : (
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 {filteredLGAs.map((lgaItem) => (
-                                  <div key={lgaItem.lga} className="bg-white p-3 rounded border border-gray-200">
+                                  <div key={lgaItem.lga} className="bg-white p-3 rounded-md border border-gray-200 shadow-sm">
                                     <div className="flex items-center justify-between">
-                                      <div className="flex items-center">
-                                        <Building2 className="w-4 h-4 text-gray-500 mr-2" />
-                                        <span className="text-sm font-medium text-gray-700">{lgaItem.lga}</span>
-                                      </div>
+                                      <span className="text-sm font-medium text-gray-700">{lgaItem.lga}</span>
                                       <EditableField
                                         value={lgaItem.delivery_fee}
                                         tempValue={tempLGAValues[lgaItem.lga]}
@@ -631,6 +458,7 @@ const DeliveryFeeAdmin = () => {
                                         onEdit={() => handleEdit(lgaItem.lga, true)}
                                         isEditing={editingLGAs.has(lgaItem.lga)}
                                         disabled={saving}
+                                        identifier={lgaItem.lga}
                                       />
                                     </div>
                                   </div>
