@@ -162,7 +162,7 @@ export const productService = {
     const formData = new FormData();
     formData.append('product_id', productId);
 
-    const fields = ['name', 'price', 'description', 'quantity', 'category', 'slashed_price'];
+    const fields = ['name', 'price', 'description', 'available_qty', 'category', 'slashed_price'];
     fields.forEach(field => {
       if (productData[field] !== undefined) {
         formData.append(field, productData[field].toString().trim());

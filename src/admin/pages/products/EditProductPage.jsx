@@ -399,8 +399,8 @@ const EditProductPage = () => {
       
       // CORRECTED: Use 'quantity' for API parameter
       if (parseInt(formData.quantity, 10) !== originalData.available_qty) {
-        productData.quantity = parseInt(formData.quantity, 10);
-      }
+        productData.available_qty = parseInt(formData.quantity, 10);
+      }
       
       if (formData.category !== originalData.category) productData.category = formData.category;
       
