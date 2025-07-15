@@ -10,11 +10,9 @@ import {
   initiateCheckout,
   storeOrderDetails,
   nigerianStates,
-  calculateShipping,
-  getSuccessRedirectUrl,
-  getDeliveryMethodDisplayName,
   fetchLGADeliveryFees,
-  fetchBusParkDeliveryFee // Import the specific function
+  fetchBusParkDeliveryFee,
+  fetchDeliveryFeeForState
 } from '../../api/CheckoutService';
 
 const CheckoutPage = () => {
@@ -27,15 +25,14 @@ const CheckoutPage = () => {
   const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
   const [availableLGAs, setAvailableLGAs] = useState([]);
   const [isLoadingLGAs, setIsLoadingLGAs] = useState(false);
-  const [busParkFee, setBusParkFee] = useState(null); // State for the fixed bus park fee
+  const [busParkFee, setBusParkFee] = useState(null);
 
-  // Form state matches API requirements
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     state: '',
-    city: '', // This will be used for both LGA (Lagos) and city (other states)
+    city: '',
     street_address: '',
     notes: '',
     agreeToTerms: false
@@ -43,9 +40,8 @@ const CheckoutPage = () => {
 
   const [formErrors, setFormErrors] = useState({});
   const finalTotal = totalPrice + shipping;
-  const SUCCESS_REDIRECT_URL = getSuccessRedirectUrl();
+  const SUCCESS_REDIRECT_URL = '/checkout/success';
 
-  // Fetch the fixed bus park delivery fee on component mount
   useEffect(() => {
     const getBusParkFee = async () => {
       try {
@@ -53,46 +49,62 @@ const CheckoutPage = () => {
         setBusParkFee(fee);
       } catch (error) {
         console.error("Failed to fetch initial bus park fee:", error);
-        setBusParkFee(2000); // Fallback fee
+        setBusParkFee(2000);
       }
     };
     getBusParkFee();
-  }, []); // Empty dependency array ensures it runs only once
+  }, []);
 
-  // Calculate shipping cost whenever delivery method or location changes
- useEffect(() => {
-  const updateShipping = async () => {
-    setIsCalculatingShipping(true);
-    try {
-      // --- Add this console.log BEFORE the calculation ---
-      console.log(`%cCALCULATING WITH: State -> [${formData.state}], City/LGA -> [${formData.city}]`, 'color: blue; font-weight: bold;');
-
-      const cost = await calculateShipping(
-        deliveryMethod,
-        formData.state || null,
-        formData.city || null
-      );
-
-      // --- Add this console.log AFTER the calculation ---
-      console.log(`%cRECEIVED COST: [${cost}]`, 'color: green; font-weight: bold;');
-
-      setShipping(cost);
-    } catch (error) {
-      console.error('Error calculating shipping:', error);
-      setShipping(deliveryMethod === 'pickup' ? 0 : 5000); // Fallback
-    } finally {
-      setIsCalculatingShipping(false);
+  useEffect(() => {
+    // Set shipping to 0 if the method is pickup
+    if (deliveryMethod === 'pickup') {
+      setShipping(0);
+      return;
     }
-  };
 
-  // Only run the calculation if a delivery method is chosen
-  if (deliveryMethod !== 'pickup') {
-    updateShipping();
-  } else {
-    setShipping(0); // Ensure pickup is always free
-  }
-}, [deliveryMethod, formData.state, formData.city]);
-  // Load LGAs when Lagos state is selected AND delivery method is address
+    // Set the bus park fee if that method is selected
+    if (deliveryMethod === 'bus-park') {
+      setShipping(busParkFee || 2000);
+      return;
+    }
+
+    // Logic for Home Delivery
+    if (deliveryMethod === 'address') {
+      // If no state is selected, shipping is 0
+      if (!formData.state) {
+        setShipping(0);
+        return;
+      }
+
+      // Logic for Lagos
+      if (formData.state === 'Lagos' && formData.city) {
+        setIsCalculatingShipping(true);
+        
+        // Find the selected LGA in the data we already have in our component
+        const selectedLGA = availableLGAs.find(lga => lga.lga === formData.city);
+
+        // If we found it, use its delivery fee
+        if (selectedLGA) {
+          console.log(`%cFound fee locally: ${selectedLGA.delivery_fee}`, 'color: purple; font-weight: bold;');
+          setShipping(selectedLGA.delivery_fee);
+        }
+        
+        setIsCalculatingShipping(false);
+        return;
+      }
+
+      // Fallback logic for any other state
+      const getOtherStateFee = async () => {
+        setIsCalculatingShipping(true);
+        const cost = await fetchDeliveryFeeForState(formData.state);
+        setShipping(cost);
+        setIsCalculatingShipping(false);
+      };
+
+      getOtherStateFee();
+    }
+  }, [deliveryMethod, formData.state, formData.city, availableLGAs, busParkFee]);
+
   useEffect(() => {
     const loadLGAs = async () => {
       if (formData.state === 'Lagos' && deliveryMethod === 'address') {
@@ -126,12 +138,9 @@ const CheckoutPage = () => {
 
     setFormData(prev => {
       const updated = { ...prev, [name]: newValue };
-
-      // Clear city when state changes
       if (name === 'state') {
         updated.city = '';
       }
-
       return updated;
     });
 
@@ -146,7 +155,6 @@ const CheckoutPage = () => {
   const handleDeliveryMethodChange = (method) => {
     setDeliveryMethod(method);
     if (method === 'pickup') {
-      // Clear address-related form data and errors for pickup only
       setFormData(prev => ({
         ...prev,
         state: '',
@@ -161,7 +169,6 @@ const CheckoutPage = () => {
       setFormErrors(newErrors);
       setAvailableLGAs([]);
     }
-    // For bus-park, keep the address fields visible but clear LGAs
     else if (method === 'bus-park') {
       setAvailableLGAs([]);
     }
@@ -174,7 +181,6 @@ const CheckoutPage = () => {
   };
 
   const prepareCheckoutData = () => {
-    // Start with basic customer data
     const checkoutData = {
       name: formData.name,
       email: formData.email,
@@ -183,9 +189,7 @@ const CheckoutPage = () => {
       agreeToTerms: formData.agreeToTerms
     };
 
-    // Add address fields for delivery orders (both address and bus-park)
     if (deliveryMethod === 'address' || deliveryMethod === 'bus-park') {
-      // For delivery orders, ensure state is valid
       if (!formData.state || !nigerianStates.includes(formData.state)) {
         throw new Error('Please select a valid delivery state');
       }
@@ -193,16 +197,12 @@ const CheckoutPage = () => {
       checkoutData.state = formData.state;
       checkoutData.city = formData.city;
 
-      // Street address is required for home delivery but optional for bus park
       if (deliveryMethod === 'address') {
         checkoutData.street_address = formData.street_address;
-
-        // Add LGA if it's Lagos state
         if (formData.state === 'Lagos' && formData.city) {
           checkoutData.lga = formData.city;
         }
       } else if (deliveryMethod === 'bus-park') {
-        // For bus park, street address is optional (for additional location info)
         checkoutData.street_address = formData.street_address || '';
       }
     }
@@ -223,11 +223,8 @@ const CheckoutPage = () => {
 
     try {
       setIsProcessingOrder(true);
-
-      // Prepare data based on delivery method
       const checkoutData = prepareCheckoutData();
 
-      // Debug logging
       console.log('Checkout attempt:', {
         deliveryMethod,
         formData: checkoutData,
@@ -237,7 +234,6 @@ const CheckoutPage = () => {
       const result = await initiateCheckout(checkoutData, deliveryMethod, cart, SUCCESS_REDIRECT_URL);
 
       if (result.code === 200 && result.authorization_url) {
-        // Store order details in memory for the success page
         storeOrderDetails(formData, deliveryMethod, cart, totalPrice, shipping, finalTotal);
 
         setNotification({
@@ -245,23 +241,18 @@ const CheckoutPage = () => {
           message: 'Redirecting to payment gateway...'
         });
 
-        // Small delay to show the success message before redirect
         setTimeout(() => {
-          // Clear cart only after successful payment initiation
           clearCart();
           window.location.href = result.authorization_url;
         }, 1000);
-
       } else {
         throw new Error(result.message || 'Failed to initiate checkout');
       }
-
     } catch (error) {
       console.error('Checkout initiation error:', error);
 
       let errorMessage = 'Failed to initiate checkout. Please try again.';
 
-      // Handle specific error messages
       if (error.message.includes('Invalid/No delivery found')) {
         errorMessage = deliveryMethod === 'pickup'
           ? 'Store pickup is currently unavailable. Please try home delivery or contact support.'
@@ -293,9 +284,8 @@ const CheckoutPage = () => {
   const getDeliveryPrice = () => {
     if (isCalculatingShipping) return 'Calculating...';
     if (deliveryMethod === 'pickup') return 'Free';
-    // Check if shipping has been calculated for address delivery
-    if (deliveryMethod === 'address' && shipping === null) {
-        return 'Select a state';
+    if (deliveryMethod === 'address' && shipping === 0) {
+      return 'Select a state';
     }
     return formatPrice(shipping);
   };
@@ -321,15 +311,11 @@ const CheckoutPage = () => {
       <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">Checkout</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Form Container */}
         <form onSubmit={handleSubmit} className="lg:col-span-3">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Billing Information Form */}
             <div className="lg:col-span-2">
-              {/* Delivery Method Selection */}
               <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-6">Delivery Method</h2>
-
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div
                     className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${deliveryMethod === 'address'
@@ -357,7 +343,6 @@ const CheckoutPage = () => {
                       </div>
                     </div>
                   </div>
-
                   <div
                     className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${deliveryMethod === 'bus-park'
                       ? 'border-pink-500 bg-pink-50'
@@ -384,7 +369,6 @@ const CheckoutPage = () => {
                       </div>
                     </div>
                   </div>
-
                   <div
                     className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${deliveryMethod === 'pickup'
                       ? 'border-pink-500 bg-pink-50'
@@ -414,10 +398,8 @@ const CheckoutPage = () => {
                 </div>
               </div>
 
-              {/* Customer Information */}
               <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-6">Customer Information</h2>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <div className="md:col-span-2">
                     <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -439,7 +421,6 @@ const CheckoutPage = () => {
                       <p className="mt-1 text-sm text-red-500">{formErrors.name}</p>
                     )}
                   </div>
-
                   <div>
                     <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                       Email <span className="text-red-500">*</span>
@@ -460,7 +441,6 @@ const CheckoutPage = () => {
                       <p className="mt-1 text-sm text-red-500">{formErrors.email}</p>
                     )}
                   </div>
-
                   <div>
                     <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
                       Phone <span className="text-red-500">*</span>
@@ -484,13 +464,11 @@ const CheckoutPage = () => {
                 </div>
               </div>
 
-              {/* Delivery Address - Show for both address and bus-park delivery */}
               {(deliveryMethod === 'address' || deliveryMethod === 'bus-park') && (
                 <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                   <h2 className="text-xl font-semibold text-gray-800 mb-6">
                     {deliveryMethod === 'address' ? 'Delivery Address' : 'Bus Park Location'}
                   </h2>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
                       <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
@@ -515,7 +493,6 @@ const CheckoutPage = () => {
                         <p className="mt-1 text-sm text-red-500">{formErrors.state}</p>
                       )}
                     </div>
-
                     <div>
                       <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
                         City <span className="text-red-500">*</span>
@@ -562,7 +539,6 @@ const CheckoutPage = () => {
                       )}
                     </div>
                   </div>
-
                   <div className="mb-6">
                     <label htmlFor="street_address" className="block text-sm font-medium text-gray-700 mb-1">
                       {deliveryMethod === 'address' ? 'Street Address' : 'Specific Location/Landmark'}
@@ -592,10 +568,8 @@ const CheckoutPage = () => {
                 </div>
               )}
 
-              {/* Additional Info */}
               <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-6">Additional Info</h2>
-
                 <div>
                   <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
                     Order Notes (Optional)
@@ -614,11 +588,9 @@ const CheckoutPage = () => {
               </div>
             </div>
 
-            {/* Order Summary */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-6">Order Summary</h2>
-
                 <div className="space-y-4 mb-6">
                   {cart.map((item) => (
                     <div key={`${item.id}-${item.variant?.id || 'default'}`} className="flex items-center gap-4">
@@ -645,22 +617,19 @@ const CheckoutPage = () => {
                     </div>
                   ))}
                 </div>
-
                 <div className="border-t border-gray-200 pt-4 space-y-4 mb-6">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Subtotal:</span>
                     <span className="font-medium">{formatPrice(totalPrice)}</span>
                   </div>
-
                   <div className="flex justify-between">
                     <span className="text-gray-600">
-                      {getDeliveryMethodDisplayName(deliveryMethod)}:
+                      {deliveryMethod === 'pickup' ? 'Store Pickup' : deliveryMethod === 'bus-park' ? 'Bus Park Delivery' : 'Home Delivery'}:
                     </span>
                     <span className="font-medium">
                       {getDeliveryPrice()}
                     </span>
                   </div>
-
                   <div className="flex justify-between text-lg font-semibold pt-2 border-t border-gray-200">
                     <span>Total:</span>
                     <span className="text-pink-600">
@@ -668,7 +637,6 @@ const CheckoutPage = () => {
                     </span>
                   </div>
                 </div>
-
                 <div className="mb-6">
                   <p className="text-sm text-gray-600 mb-4">
                     Your personal data will be used to process your order, support your experience throughout this website, and for other purposes described in our{' '}
@@ -676,7 +644,6 @@ const CheckoutPage = () => {
                       privacy policy
                     </Link>.
                   </p>
-
                   <div className="flex items-start mb-6">
                     <input
                       type="checkbox"
@@ -700,7 +667,6 @@ const CheckoutPage = () => {
                   {formErrors.agreeToTerms && (
                     <p className="mt-1 text-sm text-red-500 mb-4">{formErrors.agreeToTerms}</p>
                   )}
-
                   <Button
                     type="submit"
                     disabled={isProcessingOrder || isCalculatingShipping}
@@ -724,7 +690,6 @@ const CheckoutPage = () => {
                     )}
                   </Button>
                 </div>
-
                 <Link
                   to="/cart"
                   className="flex items-center justify-center text-pink-500 hover:text-pink-600"

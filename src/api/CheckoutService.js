@@ -1,4 +1,4 @@
-// services.js - API service functions for checkout
+// src/api/CheckoutService.js
 
 const BASE_URL = 'https://leksycosmetics.com';
 
@@ -8,11 +8,17 @@ const BASE_URL = 'https://leksycosmetics.com';
  * @returns {string} Formatted price string
  */
 export const formatPrice = (price) => {
-  return `₦${parseFloat(price).toLocaleString('en-NG', {
+  // Ensure price is a number, default to 0 if not
+  const numericPrice = Number(price);
+  if (isNaN(numericPrice)) {
+    return '₦0.00';
+  }
+  return `₦${numericPrice.toLocaleString('en-NG', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   })}`;
 };
+
 
 /**
  * Prepares cart data for API submission
@@ -80,34 +86,36 @@ export const fetchDeliveryFeeForState = async (state) => {
 };
 
 /**
- * Fetches delivery fee for a specific LGA
+ * Fetches delivery fee for a specific LGA -- WITH DEBUG LOGS
  * @param {string} state - State name
  * @param {string} lga - LGA name
  * @returns {Promise<number>} Delivery fee in Naira
  */
 export const fetchDeliveryFeeForLGA = async (state, lga) => {
   try {
-    const response = await fetch(`${BASE_URL}/api/fetch-delivery-fee?state=${encodeURIComponent(state)}&lga=${encodeURIComponent(lga)}`);
+    const fetchUrl = `${BASE_URL}/api/fetch-delivery-fee?state=${encodeURIComponent(state)}&lga=${encodeURIComponent(lga)}`;
+    
+    // --- DEBUG LOG: See the exact URL being called ---
+    console.log(`%cFETCHING LGA FEE FROM: ${fetchUrl}`, 'color: orange;');
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
+    const response = await fetch(fetchUrl);
     const result = await response.json();
+    
+    // --- DEBUG LOG: See the RAW API response ---
+    console.log('%cAPI Response for LGA:', 'color: orange;', result);
 
-    if (result.code === 200) {
+    if (result.code === 200 && result.delivery_fee) {
       return result.delivery_fee;
     } else {
-      // If LGA not found, fallback to state delivery fee
+      console.warn('LGA fee not found or API error, falling back to state fee.');
       return await fetchDeliveryFeeForState(state);
     }
-
   } catch (error) {
     console.error('Error fetching delivery fee for LGA:', error);
-    // Fallback to state delivery fee if LGA API fails
     return await fetchDeliveryFeeForState(state);
   }
 };
+
 
 /**
  * Fetches bus park delivery fee
@@ -194,39 +202,45 @@ export const fetchLGADeliveryFees = async (state = null) => {
 };
 
 /**
- * Calculates shipping cost based on delivery method and location
+ * Calculates shipping cost based on delivery method and location -- UPDATED LOGIC
  * @param {string} deliveryMethod - Delivery method ('address', 'pickup', or 'bus-park')
  * @param {string} state - State name (required for address delivery)
  * @param {string} lga - LGA name (optional for more specific pricing)
  * @returns {Promise<number>} Shipping cost in Naira
  */
+export const calculateShipping = async (deliveryMethod, state = null, lga = null) => {
+  switch (deliveryMethod) {
+    case 'pickup':
+      return 0;
 
-// src/api/CheckoutService.js
+    case 'bus-park':
+      return await fetchBusParkDeliveryFee();
 
-export const fetchDeliveryFeeForLGA = async (state, lga) => {
-  try {
-    const fetchUrl = `${BASE_URL}/api/fetch-delivery-fee?state=${encodeURIComponent(state)}&lga=${encodeURIComponent(lga)}`;
-    
-    // --- Add this console.log to see the exact URL being called ---
-    console.log(`%cFETCHING LGA FEE FROM: ${fetchUrl}`, 'color: orange;');
+    case 'address':
+      if (!state) {
+        return 0; // Return 0 if no state is selected
+      }
 
-    const response = await fetch(fetchUrl);
-    const result = await response.json();
-    
-    // --- Add this console.log to see the RAW API response ---
-    console.log('%cAPI Response for LGA:', 'color: orange;', result);
+      try {
+        // If the state is Lagos AND a specific LGA has been provided, fetch the LGA price.
+        if (state === 'Lagos' && lga) {
+          return await fetchDeliveryFeeForLGA(state, lga);
+        }
+        
+        // For any other state, or for Lagos before an LGA is selected, get the general state fee.
+        return await fetchDeliveryFeeForState(state);
 
-    if (result.code === 200 && result.delivery_fee) {
-      return result.delivery_fee;
-    } else {
-      console.warn('LGA fee not found or API error, falling back to state fee.');
-      return await fetchDeliveryFeeForState(state);
-    }
-  } catch (error) {
-    console.error('Error fetching delivery fee for LGA:', error);
-    return await fetchDeliveryFeeForState(state);
+      } catch (error) {
+        console.error('Error calculating address shipping:', error);
+        // Fallback to a default fee if any API call fails
+        return 5000;
+      }
+
+    default:
+      return 0;
   }
 };
+
 
 /**
  * Initiates checkout process with the API
@@ -255,55 +269,44 @@ export const initiateCheckout = async (formData, deliveryMethod, cart, successRe
       requestData.append('state', formData.state.trim());
       requestData.append('city', formData.city.trim());
       requestData.append('street_address', formData.street_address.trim());
+
+      // --- THIS IS THE FIX ---
+      // If an LGA is present in the form data (for Lagos), add it to the request.
+      if (formData.lga) {
+        requestData.append('lga', formData.lga.trim());
+      }
     }
-    // For pickup orders: DO NOT send any address fields
 
     // Add notes if provided
     if (formData.notes && formData.notes.trim()) {
       requestData.append('notes', formData.notes.trim());
     }
 
-    // Build API URL
     const apiUrl = `${BASE_URL}/api/checkout/initiate`;
-
-    // Build debug object for logging
-    const debugData = {
-      name: formData.name.trim(),
-      email: formData.email.trim(),
-      phone: formData.phone.trim(),
-      delivery_method: deliveryMethod,
-      cart: JSON.stringify(cartData),
-      success_redirect: successRedirectUrl,
-      notes: formData.notes?.trim() || ''
-    };
-
-    // Only add address fields to debug log if it's a delivery order
-    if (deliveryMethod === 'address') {
-      debugData.state = formData.state.trim();
-      debugData.city = formData.city.trim();
-      debugData.street_address = formData.street_address.trim();
-    }
-
-    // Log request details for debugging
     console.log('Initiating checkout with URL:', apiUrl);
-    console.log('Request data:', debugData);
+    // You can add this log to see the final data being sent
+    // for (let [key, value] of requestData.entries()) {
+    //   console.log(`Sending -> ${key}: ${value}`);
+    // }
 
-    // Make API request using FormData in body
     const response = await fetch(apiUrl, {
       method: 'POST',
-      body: requestData, // Send as form data in body
-      // Note: Don't set Content-Type header when using FormData - browser sets it automatically
+      body: requestData,
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API Error Response:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      // Try to parse the JSON error message from the backend
+      try {
+        const errorResult = await response.json();
+        throw new Error(`Err! [${response.status}] ${errorResult.message || 'An unknown error occurred'}`);
+      } catch (e) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
     }
 
     const result = await response.json();
     console.log('API Response:', result);
-
     return result;
 
   } catch (error) {
@@ -420,7 +423,7 @@ export const nigerianStates = [
  * @returns {string} Success redirect URL
  */
 export const getSuccessRedirectUrl = () => {
-  return `${window.location.origin}/checkout/checkout-success`;
+  return `${window.location.origin}/checkout/success`;
 };
 
 /**
