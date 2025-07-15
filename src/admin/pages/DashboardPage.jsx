@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // Add this import
+import { useNavigate } from 'react-router-dom';
 import { ArrowUp, ArrowDown, ArrowUpRight, Users, ShoppingBag, DollarSign, Clock, RefreshCw } from 'lucide-react';
 import { orderService, contactService, productService, authService } from '../../api/services';
-import { useAuth } from '../../contexts/AuthContext'; // Import auth context
+import { useAuth } from '../../contexts/AuthContext';
 
-
-// Dashboard Stats Component (keeping the same)
-const DashboardStats = ({ dashboardData, isLoading }) => {
+// ## Dashboard Stats Component (Modified)
+const DashboardStats = ({ dashboardData, isLoading, onNavigateToOrders }) => {
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
@@ -102,8 +101,11 @@ const DashboardStats = ({ dashboardData, isLoading }) => {
         </div>
       </div>
       
-      {/* Pending Orders Card */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-orange-500">
+      {/* Pending Orders Card - NOW CLICKABLE */}
+      <div 
+        className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-orange-500 cursor-pointer hover:shadow-md transition-shadow"
+        onClick={onNavigateToOrders}
+      >
         <div className="flex justify-between items-start">
           <div>
             <p className="text-sm font-medium text-gray-600">Pending Orders</p>
@@ -126,9 +128,9 @@ const DashboardStats = ({ dashboardData, isLoading }) => {
   );
 };
 
-// Recent Orders Component with navigation
+// ## Recent Orders Component
 const RecentOrders = ({ orders, isLoading, onRefresh }) => {
-  const navigate = useNavigate(); // Add navigation hook
+  const navigate = useNavigate(); 
   
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-NG', {
@@ -142,11 +144,8 @@ const RecentOrders = ({ orders, isLoading, onRefresh }) => {
     try {
       const date = new Date(dateString);
       return date.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
       });
     } catch (e) {
       return dateString || 'N/A';
@@ -155,20 +154,13 @@ const RecentOrders = ({ orders, isLoading, onRefresh }) => {
 
   const getStatusClass = (status) => {
     switch (status?.toLowerCase()) {
-      case 'successful':
-      case 'completed':
-      case 'delivered':
+      case 'successful': case 'completed': case 'delivered':
         return 'bg-green-100 text-green-800 border-green-200';
-      case 'pending':
-      case 'order-received':
-      case 'unpaid':
+      case 'pending': case 'order-received': case 'unpaid':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'processing':
-      case 'packaged':
-      case 'in-transit':
+      case 'processing': case 'packaged': case 'in-transit':
         return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'cancelled':
-      case 'failed':
+      case 'cancelled': case 'failed':
         return 'bg-red-100 text-red-800 border-red-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -269,42 +261,27 @@ const RecentOrders = ({ orders, isLoading, onRefresh }) => {
   );
 };
 
-// Main Dashboard Component with Auth Error Handling
+// ## Main Dashboard Page Component (Modified)
 const DashboardPage = () => {
-  const auth = useAuth(); // Add auth context
+  const navigate = useNavigate();
+  const auth = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dashboardData, setDashboardData] = useState({
-    totalOrders: 0,
-    totalSales: 0,
-    totalProducts: 0,
-    pendingOrders: 0,
-    orderGrowth: 0,
-    salesGrowth: 0,
-    productGrowth: 0
+    totalOrders: 0, totalSales: 0, totalProducts: 0, pendingOrders: 0,
+    orderGrowth: 0, salesGrowth: 0, productGrowth: 0
   });
   const [recentOrders, setRecentOrders] = useState([]);
 
-  // Helper function to handle auth errors - LESS AGGRESSIVE
   const handleAuthError = (error) => {
     const isAuthError = error.isAPILevel401 || 
-                       error.response?.status === 401 || 
-                       error.response?.data?.code === 401 ||
-                       error.message?.includes('Admin authentication required');
-    
+                      error.response?.status === 401 || 
+                      error.response?.data?.code === 401 ||
+                      error.message?.includes('Admin authentication required');
     if (isAuthError) {
       console.log('🚨 Auth error detected in dashboard, but NOT auto-logging out');
-      console.log('🔍 Error details:', {
-        message: error.message,
-        status: error.response?.status,
-        apiCode: error.response?.data?.code,
-        hasToken: !!api.getToken()
-      });
-      
-      // DON'T automatically logout - let user see the error and decide
-      return true; // Return true to indicate it was an auth error
+      return true;
     }
-    
     return false;
   };
 
@@ -316,53 +293,32 @@ const DashboardPage = () => {
     try {
       setIsLoading(true);
       setError(null);
-      console.log('Fetching dashboard data...');
-
-      // Fetch data from multiple endpoints
       const [ordersResponse, productsResponse] = await Promise.allSettled([
         orderService.fetchOrders({ limit: 50 }),
         productService.fetchProducts({ limit: 1000 })
       ]);
 
-      console.log('Orders response:', ordersResponse);
-      console.log('Products response:', productsResponse);
-
-      // Check for auth errors in responses
       if (ordersResponse.status === 'rejected') {
-        const wasAuthError = handleAuthError(ordersResponse.reason);
-        if (wasAuthError) return; // Stop processing if we're logging out
+        if (handleAuthError(ordersResponse.reason)) return;
       }
-
       if (productsResponse.status === 'rejected') {
-        const wasAuthError = handleAuthError(productsResponse.reason);
-        if (wasAuthError) return; // Stop processing if we're logging out
+        if (handleAuthError(productsResponse.reason)) return;
       }
 
-      // Process orders data
       let ordersData = [];
       let totalSales = 0;
       let pendingCount = 0;
-
       if (ordersResponse.status === 'fulfilled') {
         const ordersResult = ordersResponse.value;
-        console.log('Orders result:', ordersResult);
-        
         if (ordersResult?.code === 200 && ordersResult.orders) {
           ordersData = ordersResult.orders;
-          console.log('Orders data:', ordersData);
-          
-          // Calculate metrics from orders
           ordersData.forEach(order => {
-            const amount = parseFloat(order.amount_paid || order.amount_calculated || order.total_amount || 0);
-            totalSales += amount;
-            
+            totalSales += parseFloat(order.amount_paid || order.amount_calculated || order.total_amount || 0);
             const status = (order.delivery_status || order.order_status || '').toLowerCase();
             if (['pending', 'order-received', 'unpaid', 'flagged'].includes(status)) {
               pendingCount++;
             }
           });
-
-          // Format orders for display
           setRecentOrders(ordersData.map(order => ({
             id: order.order_id || order.id || 'N/A',
             name: order.name || order.customer_name || 'Unknown Customer',
@@ -371,87 +327,48 @@ const DashboardPage = () => {
             date: order.created_at || order.order_date || new Date().toISOString(),
             status: order.order_status || order.delivery_status || 'unknown'
           })).sort((a, b) => new Date(b.date) - new Date(a.date)));
-        } else {
-          console.log('Orders API returned unexpected format:', ordersResult);
         }
       } else {
-        console.error('Orders fetch failed:', ordersResponse.reason?.message || ordersResponse.reason);
-        // Check if it's an auth error but don't auto-logout
         const wasAuthError = handleAuthError(ordersResponse.reason);
-        if (wasAuthError) {
-          setError('Authentication issue detected. You may need to log in again.');
-        } else {
-          setError(ordersResponse.reason?.message || 'Failed to fetch orders');
-        }
+        setError(wasAuthError ? 'Authentication issue detected. You may need to log in again.' : ordersResponse.reason?.message || 'Failed to fetch orders');
       }
 
-      // Process products data
       let productsCount = 0;
       if (productsResponse.status === 'fulfilled') {
         const productsResult = productsResponse.value;
-        console.log('Products result:', productsResult);
-        
         if (productsResult?.code === 200 && productsResult.products) {
           productsCount = productsResult.products.length;
-        } else {
-          console.log('Products API returned unexpected format:', productsResult);
         }
       } else {
-        console.error('Products fetch failed:', productsResponse.reason?.message || productsResponse.reason);
-        // Check if it's an auth error but don't auto-logout  
         const wasAuthError = handleAuthError(productsResponse.reason);
-        if (wasAuthError) {
-          setError(prev => prev || 'Authentication issue detected. You may need to log in again.');
-        } else {
-          setError(prev => prev || (productsResponse.reason?.message || 'Failed to fetch products'));
-        }
+        setError(prev => prev || (wasAuthError ? 'Authentication issue detected. You may need to log in again.' : productsResponse.reason?.message || 'Failed to fetch products'));
       }
 
-      // Generate some mock growth percentages for demo
-      const orderGrowth = Math.floor(Math.random() * 25) + 5;
-      const salesGrowth = Math.floor(Math.random() * 20) + 3;
-      const productGrowth = Math.floor(Math.random() * 15) + 1;
-
-      // Update dashboard data
       setDashboardData({
-        totalOrders: ordersData.length,
-        totalSales: totalSales,
-        totalProducts: productsCount,
+        totalOrders: ordersData.length, totalSales: totalSales, totalProducts: productsCount,
         pendingOrders: pendingCount,
-        orderGrowth: orderGrowth,
-        salesGrowth: salesGrowth,
-        productGrowth: productGrowth
-      });
-
-      console.log('Dashboard data updated:', {
-        totalOrders: ordersData.length,
-        totalSales,
-        totalProducts: productsCount,
-        pendingOrders: pendingCount
+        orderGrowth: Math.floor(Math.random() * 25) + 5,
+        salesGrowth: Math.floor(Math.random() * 20) + 3,
+        productGrowth: Math.floor(Math.random() * 15) + 1
       });
 
     } catch (err) {
-      console.error('Error fetching dashboard data:', err);
-      
-      // Check if it's an auth error but don't auto-logout
       const wasAuthError = handleAuthError(err);
-      if (wasAuthError) {
-        setError('Authentication issue detected. You may need to log in again.');
-      } else {
-        setError(err.message || 'Failed to load dashboard data');
-      }
+      setError(wasAuthError ? 'Authentication issue detected. You may need to log in again.' : err.message || 'Failed to load dashboard data');
     } finally {
       setIsLoading(false);
     }
   };
+  
+  const handleNavigateToOrders = () => {
+    navigate('/admin/orders', { state: { initialFilter: 'pending' } });
+  };
 
-  // Get user info
   const user = authService.getAuthUser();
   const userName = user?.name || user?.username || 'Admin';
 
   if (error) {
     const isAuthIssue = error.includes('Authentication issue');
-    
     return (
       <div className="space-y-6">
         <div className={`border rounded-xl p-6 ${isAuthIssue ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'}`}>
@@ -467,11 +384,7 @@ const DashboardPage = () => {
           <div className="flex space-x-3">
             <button 
               onClick={fetchDashboardData}
-              className={`px-4 py-2 rounded-lg transition-colors flex items-center ${
-                isAuthIssue 
-                  ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
-                  : 'bg-red-600 text-white hover:bg-red-700'
-              }`}
+              className={`px-4 py-2 rounded-lg transition-colors flex items-center ${isAuthIssue ? 'bg-yellow-600 text-white hover:bg-yellow-700' : 'bg-red-600 text-white hover:bg-red-700'}`}
             >
               <RefreshCw size={16} className="mr-2" />
               Try Again
@@ -518,7 +431,11 @@ const DashboardPage = () => {
       </div>
       
       {/* Statistics cards */}
-      <DashboardStats dashboardData={dashboardData} isLoading={isLoading} />
+      <DashboardStats 
+        dashboardData={dashboardData} 
+        isLoading={isLoading} 
+        onNavigateToOrders={handleNavigateToOrders} 
+      />
       
       {/* Recent Orders */}
       <RecentOrders 
