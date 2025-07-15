@@ -62,7 +62,7 @@ curl --location --request POST '{base_url}/api/admin/add-product?name={name}&pri
 ## Update Product
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/update-product?product_id={product_id}name={name|optional}&price={price|numeric|optional}&slashed_price={slashed_price|numeric|optional}&description={description|optional}&quantity={quantity|integer|optional}&category={category|optional}&concern_options={concern_options_1,concern_options_2,concern_options_n}&images={files|max:2mb_each|image/*|optional}' \
+curl --location --request POST '{base_url}/api/admin/update-product?product_id={product_id}name={name|optional}&price={price|numeric|optional}&slashed_price={slashed_price|numeric|optional}&description={description|optional}&available_qty={available_qty|integer|optional}&category={category|optional}&concern_options={concern_options_1,concern_options_2,concern_options_n}&images={files|max:2mb_each|image/*|optional}' \
 --header 'Authorization: Bearer {token}'
 ```
 
