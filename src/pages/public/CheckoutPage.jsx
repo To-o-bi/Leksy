@@ -12,6 +12,7 @@ import {
   nigerianStates,
   fetchLGADeliveryFees,
   fetchBusParkDeliveryFee,
+  getSuccessRedirectUrl,
   fetchDeliveryFeeForState
 } from '../../api/CheckoutService';
 
@@ -40,7 +41,7 @@ const CheckoutPage = () => {
 
   const [formErrors, setFormErrors] = useState({});
   const finalTotal = totalPrice + shipping;
-  const SUCCESS_REDIRECT_URL = '/checkout/success';
+  const SUCCESS_REDIRECT_URL = getSuccessRedirectUrl();
 
   useEffect(() => {
     const getBusParkFee = async () => {
