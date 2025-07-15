@@ -258,84 +258,89 @@ export const contactService = {
   }
 };
 
-// Order Service
+// Order Service (Final Version)
 export const orderService = {
-  async initiateCheckout(checkoutData) {
-    this._validateCheckoutData(checkoutData);
+  async initiateCheckout(checkoutData) {
+    this._validateCheckoutData(checkoutData);
 
-    const params = {
-      name: checkoutData.name?.trim() || '',
-      email: checkoutData.email?.trim() || '',
-      phone: checkoutData.phone.trim(),
-      delivery_method: checkoutData.delivery_method,
-      cart: JSON.stringify(checkoutData.cart)
-    };
+    const params = {
+      name: checkoutData.name?.trim() || '',
+      email: checkoutData.email?.trim() || '',
+      phone: checkoutData.phone.trim(),
+      delivery_method: checkoutData.delivery_method,
+      cart: JSON.stringify(checkoutData.cart)
+    };
 
-    if (checkoutData.delivery_method === 'address') {
-      params.state = checkoutData.state.trim();
-      params.city = checkoutData.city.trim();
-      params.street_address = checkoutData.street_address.trim();
-    }
+    if (checkoutData.delivery_method === 'address') {
+      params.state = checkoutData.state.trim();
+      params.city = checkoutData.city.trim();
+      params.street_address = checkoutData.street_address.trim();
+    }
 
-    if (checkoutData.success_redirect) {
-      params.success_redirect = checkoutData.success_redirect;
-    } else if (isBrowser()) {
-      params.success_redirect = `${window.location.origin}/checkout/checkout-success`;
-    }
+    if (checkoutData.success_redirect) {
+      params.success_redirect = checkoutData.success_redirect;
+    } else if (isBrowser()) {
+      params.success_redirect = `${window.location.origin}/checkout/checkout-success`;
+    }
 
-    const response = await api.post(`/checkout/initiate?${new URLSearchParams(params).toString()}`);
-    return response.data;
-  },
+    const response = await api.post(`/checkout/initiate?${new URLSearchParams(params).toString()}`);
+    return response.data;
+  },
 
-  async fetchOrders(filters = {}) {
-    const params = {};
-    if (filters.order_status && filters.order_status !== 'all') {
-      params.order_status = filters.order_status;
-    }
-    if (filters.delivery_status && filters.delivery_status !== 'all') {
-      params.delivery_status = filters.delivery_status;
-    }
-    if (filters.limit) params.limit = filters.limit;
+  async fetchOrders(filters = {}) {
+    const params = {};
+    if (filters.order_status && filters.order_status !== 'all') {
+      params.order_status = filters.order_status;
+    }
+    if (filters.delivery_status && filters.delivery_status !== 'all') {
+      params.delivery_status = filters.delivery_status;
+    }
+    if (filters.limit) params.limit = filters.limit;
 
-    const response = await api.get('/fetch-orders', params);
-    return response.data;
-  },
+    const response = await api.get('/fetch-orders', params);
+    return response.data;
+  },
 
-  async fetchOrder(orderId) {
-    if (!orderId) throw new Error('Order ID is required');
-    const response = await api.get('/fetch-order', { order_id: orderId });
-    return response.data;
-  },
+  async fetchOrder(orderId) {
+    if (!orderId) throw new Error('Order ID is required');
+    const response = await api.get('/fetch-order', { order_id: orderId });
+    return response.data;
+  },
 
-  async changeDeliveryStatus(orderId, newStatus) {
-    const validStatuses = ['unpaid', 'order-received', 'packaged', 'in-transit', 'delivered'];
-    
-    if (!orderId) throw new Error('Order ID is required');
-    if (!newStatus || !validStatuses.includes(newStatus)) {
-      throw new Error(`Invalid delivery status. Must be one of: ${validStatuses.join(', ')}`);
-    }
+  async changeDeliveryStatus(orderId, newStatus) {
+    const validStatuses = ['unpaid', 'order-received', 'packaged', 'in-transit', 'delivered'];
+    if (!orderId) throw new Error('Order ID is required');
+    if (!newStatus || !validStatuses.includes(newStatus)) {
+      throw new Error(`Invalid delivery status. Must be one of: ${validStatuses.join(', ')}`);
+    }
 
-    const params = { order_id: orderId, new_delivery_status: newStatus };
-    const response = await api.post(`/admin/change-delivery-status?${new URLSearchParams(params).toString()}`);
-    return response.data;
-  },
+    // Create a FormData object and append the data
+    const formData = new FormData();
+    formData.append('order_id', orderId);
+    formData.append('new_delivery_status', newStatus);
 
-  _validateCheckoutData(checkoutData) {
-    if (!checkoutData.phone?.trim()) throw new Error('Phone is required');
-    if (!['pickup', 'address'].includes(checkoutData.delivery_method)) {
-      throw new Error('Invalid delivery method');
-    }
-    if (!checkoutData.cart?.length) throw new Error('Cart cannot be empty');
+    // Send the request using the confirmed FormData method
+    const response = await api.post('/admin/change-delivery-status', formData);
+    
+    return response.data;
+  },
 
-    if (checkoutData.delivery_method === 'address') {
-      const addressFields = ['state', 'city', 'street_address'];
-      addressFields.forEach(field => {
-        if (!checkoutData[field]?.trim()) {
-          throw new Error(`${field.replace('_', ' ')} is required`);
-        }
-      });
-    }
-  }
+  _validateCheckoutData(checkoutData) {
+    if (!checkoutData.phone?.trim()) throw new Error('Phone is required');
+    if (!['pickup', 'address'].includes(checkoutData.delivery_method)) {
+      throw new Error('Invalid delivery method');
+    }
+    if (!checkoutData.cart?.length) throw new Error('Cart cannot be empty');
+
+    if (checkoutData.delivery_method === 'address') {
+      const addressFields = ['state', 'city', 'street_address'];
+      addressFields.forEach(field => {
+        if (!checkoutData[field]?.trim()) {
+          throw new Error(`${field.replace('_', ' ')} is required`);
+        }
+      });
+    }
+  }
 };
 
 // Consultation Service
