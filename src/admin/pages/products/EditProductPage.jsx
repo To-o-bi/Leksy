@@ -37,8 +37,6 @@ const parseApiResponse = (response) => {
   return response;
 };
 
-// 👇 *** ADD THIS MISSING FUNCTION ***
-// Added missing image validation function
 const validateImageFile = (file) => {
   if (!IMAGE_CONFIG.validTypes.includes(file.type)) {
     return { valid: false, error: 'Invalid file type.' };
@@ -48,9 +46,7 @@ const validateImageFile = (file) => {
   }
   return { valid: true };
 };
-// 👆 *** END OF CHANGE ***
 
-// FormField component (unchanged)
 const FormField = React.memo(({ 
   label, name, type = 'text', required = false, placeholder, 
   currency = false, rows, options, className = '', value,
@@ -91,7 +87,6 @@ const FormField = React.memo(({
   );
 });
 
-// The rest of the EditProductPage component remains the same as the previous version.
 const EditProductPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -120,13 +115,12 @@ const EditProductPage = () => {
   const [newImages, setNewImages] = useState([]);
   const [newImagePreviews, setNewImagePreviews] = useState([]);
   const [existingImages, setExistingImages] = useState([]);
-  const [removedImages, setRemovedImages] = useState([]); // State for deleted images
+  const [removedImages, setRemovedImages] = useState([]);
 
   // Memoized functions
   const hasChanges = useCallback(() => {
     if (!originalData) return false;
     
-    // Updated to check for removed images as well
     return (
       formData.name !== originalData.name ||
       parseFloat(formData.price) !== originalData.price ||
@@ -142,7 +136,6 @@ const EditProductPage = () => {
   const handleError = useCallback((error, defaultMessage) => {
     console.error('Error:', error);
     
-    // The specific backend error for images
     if (error.message?.includes('Unexpected file input formatting')) {
         setSubmitError(error.message);
     } else if (error.message?.includes('Authentication')) {
@@ -348,7 +341,7 @@ const EditProductPage = () => {
       if (parsedResponse && (parsedResponse.code === 200 || parsedResponse.code === '200')) {
         setSubmitSuccess(true);
         setTimeout(() => {
-          navigate('/admin/products', {
+          navigate('/admin/products/stock', {
             state: {
               notification: {
                 type: 'success',
@@ -372,22 +365,91 @@ const EditProductPage = () => {
     if (hasChanges() && !window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
       return;
     }
-    navigate('/admin/products');
+    navigate('/admin/products/stock');
   }, [hasChanges, navigate]);
 
-  // Render components (unchanged)
-  const LoadingSpinner = () => (<div className="min-h-screen bg-gray-50 py-6"><div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8"><div className="bg-white rounded-lg shadow-md p-6"><div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div></div></div></div></div>);
-  const NotFoundPage = () => (<div className="min-h-screen bg-gray-50 py-6"><div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8"><div className="bg-white rounded-lg shadow-md overflow-hidden"><div className="bg-white px-6 py-4 border-b border-gray-200"><div className="flex items-center"><button onClick={() => navigate('/admin/products')} className="flex items-center text-gray-600 hover:text-gray-800 mr-4"><ChevronLeft size={20} /><span className="ml-1">Back</span></button><h1 className="text-2xl font-semibold text-gray-900">Product Not Found</h1></div></div><div className="px-6 py-6"><div className="p-4 bg-red-50 border border-red-200 rounded-md mb-6"><div className="flex items-center"><AlertCircle size={20} className="mr-3 text-red-500 flex-shrink-0" /><p className="text-red-800">The product you are looking for does not exist or has been removed.</p></div></div><div className="flex justify-end"><button onClick={() => navigate('/admin/products')} className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md transition-colors">Return to Products</button></div></div></div></div></div>);
-  const StatusMessage = ({ type, message, submessage }) => (<div className={`mb-6 p-4 border rounded-md ${type === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}><div className="flex items-center">{type === 'success' ? (<CheckCircle size={20} className="mr-3 text-green-500 flex-shrink-0" />) : (<AlertCircle size={20} className="mr-3 text-red-500 flex-shrink-0" />)}<div><p className={`${type === 'success' ? 'text-green-800' : 'text-red-800'} font-medium`}>{message}</p>{submessage && (<p className={`${type === 'success' ? 'text-green-700' : 'text-red-700'} text-sm mt-1`}>{submessage}</p>)}</div></div></div>);
-  const ImageGrid = React.memo(({ images, type, onRemove, submitting }) => (<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">{images.map((image, index) => (<div key={`${type}-${index}`} className="relative group"><div className="aspect-square w-full overflow-hidden rounded-lg bg-gray-100"><img src={image} alt={`${type === 'new' ? 'New' : 'Product'} image ${index + 1}`} className="h-full w-full object-cover" onError={(e) => { e.target.src = FALLBACK_IMAGE; }} /></div>{!submitting && (<button type="button" onClick={() => onRemove(index, type)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16} /></button>)}{type === 'new' && (<div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">New</div>)}</div>))}</div>));
+  // Render components
+  const LoadingSpinner = () => (
+    <div>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
-  // Main render (unchanged)
+  const NotFoundPage = () => (
+    <div>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-white px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center">
+              <button onClick={() => navigate('/admin/products/stock')} className="flex items-center text-gray-600 hover:text-gray-800 mr-4">
+                <ChevronLeft size={20} />
+                <span className="ml-1">Back</span>
+              </button>
+              <h1 className="text-2xl font-semibold text-gray-900">Product Not Found</h1>
+            </div>
+          </div>
+          <div className="px-6 py-6">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-md mb-6">
+              <div className="flex items-center">
+                <AlertCircle size={20} className="mr-3 text-red-500 flex-shrink-0" />
+                <p className="text-red-800">The product you are looking for does not exist or has been removed.</p>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button onClick={() => navigate('/admin/products/stock')} className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md transition-colors">
+                Return to Products
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const StatusMessage = ({ type, message, submessage }) => (
+    <div className={`mb-6 p-4 border rounded-md ${type === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+        <div className="flex items-center">
+            {type === 'success' ? (<CheckCircle size={20} className="mr-3 text-green-500 flex-shrink-0" />) : (<AlertCircle size={20} className="mr-3 text-red-500 flex-shrink-0" />)}
+            <div>
+                <p className={`${type === 'success' ? 'text-green-800' : 'text-red-800'} font-medium`}>{message}</p>
+                {submessage && (<p className={`${type === 'success' ? 'text-green-700' : 'text-red-700'} text-sm mt-1`}>{submessage}</p>)}
+            </div>
+        </div>
+    </div>
+  );
+
+  const ImageGrid = React.memo(({ images, type, onRemove, submitting }) => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+        {images.map((image, index) => (
+            <div key={`${type}-${index}`} className="relative group">
+                <div className="aspect-square w-full overflow-hidden rounded-lg bg-gray-100">
+                    <img src={image} alt={`${type === 'new' ? 'New' : 'Product'} image ${index + 1}`} className="h-full w-full object-cover" onError={(e) => { e.target.src = FALLBACK_IMAGE; }} />
+                </div>
+                {!submitting && (
+                    <button type="button" onClick={() => onRemove(index, type)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <X size={16} />
+                    </button>
+                )}
+                {type === 'new' && (
+                    <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">New</div>
+                )}
+            </div>
+        ))}
+    </div>
+  ));
+
   if (loading) return <LoadingSpinner />;
   if (productNotFound) return <NotFoundPage />;
   
   return (
-    <div className="min-h-screen bg-gray-50 py-6">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div>
+      <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           {/* Header */}
           <div className="bg-white px-6 py-4 border-b border-gray-200">

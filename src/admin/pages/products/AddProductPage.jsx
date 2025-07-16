@@ -316,7 +316,7 @@ const AddProductPage = () => {
   }, [notification]);
 
   return (
-    <div className="bg-gray-50 min-h-screen overflow-y-auto">
+    <div className="bg-gray-50">
       <div className="p-4 sm:p-6 md:p-8 pb-20">
         {/* Notification */}
         {notification && (
@@ -593,41 +593,46 @@ const AddProductPage = () => {
                     )}
                   </div>
 
-                  {/* Skin Concerns Section - Fixed UI layout */}
+                  {/* Skin Concerns Section - FIXED */}
                   <div>
                     <label className="block text-gray-700 mb-2">Skin Concerns*</label>
                     <p className="text-sm text-gray-500 mb-3">Select which skin concerns this product addresses:</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {concernOptions.map(concern => (
-                        <label 
-                          key={concern.value} 
-                          className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${
-                            formData.concern_options.includes(concern.value)
-                              ? 'bg-pink-50 border-pink-300 text-pink-700'
-                              : 'bg-white border-gray-200 hover:bg-gray-50'
-                          } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.concern_options.includes(concern.value)}
-                            onChange={() => handleConcernToggle(concern.value)}
-                            disabled={isSubmitting}
-                            className="sr-only"
-                          />
-                          <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center flex-shrink-0 ${
-                            formData.concern_options.includes(concern.value)
-                              ? 'bg-pink-500 border-pink-500'
-                              : 'border-gray-300'
-                          }`}>
-                            {formData.concern_options.includes(concern.value) && (
-                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </div>
-                          <span className="text-sm font-medium">{concern.label}</span>
-                        </label>
-                      ))}
+                      {concernOptions.map(concern => {
+                        const isSelected = formData.concern_options.includes(concern.value);
+                        return (
+                          <label 
+                            key={concern.value} 
+                            className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${
+                              isSelected
+                                ? 'bg-pink-50 border-pink-300'
+                                : 'bg-white border-gray-200 hover:bg-gray-50'
+                            } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleConcernToggle(concern.value)}
+                              disabled={isSubmitting}
+                              className="sr-only"
+                            />
+                            <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center flex-shrink-0 ${
+                              isSelected
+                                ? 'bg-pink-500 border-pink-500'
+                                : 'border-gray-300'
+                            }`}>
+                              {isSelected && (
+                                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                            <span className={`text-sm font-medium ${isSelected ? 'text-pink-700' : 'text-gray-700'}`}>
+                              {concern.label}
+                            </span>
+                          </label>
+                        );
+                      })}
                     </div>
                     {errors.concern_options && (
                       <p className="mt-2 text-red-500 text-sm flex items-center">
