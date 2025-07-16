@@ -8,19 +8,14 @@ const AdminHeader = ({ toggleSidebar }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [isProfileOpen, setProfileOpen] = useState(false);
-
-  // Use the shared state and functions from the NotificationsContext
   const { unreadCount, fetchNotifications } = useNotifications();
 
-  // A robust way to get the page title based on the full pathname
   const getPageTitle = () => {
     const path = location.pathname;
 
-    // Handle dynamic paths first
     if (path.startsWith('/admin/products/edit/')) return 'Edit Product';
     if (path.startsWith('/admin/bookings/')) return 'View Booking';
 
-    // Map static paths to titles
     const titles = {
       '/admin/dashboard': 'Dashboard',
       '/admin/inbox': 'Inbox',
@@ -32,21 +27,17 @@ const AdminHeader = ({ toggleSidebar }) => {
       '/admin/newletter': 'Newsletter Subscribers',
       '/admin/delivery': 'Delivery Fees',
     };
-
-    return titles[path] || 'Dashboard'; // Default to Dashboard
+    return titles[path] || 'Dashboard';
   };
 
   const handleLogout = async () => {
     try {
-      await logout(navigate); // The logout function from context should handle navigation
+      await logout(navigate);
     } catch (error) {
       console.error('Logout failed:', error);
       navigate('/admin/login', { replace: true });
     }
   };
-
-  // The local fetchNotifications and useEffect hooks have been removed.
-  // All notification logic is now handled by the NotificationsContext.
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
@@ -54,7 +45,7 @@ const AdminHeader = ({ toggleSidebar }) => {
         <div className="flex items-center">
           <button 
             onClick={toggleSidebar}
-            className="mr-4 text-gray-500 hover:text-gray-700 focus:outline-none lg:hidden"
+            className="mr-4 p-2 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none transition-colors duration-200"
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -66,17 +57,15 @@ const AdminHeader = ({ toggleSidebar }) => {
         <div className="flex items-center space-x-4">
           <Link to="/" className='text-sm text-pink-500 hover:text-pink-600 font-medium'>Go to Website</Link>
           
-          {/* Enhanced Notifications Bell using shared context */}
           <Link 
             to="/admin/notifications" 
-            className="relative group p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95"
-            onClick={() => fetchNotifications()} // Refresh notifications from context when clicked
+            className="relative group p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all"
+            onClick={() => fetchNotifications()}
           >
             <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
             
-            {/* Unread count badge now comes directly from the synchronized context */}
             {unreadCount > 0 && (
               <div className="absolute -top-1 -right-1 flex items-center justify-center">
                 <span className="bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center animate-pulse border-2 border-white shadow-lg">
@@ -86,14 +75,12 @@ const AdminHeader = ({ toggleSidebar }) => {
               </div>
             )}
             
-            {/* Hover tooltip */}
             <div className="absolute right-0 top-12 bg-gray-800 text-white text-xs rounded-lg px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
               {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'No new notifications'}
               <div className="absolute -top-1 right-3 w-2 h-2 bg-gray-800 transform rotate-45"></div>
             </div>
           </Link>
 
-          {/* User Profile Dropdown */}
           <div className="relative">
             <button onClick={() => setProfileOpen(!isProfileOpen)} className="flex items-center focus:outline-none">
               <div className="w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center overflow-hidden mr-2 text-white font-bold">
@@ -104,20 +91,20 @@ const AdminHeader = ({ toggleSidebar }) => {
               </div>
             </button>
             
-            {/* Dropdown Menu */}
-            {isProfileOpen && (
-              <div 
-                className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-30 border border-gray-100"
-                onMouseLeave={() => setProfileOpen(false)} // Added for better UX
+            <div 
+              className={`absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-30 border border-gray-100 transition-all duration-200 ease-out transform ${
+                isProfileOpen 
+                  ? 'opacity-100 scale-100 translate-y-0' 
+                  : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
+              }`}
+            >
+              <button
+                onClick={handleLogout}
+                className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
               >
-                <button
-                  onClick={handleLogout}
-                  className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                >
-                  Logout
-                </button>
-              </div>
-            )}
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </div>

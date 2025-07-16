@@ -20,9 +20,8 @@ const AdminSidebar = ({ isOpen, isMobile, onClose }) => {
     setIsLoggingOut(true);
     try {
       await logout(navigate);
-    } catch (error) { 
+    } catch (error) {
       console.error('Logout failed:', error);
-      // Still redirect to login even if logout fails
       navigate('/login', { replace: true });
     } finally {
       setIsLoggingOut(false);
@@ -56,33 +55,22 @@ const AdminSidebar = ({ isOpen, isMobile, onClose }) => {
 
   return (
     <>
-      <div 
-        className={`fixed inset-y-0 left-0 z-50 h-screen flex flex-col bg-white border-r border-gray-200 transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${
+      <div
+        className={`fixed inset-y-0 left-0 z-50 h-screen flex flex-col bg-white border-r border-gray-200 transition-all duration-300 ease-in-out lg:relative lg:translate-x-0 ${
           isOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:w-20'
         }`}
       >
-        <div className={`flex items-center pt-6 ${isOpen ? 'justify-between px-6' : 'justify-center'}`}>
-          <img src="/assets/images/icons/leksy-logo.png" alt="Logo" className={isOpen ? 'w-28' : 'w-14'} />
+        <div className={`flex items-center pt-6 pb-6 ${isOpen ? 'justify-between px-6' : 'justify-center'}`}>
+          <img src="/assets/images/icons/leksy-logo.png" alt="Logo" className={`transition-all duration-300 ${isOpen ? 'w-28' : 'w-14'}`} />
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 lg:hidden">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
-        {isOpen && user && (
-          <div className="px-6 py-4 mt-2 border-b border-t border-gray-100">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center text-white font-bold">
-                {user.name ? user.name.charAt(0).toUpperCase() : 'A'}
-              </div>
-              <div className="ml-3">
-                <div className="text-sm font-medium text-gray-900">{user.name || 'Admin'}</div>
-                <div className="text-xs text-gray-500">{user.role || 'Administrator'}</div>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* User Info Section has been removed */}
 
-        <nav className="flex-1 mt-6 overflow-y-auto">
+        {/* REMOVED: `overflow-y-auto` to prevent scrollbar */}
+        <nav className="flex-1">
           <ul className="space-y-1">
             {navItems.map((item) => (
               <li key={item.path}>
@@ -93,28 +81,26 @@ const AdminSidebar = ({ isOpen, isMobile, onClose }) => {
                   title={!isOpen ? item.name : ''}
                 >
                   <span className={location.pathname.startsWith(item.path) ? 'text-pink-500' : 'text-gray-500'}>{item.icon}</span>
-                  {isOpen && (
-                    <div className="flex items-center justify-between w-full ml-3">
-                      <span>{item.name}</span>
-                      {item.name === 'Notifications' && unreadCount > 0 && (
-                        <span className="bg-pink-500 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center">
-                          {unreadCount}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  <div className={`flex items-center justify-between w-full ml-3 whitespace-nowrap transition-all duration-200 ${isOpen ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 overflow-hidden'}`}>
+                    <span>{item.name}</span>
+                    {item.name === 'Notifications' && unreadCount > 0 && (
+                      <span className="bg-pink-500 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </div>
                 </NavLink>
               </li>
             ))}
 
-            {isOpen && (
-              <li className="pt-6 pb-2">
+            <li className={`transition-all duration-300 ${isOpen ? 'opacity-100 max-h-12' : 'opacity-0 max-h-0 overflow-hidden'}`}>
+              <div className="pt-6 pb-2">
                 <div className="px-6 text-xs font-medium uppercase tracking-wider text-gray-500">Other Sections</div>
-              </li>
-            )}
+              </div>
+            </li>
 
             {otherNavItems.map((item) => (
-               <li key={item.path}>
+              <li key={item.path}>
                 <NavLink
                   to={item.path}
                   onClick={handleLinkClick}
@@ -122,7 +108,9 @@ const AdminSidebar = ({ isOpen, isMobile, onClose }) => {
                   title={!isOpen ? item.name : ''}
                 >
                   <span className={location.pathname.startsWith(item.path) ? 'text-pink-500' : 'text-gray-500'}>{item.icon}</span>
-                  {isOpen && <span className="ml-3">{item.name}</span>}
+                  <span className={`ml-3 whitespace-nowrap transition-all duration-200 ${isOpen ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 overflow-hidden'}`}>
+                    {item.name}
+                  </span>
                 </NavLink>
               </li>
             ))}
@@ -133,15 +121,17 @@ const AdminSidebar = ({ isOpen, isMobile, onClose }) => {
           <button
             onClick={handleLogout}
             disabled={isLoggingOut}
-            className={`flex items-center w-full py-3 text-sm font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors ${isOpen ? 'px-2' : 'justify-center'} ${isLoggingOut ? 'opacity-50' : ''}`}
+            className={`flex items-center w-full py-3 text-sm font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors ${isOpen ? 'px-6' : 'px-4 justify-center'} ${isLoggingOut ? 'opacity-50' : ''}`}
             title={!isOpen ? 'Logout' : ''}
           >
             <span><svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17 16L21 12M21 12L17 8M21 12H9M13 16V17C13 18.6569 11.6569 20 10 20H6C4.34315 20 3 18.6569 3 17V7C3 5.34315 4.34315 4 6 4H10C11.6569 4 13 5.34315 13 7V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
-            {isOpen && <span className="ml-3">Log-out</span>}
+            <span className={`ml-3 whitespace-nowrap transition-all duration-200 ${isOpen ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 overflow-hidden'}`}>
+              Log-out
+            </span>
           </button>
         </div>
       </div>
-
+      
       <LogoutModal
         isOpen={showLogoutModal}
         onClose={cancelLogout}
