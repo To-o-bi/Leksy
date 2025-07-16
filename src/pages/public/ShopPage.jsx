@@ -6,16 +6,17 @@ import Breadcrumb from '../../components/common/Breadcrumb';
 import Pagination from '../../components/common/Pagination';
 import Loader from '../../components/common/Loader';
 import Hero from '../../components/shop/Hero';
+// MODIFIED: We no longer need normalizeProductData here, it's handled inside fetchProducts
 import { fetchProducts, handleApiError, getCategoryDisplayName } from '../../utils/api';
 
-const ShopPage = () => { 
+const ShopPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    
+
     // --- STATE MANAGEMENT ---
-    const [products, setProducts] = useState([]); // Final, paginated products for display
-    const [allProducts, setAllProducts] = useState([]); // Stores all products from the API for the current category/search
-    const [filteredProducts, setFilteredProducts] = useState([]); // Stores client-side filtered products
+    const [products, setProducts] = useState([]);
+    // MODIFIED: We only need one list for all products now.
+    const [allProducts, setAllProducts] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
@@ -27,35 +28,37 @@ const ShopPage = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [showMobileFilters, setShowMobileFilters] = useState(false);
     const [totalProductsCount, setTotalProductsCount] = useState(0);
-    
+
     const productsPerPage = 20;
 
     // --- DATA FETCHING & FILTERING ---
-
-    // Fetch products from API (now only depends on category and search)
-    const fetchProductsData = useCallback(async (filters = {}, search = '') => {
+    const fetchAndFilterProducts = useCallback(async (filters, search) => {
         setLoading(true);
         setError(null);
-        
+        console.log(`[DEBUG 1] Calling fetchProducts with filters:`, { ...filters, search });
+
         try {
+            // MODIFIED: All filtering logic is now inside fetchProducts in utils/api.js
             const result = await fetchProducts({
-                category: filters.category || '',
-                search: search || '',
+                category: filters.category,
+                concerns: filters.concerns,
+                search: search,
                 sort: 'name',
-                limit: 1000 
             });
 
+            console.log(`[DEBUG 2] API & Frontend Filtering Result Received:`, result);
+
             if (result.success) {
-                setAllProducts(result.products); 
+                setAllProducts(result.products);
+                setTotalProductsCount(result.totalCount);
+                setCurrentPage(1); // Reset page on new filter
             } else {
-                throw new Error(result.error || 'Failed to fetch products');
+                throw new Error(result.error || 'Failed to fetch or filter products');
             }
         } catch (err) {
-            console.error('Error fetching products:', err);
-            setError(handleApiError(err, 'Failed to fetch products. Please try again.'));
-            setProducts([]);
+            console.error('[DEBUG] Error in fetchAndFilterProducts:', err);
+            setError(handleApiError(err, 'Failed to process products. Please try again.'));
             setAllProducts([]);
-            setFilteredProducts([]);
             setTotalProductsCount(0);
         } finally {
             setLoading(false);
@@ -67,50 +70,35 @@ const ShopPage = () => {
         const queryParams = new URLSearchParams(location.search);
         const categoryParam = queryParams.get('category');
         const newFilters = { category: categoryParam || '', concerns: location.state?.concerns || [] };
-        
         setSelectedFilters(newFilters);
-        
         if (location.state?.filterByConcern) {
             navigate(location.pathname + location.search, { replace: true, state: {} });
         }
     }, [location, navigate]);
 
-    // Step 1 -> Fetch from API only when category or search changes
+    // MODIFIED: Main useEffect to call the single fetch-and-filter function
     useEffect(() => {
-        fetchProductsData({ category: selectedFilters.category }, searchQuery);
-    }, [fetchProductsData, selectedFilters.category, searchQuery]);
+        fetchAndFilterProducts(selectedFilters, searchQuery);
+    }, [selectedFilters, searchQuery, fetchAndFilterProducts]);
 
-    // Step 2 -> Apply client-side filters (concerns) when API data or concerns change
+
+    // MODIFIED: Simplified pagination useEffect
     useEffect(() => {
-        let productsToFilter = [...allProducts];
-
-        // Apply concern filters
-        if (selectedFilters.concerns.length > 0) {
-            productsToFilter = productsToFilter.filter(product =>
-                selectedFilters.concerns.every(concern =>
-                    Array.isArray(product.concern_options) && product.concern_options.includes(concern)
-                )
-            );
-        }
-        
-        setFilteredProducts(productsToFilter);
-        setTotalProductsCount(productsToFilter.length);
-        setCurrentPage(1);
-    }, [allProducts, selectedFilters.concerns]);
-
-    // Step 3 -> Paginate the filtered list
-    useEffect(() => {
-        const total = Math.ceil(filteredProducts.length / productsPerPage);
+        console.log(`[DEBUG 6] Paginating`, allProducts.length, `products for page`, currentPage);
+        const total = Math.ceil(totalProductsCount / productsPerPage);
         setTotalPages(total > 0 ? total : 1);
 
         const startIndex = (currentPage - 1) * productsPerPage;
         const endIndex = startIndex + productsPerPage;
-        setProducts(filteredProducts.slice(startIndex, endIndex));
-    }, [filteredProducts, currentPage]);
+        const finalProducts = allProducts.slice(startIndex, endIndex);
+
+        console.log(`[DEBUG 7] Final products to display:`, finalProducts.length);
+        setProducts(finalProducts);
+    }, [allProducts, currentPage, totalProductsCount]);
 
 
-    // --- EVENT HANDLERS ---
-    
+    // --- EVENT HANDLERS (No changes needed below this line) ---
+
     const handleSearchChange = useCallback((e) => {
         setSearchQuery(e.target.value);
     }, []);
@@ -118,7 +106,6 @@ const ShopPage = () => {
     const handleFilterChange = useCallback((filters) => {
         setSelectedFilters(prev => {
             const newFilters = { ...prev, ...filters };
-            
             if (filters.category !== undefined && filters.category !== prev.category) {
                 const searchParams = new URLSearchParams(location.search);
                 if (filters.category) {
@@ -131,29 +118,28 @@ const ShopPage = () => {
                     search: searchParams.toString()
                 }, { replace: true });
             }
-            
             return newFilters;
         });
     }, [location.search, location.pathname, navigate]);
-    
+
     const handlePageChange = useCallback((page) => {
         setCurrentPage(page);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, []);
-    
+
     const clearAllFilters = useCallback(() => {
         setSelectedFilters({ category: '', concerns: [] });
         setSearchQuery('');
         navigate(location.pathname, { replace: true });
     }, [navigate, location.pathname]);
-    
-    const handleRetry = useCallback(() => {
-        fetchProductsData({ category: selectedFilters.category }, searchQuery);
-    }, [fetchProductsData, selectedFilters, searchQuery]);
-    
-    // --- RENDER LOGIC ---
 
-    if (loading && allProducts.length === 0) {
+    const handleRetry = useCallback(() => {
+        fetchAndFilterProducts(selectedFilters, searchQuery);
+    }, [fetchAndFilterProducts, selectedFilters, searchQuery]);
+
+    // --- RENDER LOGIC (No changes needed) ---
+
+    if (loading && products.length === 0) {
         return (
             <div className="w-[90%] mx-auto py-16">
                 <div className="text-center">
@@ -164,19 +150,19 @@ const ShopPage = () => {
         );
     }
 
-    if (error && allProducts.length === 0) {
+    if (error && products.length === 0) {
         return (
             <div className="w-[90%] mx-auto py-16 text-center">
                 <h2 className="text-2xl font-semibold text-red-600">Error Loading Products</h2>
                 <p className="mt-2 text-gray-600">{error}</p>
                 <div className="mt-6 flex flex-col sm:flex-row justify-center gap-4">
-                    <button 
+                    <button
                         className="px-6 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600 transition-colors"
                         onClick={handleRetry}
                     >
                         Try Again
                     </button>
-                    <button 
+                    <button
                         className="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
                         onClick={() => navigate('/')}
                     >
@@ -191,15 +177,15 @@ const ShopPage = () => {
 
     return (
         <div className="flex flex-col min-h-screen">
-            <Breadcrumb 
+            <Breadcrumb
                 items={[
                     { label: 'Home', path: '/' },
                     { label: 'Shop', path: '/shop' },
-                    ...(selectedFilters.category ? [{ 
-                        label: getCategoryDisplayName(selectedFilters.category), 
-                        path: `/shop?category=${encodeURIComponent(selectedFilters.category)}` 
+                    ...(selectedFilters.category ? [{
+                        label: getCategoryDisplayName(selectedFilters.category),
+                        path: `/shop?category=${encodeURIComponent(selectedFilters.category)}`
                     }] : [])
-                ]} 
+                ]}
             />
             
             <Hero />
@@ -216,10 +202,10 @@ const ShopPage = () => {
                                 onChange={handleSearchChange}
                                 className="w-full md:w-64 pl-8 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-300"
                             />
-                            <svg 
-                                className="w-4 h-4 absolute left-2.5 top-3 text-gray-400" 
-                                fill="none" 
-                                stroke="currentColor" 
+                            <svg
+                                className="w-4 h-4 absolute left-2.5 top-3 text-gray-400"
+                                fill="none"
+                                stroke="currentColor"
                                 viewBox="0 0 24 24"
                             >
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -228,7 +214,7 @@ const ShopPage = () => {
                         
                         <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
                             <div className="text-sm text-gray-600 flex-grow md:flex-grow-0">
-                                {loading ? (
+                                {loading && !products.length ? (
                                     'Loading...'
                                 ) : (
                                     <>
@@ -239,7 +225,7 @@ const ShopPage = () => {
                             </div>
                             
                             <div className="hidden md:flex gap-6 flex-wrap">
-                                <ProductFilters 
+                                <ProductFilters
                                     selectedFilters={selectedFilters}
                                     onFilterChange={handleFilterChange}
                                     horizontal={true}
@@ -247,7 +233,7 @@ const ShopPage = () => {
                                 />
                             </div>
                             
-                            <button 
+                            <button
                                 className="md:hidden flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
                                 onClick={() => setShowMobileFilters(!showMobileFilters)}
                             >
@@ -261,7 +247,7 @@ const ShopPage = () => {
                     
                     {showMobileFilters && (
                         <div className="md:hidden bg-gray-50 p-4 rounded-md mb-4">
-                            <ProductFilters 
+                            <ProductFilters
                                 selectedFilters={selectedFilters}
                                 onFilterChange={handleFilterChange}
                                 compact={true}
@@ -277,7 +263,7 @@ const ShopPage = () => {
                                 {selectedFilters.category && (
                                     <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-pink-100 text-pink-800">
                                         {getCategoryDisplayName(selectedFilters.category)}
-                                        <button 
+                                        <button
                                             onClick={() => handleFilterChange({ category: '' })}
                                             className="ml-2 focus:outline-none hover:text-pink-900"
                                         >
@@ -291,7 +277,7 @@ const ShopPage = () => {
                                 {selectedFilters.concerns.map((concern, index) => (
                                     <span key={index} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-pink-100 text-pink-800">
                                         {concern}
-                                        <button 
+                                        <button
                                             onClick={() => {
                                                 const updatedConcerns = selectedFilters.concerns.filter(c => c !== concern);
                                                 handleFilterChange({ concerns: updatedConcerns });
@@ -308,7 +294,7 @@ const ShopPage = () => {
                                 {searchQuery.trim() && (
                                     <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-pink-100 text-pink-800">
                                         Search: "{searchQuery}"
-                                        <button 
+                                        <button
                                             onClick={() => setSearchQuery('')}
                                             className="ml-2 focus:outline-none hover:text-pink-900"
                                         >
@@ -320,7 +306,7 @@ const ShopPage = () => {
                                 )}
                             </div>
                             
-                            <button 
+                            <button
                                 onClick={clearAllFilters}
                                 className="text-sm text-pink-600 hover:text-pink-800 font-medium flex items-center transition-colors"
                             >
@@ -333,7 +319,7 @@ const ShopPage = () => {
                     )}
                 </div>
                 
-                {loading && allProducts.length > 0 && (
+                {loading && (
                     <div className="relative">
                         <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-md">
                             <Loader />
@@ -348,13 +334,13 @@ const ShopPage = () => {
                         <div className="text-5xl mb-4">😕</div>
                         <h3 className="text-xl font-medium text-gray-800 mb-2">No products found</h3>
                         <p className="text-gray-600 mb-6">
-                            {hasActiveFilters 
-                                ? 'Try adjusting your filters or search criteria' 
+                            {hasActiveFilters
+                                ? 'Try adjusting your filters or search criteria'
                                 : 'No products available at the moment'
                             }
                         </p>
                         {hasActiveFilters && (
-                            <button 
+                            <button
                                 onClick={clearAllFilters}
                                 className="px-6 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600 transition-colors"
                             >
@@ -366,10 +352,10 @@ const ShopPage = () => {
                 
                 {totalPages > 1 && products.length > 0 && (
                     <div className="mt-8 mb-12">
-                        <Pagination 
-                            currentPage={currentPage} 
-                            totalPages={totalPages} 
-                            onPageChange={handlePageChange} 
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={handlePageChange}
                         />
                         <div className="text-center mt-4 text-sm text-gray-500">
                             Page {currentPage} of {totalPages} • Showing {products.length} products • {totalProductsCount} total
