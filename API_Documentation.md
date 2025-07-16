@@ -45,7 +45,7 @@ curl --location --request POST '{base_url}/api/admin/logout' \
 ## Add Product
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/add-product?name={name}&price={price|numeric}&slashed_price={slashed_price|numeric}&description={description}&quantity={quantity|integer}&category={category}&images={files|max:2mb_each|image/*}' \
+curl --location --request POST '{base_url}/api/admin/add-product?name={name}&price={price|numeric}&slashed_price={slashed_price|numeric}&description={description}&quantity={quantity|integer}&concern_options={concern_options_1,concern_options_2,concern_options_n}&category={category}&images={files|max:2mb_each|image/*}' \
 --header 'Authorization: Bearer {token}'
 ```
 
