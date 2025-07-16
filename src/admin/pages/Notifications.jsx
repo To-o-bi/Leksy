@@ -22,9 +22,12 @@ const NotificationsPage = () => {
       }
       setError(null);
       
-      const response = await api.get('/admin/fetch-notifications', { limit: fetchLimit });
+      const response = await api.get('/admin/fetch-notifications', { params: { limit: fetchLimit } });
       
       if (response.data.code === 200) {
+        // Get read notification IDs from localStorage
+        const readIds = new Set(JSON.parse(localStorage.getItem('readNotificationIds')) || []);
+
         // Transform API data to match component structure
         const transformedNotifications = response.data.notifications.map(notification => ({
           id: notification.id,
@@ -33,7 +36,7 @@ const NotificationsPage = () => {
           title: notification.title,
           message: notification.description,
           time: formatTimeAgo(notification.created_at),
-          read: false, // API doesn't provide read status, using local state
+          read: readIds.has(notification.id), // Check against localStorage
           date: formatDate(notification.created_at),
           created_at: notification.created_at,
           raw_description: notification.description
@@ -96,12 +99,29 @@ const NotificationsPage = () => {
   }, [limit]);
 
   const markAsRead = (id) => {
+    // Get current read IDs, add the new one, and save back to localStorage
+    const readIds = new Set(JSON.parse(localStorage.getItem('readNotificationIds')) || []);
+    readIds.add(id);
+    localStorage.setItem('readNotificationIds', JSON.stringify([...readIds]));
+
+    // Update component state
     setNotifications(prev => prev.map(notification => 
       notification.id === id ? { ...notification, read: true } : notification
     ));
   };
 
   const markAllAsRead = () => {
+    // Get all current notification IDs
+    const allIds = notifications.map(n => n.id);
+    
+    // Get existing read IDs from localStorage
+    const readIds = new Set(JSON.parse(localStorage.getItem('readNotificationIds')) || []);
+
+    // Add all current IDs to the set and save back to localStorage
+    allIds.forEach(id => readIds.add(id));
+    localStorage.setItem('readNotificationIds', JSON.stringify([...readIds]));
+
+    // Update component state
     setNotifications(prev => prev.map(notification => ({
       ...notification,
       read: true

@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Search, RefreshCw, Send, Users, Eye, Paperclip, User, CheckCircle, Clock, Star } from 'lucide-react';
+import { Mail, Search, RefreshCw, ExternalLink, Users, Clock, User, CheckCircle } from 'lucide-react';
 import { contactService } from '../../../api';
-
 
 const AdminInbox = () => {
   const [messages, setMessages] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [replyText, setReplyText] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notification, setNotification] = useState(null);
@@ -190,36 +188,29 @@ const AdminInbox = () => {
       setMessages(updatedMessages);
     }
     setSelectedMessage(message);
-    setReplyText('');
   };
 
-  const handleSendReply = async () => {
-    if (!replyText.trim() || !selectedMessage) return;
+  const handleOpenGmail = () => {
+    if (!selectedMessage) return;
     
-    try {
-      // Simulate sending reply
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setNotification({
-        type: 'success',
-        message: `Reply sent to ${selectedMessage.name}!`
-      });
-      
-      setReplyText('');
-      
-      // Mark as replied
-      const updatedMessages = messages.map(msg => 
-        msg.id === selectedMessage.id ? { ...msg, replied: true } : msg
-      );
-      setMessages(updatedMessages);
-      setSelectedMessage(prev => ({ ...prev, replied: true }));
-      
-    } catch (error) {
-      setNotification({
-        type: 'error',
-        message: 'Failed to send reply'
-      });
-    }
+    // Create Gmail compose URL with pre-filled fields
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(selectedMessage.email)}&su=${encodeURIComponent(`Re: ${selectedMessage.subject}`)}&body=${encodeURIComponent(`Hi ${selectedMessage.name},\n\nThank you for your message:\n\n"${selectedMessage.message}"\n\nBest regards,\nAdmin Team`)}`;
+    
+    // Open Gmail in a new tab
+    window.open(gmailUrl, '_blank');
+    
+    // Show notification
+    setNotification({
+      type: 'success',
+      message: 'Opening Gmail to reply...'
+    });
+    
+    // Mark as replied
+    const updatedMessages = messages.map(msg => 
+      msg.id === selectedMessage.id ? { ...msg, replied: true } : msg
+    );
+    setMessages(updatedMessages);
+    setSelectedMessage(prev => ({ ...prev, replied: true }));
   };
 
   // Clear notification after 5 seconds
@@ -496,30 +487,21 @@ const AdminInbox = () => {
                 </div>
               </div>
 
-              {/* Enhanced Reply Section */}
+              {/* Gmail Reply Button */}
               <div className="p-6 border-t border-gray-100/60 bg-gradient-to-r from-white/70 to-pink-50/30 backdrop-blur-sm">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                    <Paperclip className="h-5 w-5 text-gray-500" />
-                  </div>
-                  <div className="flex-1">
-                    <input 
-                      type="text" 
-                      className="w-full px-4 py-4 bg-white/80 backdrop-blur-sm border border-gray-200/60 rounded-xl text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:bg-white/90 focus:border-pink-300/60 transition-all duration-200 shadow-sm"
-                      placeholder={`Reply to ${selectedMessage.name}...`}
-                      value={replyText}
-                      onChange={(e) => setReplyText(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && replyText.trim() && handleSendReply()}
-                    />
-                  </div>
+                <div className="flex items-center justify-center">
                   <button 
-                    onClick={handleSendReply} 
-                    disabled={!replyText.trim()}
-                    className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-xl p-4 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 disabled:hover:scale-100"
+                    onClick={handleOpenGmail}
+                    className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white px-8 py-4 rounded-xl font-medium flex items-center gap-3 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 text-lg"
                   >
-                    <Send className="h-5 w-5" />
+                    <Mail className="h-6 w-6" />
+                    Reply via Gmail
+                    <ExternalLink className="h-5 w-5" />
                   </button>
                 </div>
+                <p className="text-center text-sm text-gray-500 mt-3">
+                  This will open Gmail in a new tab with a pre-filled reply to {selectedMessage.name}
+                </p>
               </div>
             </>
           ) : (
@@ -529,7 +511,7 @@ const AdminInbox = () => {
                   <Mail className="h-12 w-12 text-pink-500" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-700 mb-2">Select a Message</h3>
-                <p className="text-gray-500 max-w-md">Choose a message from the list to view its contents and reply to the sender.</p>
+                <p className="text-gray-500 max-w-md">Choose a message from the list to view its contents and reply via Gmail.</p>
               </div>
             </div>
           )}
