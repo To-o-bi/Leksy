@@ -1,85 +1,165 @@
-import React from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../../contexts/AuthContext'; // Correct path to your AuthContext
+import api from '../../../api/axios'; // Adjust path as needed
 
 const AdminHeader = ({ toggleSidebar }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth(); // Get user and logout function from context
+  const [isProfileOpen, setProfileOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  // Get the page title based on the current route
+  // A more robust way to get the page title based on the full pathname
   const getPageTitle = () => {
-    // Extract the last part of the path
-    const path = location.pathname.split('/').pop() || 'dashboard';
+    const path = location.pathname;
 
-    switch (path) {
-      case 'dashboard':
-        return 'Dashboard';
-      case 'inbox':
-        return 'Inbox';
-      case 'orders':
-        return 'All Orders';
-      case 'product-stock':
-        return 'Product Stock';
-      case 'bookings':
-        return 'Bookings';
-      case 'notifications':
-        return 'Notifications';
-      case 'customers':
-        return 'Customers';
-      case 'settings':
-        return 'Settings';
-      default:
-        return 'Dashboard';
+    // Handle dynamic paths first
+    if (path.startsWith('/admin/products/edit/')) return 'Edit Product';
+    if (path.startsWith('/admin/bookings/')) return 'View Booking';
+
+    // Map static paths to titles
+    const titles = {
+      '/admin/dashboard': 'Dashboard',
+      '/admin/inbox': 'Inbox',
+      '/admin/orders': 'All Orders',
+      '/admin/products/stock': 'Product Stock',
+      '/admin/products/add': 'Add New Product',
+      '/admin/bookings': 'Bookings',
+      '/admin/notifications': 'Notifications',
+      '/admin/settings': 'Settings',
+      '/admin/newletter': 'Newsletter Subscribers',
+      '/admin/delivery': 'Delivery Fees',
+    };
+
+    return titles[path] || 'Dashboard'; // Default to Dashboard
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout(navigate); // The logout function from context should handle navigation
+    } catch (error) {
+      console.error('Logout failed:', error);
+      navigate('/admin/login', { replace: true });
     }
   };
 
+  // Fetch notifications for the bell
+  const fetchNotifications = async () => {
+    try {
+      const response = await api.get('/admin/fetch-notifications', { params: { limit: 20 } });
+      
+      if (response.data.code === 200) {
+        // Get read notification IDs from localStorage
+        const readIds = new Set(JSON.parse(localStorage.getItem('readNotificationIds')) || []);
+        
+        // Transform and filter unread notifications
+        const transformedNotifications = response.data.notifications.map(notification => ({
+          id: notification.id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.description,
+          read: readIds.has(notification.id),
+          created_at: notification.created_at
+        }));
+        
+        setNotifications(transformedNotifications);
+        setUnreadCount(transformedNotifications.filter(n => !n.read).length);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
+
+  // Fetch notifications on component mount
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  // Auto-refresh notifications every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
       <div className="flex items-center justify-between px-6 py-4">
         <div className="flex items-center">
           <button 
             onClick={toggleSidebar}
-            className="mr-4 text-gray-500 hover:text-gray-700 focus:outline-none"
+            className="mr-4 text-gray-500 hover:text-gray-700 focus:outline-none lg:hidden" // Hide on larger screens if sidebar is always open
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          {/* <h1 className="text-xl font-semibold text-gray-800">{getPageTitle()}</h1> */}
+          {/* Page Title is now active */}
+          <h1 className="text-xl font-semibold text-gray-800">{getPageTitle()}</h1>
         </div>
 
         <div className="flex items-center space-x-4">
-          <a href="/" className='text-pink-500'>Go to Website</a>
-          {/* Search */}
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search"
-              className="w-64 bg-gray-50 rounded-lg py-2 pl-10 pr-4 text-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-            />
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-          </div>
-
-          {/* Notifications */}
-          <button className="relative text-gray-500 hover:text-gray-700">
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <Link to="/" className='text-sm text-pink-500 hover:text-pink-600 font-medium'>Go to Website</Link>
+          
+          {/* Enhanced Notifications Bell */}
+          <Link 
+            to="/admin/notifications" 
+            className="relative group p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95"
+            onClick={fetchNotifications} // Refresh notifications when clicked
+          >
+            <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            <span className="absolute top-0 right-0 h-5 w-5 bg-pink-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-              5
-            </span>
-          </button>
+            
+            {/* Unread count badge */}
+            {unreadCount > 0 && (
+              <div className="absolute -top-1 -right-1 flex items-center justify-center">
+                <span className="bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center animate-pulse border-2 border-white shadow-lg">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+                <div className="absolute inset-0 h-6 w-6 bg-red-400 rounded-full animate-ping"></div>
+              </div>
+            )}
+            
+            {/* Hover tooltip */}
+            <div className="absolute right-0 top-12 bg-gray-800 text-white text-xs rounded-lg px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+              {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'No new notifications'}
+              <div className="absolute -top-1 right-3 w-2 h-2 bg-gray-800 transform rotate-45"></div>
+            </div>
+          </Link>
 
-          {/* User Profile */}
-          <div className="flex items-center">
-            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden mr-2">
-              <img src="/assets/images/avatars/avatar-1.jpg" alt="User" className="w-full h-full object-cover" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">Leksy Admin</p>
-            </div>
+          {/* User Profile Dropdown */}
+          <div className="relative">
+            <button onClick={() => setProfileOpen(!isProfileOpen)} className="flex items-center focus:outline-none">
+              <div className="w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center overflow-hidden mr-2 text-white font-bold">
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-800">{user?.name || 'Leksy Admin'}</p>
+              </div>
+            </button>
+            
+            {/* Dropdown Menu */}
+            {isProfileOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-30 border border-gray-100">
+                <div className="px-4 py-2 text-xs text-gray-400">Manage Account</div>
+                <Link
+                  to="/admin/settings"
+                  onClick={() => setProfileOpen(false)}
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Settings
+                </Link>
+                <div className="border-t border-gray-100"></div>
+                <button
+                  onClick={handleLogout}
+                  className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

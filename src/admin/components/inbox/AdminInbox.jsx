@@ -2,6 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { Mail, Search, RefreshCw, ExternalLink, Users, Clock, User, CheckCircle } from 'lucide-react';
 import { contactService } from '../../../api';
 
+// FIX: Define a key for localStorage to avoid typos
+const MESSAGE_STATUS_KEY = 'adminInboxMessageStatus';
+
+// FIX: Helper function to get all saved statuses from localStorage
+const getSavedStatuses = () => {
+  try {
+    const saved = localStorage.getItem(MESSAGE_STATUS_KEY);
+    return saved ? JSON.parse(saved) : {};
+  } catch (error) {
+    console.error('Failed to parse message statuses from localStorage', error);
+    return {};
+  }
+};
+
+// FIX: Helper function to save the status for a single message
+const saveMessageStatus = (id, newStatus) => {
+  const allStatuses = getSavedStatuses();
+  const currentStatus = allStatuses[id] || { read: false, replied: false };
+  // Merge old and new status, e.g., { read: true } + { replied: true } = { read: true, replied: true }
+  allStatuses[id] = { ...currentStatus, ...newStatus };
+  localStorage.setItem(MESSAGE_STATUS_KEY, JSON.stringify(allStatuses));
+};
+
 const AdminInbox = () => {
   const [messages, setMessages] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
@@ -37,7 +60,6 @@ const AdminInbox = () => {
       return 'from-gray-400 to-gray-500';
     }
     
-    // Use original pink/rose color scheme for unread messages
     return 'from-pink-500 to-rose-500';
   };
 
@@ -49,56 +71,48 @@ const AdminInbox = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      console.log('Fetching contact submissions...');
-      
-      // Pass limit parameter as documented in API
       const result = await contactService.fetchSubmissions({ limit: 100 });
-      
-      console.log('API Response:', result);
-      
-      // Handle potential double-wrapped response
       const responseData = result.data || result;
-      
-      // Check if response structure matches expected format
+
       if (responseData && responseData.code === 200) {
-        // The API returns 'submissions' field (plural) as an array
         const submissionsData = responseData.submissions || [];
         
-        console.log('Submissions data:', submissionsData);
-        
         if (submissionsData && submissionsData.length > 0) {
-          const formattedMessages = submissionsData.map((submission, index) => ({
-            id: submission.id || submission.submission_id || `msg_${index}`,
-            name: decodeHtml(submission.name || 'Unknown'),
-            email: submission.email || '',
-            phone: submission.phone || '',
-            subject: decodeHtml(submission.subject || 'No subject'),
-            message: decodeHtml(submission.message || ''),
-            created_at: submission.created_at || new Date().toISOString(),
-            read: false,
-            replied: false,
-            date: formatDate(submission.created_at),
-            time: formatTime(submission.created_at)
-          }));
+          // FIX: Get all saved statuses from localStorage before mapping
+          const savedStatuses = getSavedStatuses();
 
-          console.log('Formatted messages:', formattedMessages);
+          const formattedMessages = submissionsData.map((submission, index) => {
+            const id = submission.id || submission.submission_id || `msg_${index}`;
+            // FIX: Get the saved status for this specific message ID
+            const status = savedStatuses[id] || { read: false, replied: false };
+
+            return {
+              id: id,
+              name: decodeHtml(submission.name || 'Unknown'),
+              email: submission.email || '',
+              phone: submission.phone || '',
+              subject: decodeHtml(submission.subject || 'No subject'),
+              message: decodeHtml(submission.message || ''),
+              created_at: submission.created_at || new Date().toISOString(),
+              // FIX: Use the saved status, otherwise default to false
+              read: status.read,
+              replied: status.replied,
+              date: formatDate(submission.created_at),
+              time: formatTime(submission.created_at)
+            };
+          });
+
           setMessages(formattedMessages);
         } else {
-          console.log('No submissions found in response');
           setMessages([]);
         }
       } else {
         const errorMsg = responseData?.message || result?.message || 'Failed to load messages - Invalid response format';
-        console.error('API Error:', errorMsg, responseData || result);
         throw new Error(errorMsg);
       }
     } catch (err) {
       const errorMessage = err.message || 'Failed to load contact submissions';
       setError(errorMessage);
-      console.error('Error loading messages:', err);
-      
-      // Show detailed error for debugging
       setNotification({
         type: 'error',
         message: `Error: ${errorMessage}`
@@ -113,122 +127,88 @@ const AdminInbox = () => {
     try {
       const date = new Date(dateString);
       const today = new Date();
-      
       if (isNaN(date.getTime())) return 'Invalid Date';
-      
       if (date.toDateString() === today.toDateString()) {
         return 'Today';
       }
-      
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
       if (date.toDateString() === yesterday.toDateString()) {
         return 'Yesterday';
       }
-      
       return date.toLocaleDateString();
     } catch (e) {
       return 'Unknown';
     }
   };
 
-  // Fixed formatTime function
   const formatTime = (dateString) => {
     if (!dateString) return '';
     try {
       const date = new Date(dateString);
-      
       if (isNaN(date.getTime())) return '';
-      
       const now = new Date();
-      const diffInMilliseconds = now.getTime() - date.getTime();
-      
-      // Convert to different time units
-      const diffInSeconds = Math.floor(diffInMilliseconds / 1000);
+      const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
       const diffInMinutes = Math.floor(diffInSeconds / 60);
       const diffInHours = Math.floor(diffInMinutes / 60);
       const diffInDays = Math.floor(diffInHours / 24);
+
+      if (diffInSeconds < 60) return 'now';
+      if (diffInMinutes < 60) return `${diffInMinutes} min${diffInMinutes > 1 ? 's' : ''} ago`;
+      if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+      if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
       
-      // Less than 1 minute (0-59 seconds)
-      if (diffInSeconds < 60) {
-        return 'now';
-      }
-      
-      // Less than 1 hour (1-59 minutes)
-      if (diffInMinutes < 60) {
-        return diffInMinutes === 1 ? '1 min ago' : `${diffInMinutes} mins ago`;
-      }
-      
-      // Less than 24 hours (1-23 hours)
-      if (diffInHours < 24) {
-        return diffInHours === 1 ? '1 hour ago' : `${diffInHours} hours ago`;
-      }
-      
-      // Less than 7 days
-      if (diffInDays < 7) {
-        return diffInDays === 1 ? '1 day ago' : `${diffInDays} days ago`;
-      }
-      
-      // More than 7 days - show actual time
-      return date.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-      });
+      return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     } catch (e) {
       return '';
     }
   };
 
   const handleSelectMessage = (message) => {
+    // FIX: Only update state and localStorage if the message is currently unread
     if (!message.read) {
       const updatedMessages = messages.map(msg => 
         msg.id === message.id ? { ...msg, read: true } : msg
       );
       setMessages(updatedMessages);
+      // FIX: Save the new 'read' status to localStorage
+      saveMessageStatus(message.id, { read: true });
     }
-    setSelectedMessage(message);
+    // Update the selected message in either case
+    setSelectedMessage(prev => ({ ...message, read: true }));
   };
 
   const handleOpenGmail = () => {
     if (!selectedMessage) return;
     
-    // Create Gmail compose URL with pre-filled fields
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(selectedMessage.email)}&su=${encodeURIComponent(`Re: ${selectedMessage.subject}`)}&body=${encodeURIComponent(`Hi ${selectedMessage.name},\n\nThank you for your message:\n\n"${selectedMessage.message}"\n\nBest regards,\nAdmin Team`)}`;
-    
-    // Open Gmail in a new tab
     window.open(gmailUrl, '_blank');
     
-    // Show notification
-    setNotification({
-      type: 'success',
-      message: 'Opening Gmail to reply...'
-    });
+    setNotification({ type: 'success', message: 'Opening Gmail to reply...' });
     
-    // Mark as replied
-    const updatedMessages = messages.map(msg => 
-      msg.id === selectedMessage.id ? { ...msg, replied: true } : msg
-    );
-    setMessages(updatedMessages);
-    setSelectedMessage(prev => ({ ...prev, replied: true }));
+    // FIX: Only update state and localStorage if the message hasn't been marked as replied yet
+    if (!selectedMessage.replied) {
+      const updatedMessages = messages.map(msg => 
+        msg.id === selectedMessage.id ? { ...msg, replied: true } : msg
+      );
+      setMessages(updatedMessages);
+      setSelectedMessage(prev => ({ ...prev, replied: true }));
+      // FIX: Save the new 'replied' status to localStorage
+      saveMessageStatus(selectedMessage.id, { replied: true });
+    }
   };
 
-  // Clear notification after 5 seconds
   useEffect(() => {
     if (notification) {
-      const timer = setTimeout(() => {
-        setNotification(null);
-      }, 5000);
+      const timer = setTimeout(() => setNotification(null), 5000);
       return () => clearTimeout(timer);
     }
   }, [notification]);
 
-  // Filter messages based on search
   const filteredMessages = messages.filter(msg => 
-    msg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    msg.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    msg.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    msg.message.toLowerCase().includes(searchQuery.toLowerCase())
+    Object.values(msg).some(value => 
+      String(value).toLowerCase().includes(searchQuery.toLowerCase())
+    )
   );
 
   const stats = {
@@ -236,6 +216,8 @@ const AdminInbox = () => {
     unread: messages.filter(m => !m.read).length
   };
 
+  // --- No changes to JSX, return statement is identical ---
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 to-rose-50 flex items-center justify-center">
@@ -278,7 +260,6 @@ const AdminInbox = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-purple-100">
-      {/* Enhanced Notification */}
       {notification && (
         <div className={`fixed top-6 right-6 p-4 rounded-2xl shadow-2xl z-50 transition-all duration-500 transform backdrop-blur-sm border ${
           notification.type === 'success' 
@@ -305,9 +286,7 @@ const AdminInbox = () => {
       )}
 
       <div className="flex h-screen">
-        {/* Enhanced Left Sidebar */}
         <div className="w-96 bg-white/70 backdrop-blur-xl border-r border-white/20 flex flex-col shadow-xl">
-          {/* Modern Header */}
           <div className="p-6 border-b border-gray-100/60 bg-gradient-to-r from-white/50 to-pink-50/30">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -329,7 +308,6 @@ const AdminInbox = () => {
               </button>
             </div>
             
-            {/* Enhanced Search with better visibility */}
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-600 group-focus-within:text-pink-600 transition-colors z-10" />
               <input
@@ -341,7 +319,6 @@ const AdminInbox = () => {
               />
             </div>
             
-            {/* Enhanced Stats */}
             <div className="flex items-center gap-6 mt-4">
               <div className="flex items-center gap-2 px-3 py-2 bg-pink-50/60 rounded-lg">
                 <Users className="h-4 w-4 text-pink-600" />
@@ -354,11 +331,10 @@ const AdminInbox = () => {
             </div>
           </div>
 
-          {/* Enhanced Messages List with Initials */}
           <div className="flex-1 overflow-y-auto">
             {filteredMessages.length > 0 ? (
               <div className="p-4 space-y-2">
-                {filteredMessages.map((message, index) => (
+                {filteredMessages.map((message) => (
                   <div key={message.id} className="group">
                     <div 
                       className={`p-4 cursor-pointer rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
@@ -423,7 +399,7 @@ const AdminInbox = () => {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center p-12 text-gray-400">
-                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Mail className="h-10 w-10 text-gray-300" />
                 </div>
                 <p className="text-lg font-semibold text-gray-500 mb-2">No messages found</p>
@@ -435,11 +411,9 @@ const AdminInbox = () => {
           </div>
         </div>
 
-        {/* Enhanced Right Side - Message Detail */}
         <div className="flex-1 flex flex-col bg-white/40 backdrop-blur-sm">
           {selectedMessage ? (
             <>
-              {/* Enhanced Message Header with Initials */}
               <div className="p-6 border-b border-gray-100/60 bg-gradient-to-r from-white/70 to-pink-50/30 backdrop-blur-sm">
                 <div className="flex items-start gap-4">
                   <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-xl bg-gradient-to-br ${getAvatarColor(selectedMessage.name, selectedMessage.read)}`}>
@@ -465,7 +439,6 @@ const AdminInbox = () => {
                 </div>
               </div>
 
-              {/* Enhanced Message Subject */}
               <div className="px-6 py-4 bg-gradient-to-r from-gray-50/80 to-pink-50/60 border-b border-gray-100/60">
                 <div className="flex items-center justify-between">
                   <h1 className="text-xl font-bold text-gray-900">{selectedMessage.subject}</h1>
@@ -478,7 +451,6 @@ const AdminInbox = () => {
                 </div>
               </div>
               
-              {/* Enhanced Message Content */}
               <div className="flex-1 overflow-y-auto p-6 bg-white/30">
                 <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-sm border border-gray-100/60">
                   <p className="text-gray-700 leading-relaxed whitespace-pre-line text-base">
@@ -487,7 +459,6 @@ const AdminInbox = () => {
                 </div>
               </div>
 
-              {/* Gmail Reply Button */}
               <div className="p-6 border-t border-gray-100/60 bg-gradient-to-r from-white/70 to-pink-50/30 backdrop-blur-sm">
                 <div className="flex items-center justify-center">
                   <button 
@@ -507,7 +478,7 @@ const AdminInbox = () => {
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-white/20 to-pink-50/40 backdrop-blur-sm">
               <div className="text-center">
-                <div className="w-24 h-24 bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center mb-6 shadow-lg">
+                <div className="w-24 h-24 bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center mb-6 shadow-lg mx-auto">
                   <Mail className="h-12 w-12 text-pink-500" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-700 mb-2">Select a Message</h3>
