@@ -279,7 +279,6 @@ const DashboardPage = () => {
                       error.response?.data?.code === 401 ||
                       error.message?.includes('Admin authentication required');
     if (isAuthError) {
-      console.log('🚨 Auth error detected in dashboard, but NOT auto-logging out');
       return true;
     }
     return false;

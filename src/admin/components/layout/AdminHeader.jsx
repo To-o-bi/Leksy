@@ -1,17 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../../contexts/AuthContext'; // Correct path to your AuthContext
-import api from '../../../api/axios'; // Adjust path as needed
+import { useAuth } from '../../../contexts/AuthContext'; 
+import { useNotifications } from '../../../contexts/NotificationsContext'; 
 
 const AdminHeader = ({ toggleSidebar }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth(); // Get user and logout function from context
+  const { user, logout } = useAuth();
   const [isProfileOpen, setProfileOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
 
-  // A more robust way to get the page title based on the full pathname
+  // Use the shared state and functions from the NotificationsContext
+  const { unreadCount, fetchNotifications } = useNotifications();
+
+  // A robust way to get the page title based on the full pathname
   const getPageTitle = () => {
     const path = location.pathname;
 
@@ -28,7 +29,6 @@ const AdminHeader = ({ toggleSidebar }) => {
       '/admin/products/add': 'Add New Product',
       '/admin/bookings': 'Bookings',
       '/admin/notifications': 'Notifications',
-      '/admin/settings': 'Settings',
       '/admin/newletter': 'Newsletter Subscribers',
       '/admin/delivery': 'Delivery Fees',
     };
@@ -45,43 +45,8 @@ const AdminHeader = ({ toggleSidebar }) => {
     }
   };
 
-  // Fetch notifications for the bell
-  const fetchNotifications = async () => {
-    try {
-      const response = await api.get('/admin/fetch-notifications', { params: { limit: 20 } });
-      
-      if (response.data.code === 200) {
-        // Get read notification IDs from localStorage
-        const readIds = new Set(JSON.parse(localStorage.getItem('readNotificationIds')) || []);
-        
-        // Transform and filter unread notifications
-        const transformedNotifications = response.data.notifications.map(notification => ({
-          id: notification.id,
-          type: notification.type,
-          title: notification.title,
-          message: notification.description,
-          read: readIds.has(notification.id),
-          created_at: notification.created_at
-        }));
-        
-        setNotifications(transformedNotifications);
-        setUnreadCount(transformedNotifications.filter(n => !n.read).length);
-      }
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-    }
-  };
-
-  // Fetch notifications on component mount
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
-
-  // Auto-refresh notifications every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  // The local fetchNotifications and useEffect hooks have been removed.
+  // All notification logic is now handled by the NotificationsContext.
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
@@ -89,30 +54,29 @@ const AdminHeader = ({ toggleSidebar }) => {
         <div className="flex items-center">
           <button 
             onClick={toggleSidebar}
-            className="mr-4 text-gray-500 hover:text-gray-700 focus:outline-none lg:hidden" // Hide on larger screens if sidebar is always open
+            className="mr-4 text-gray-500 hover:text-gray-700 focus:outline-none lg:hidden"
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          {/* Page Title is now active */}
           <h1 className="text-xl font-semibold text-gray-800">{getPageTitle()}</h1>
         </div>
 
         <div className="flex items-center space-x-4">
           <Link to="/" className='text-sm text-pink-500 hover:text-pink-600 font-medium'>Go to Website</Link>
           
-          {/* Enhanced Notifications Bell */}
+          {/* Enhanced Notifications Bell using shared context */}
           <Link 
             to="/admin/notifications" 
             className="relative group p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95"
-            onClick={fetchNotifications} // Refresh notifications when clicked
+            onClick={() => fetchNotifications()} // Refresh notifications from context when clicked
           >
             <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
             
-            {/* Unread count badge */}
+            {/* Unread count badge now comes directly from the synchronized context */}
             {unreadCount > 0 && (
               <div className="absolute -top-1 -right-1 flex items-center justify-center">
                 <span className="bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center animate-pulse border-2 border-white shadow-lg">
@@ -142,16 +106,10 @@ const AdminHeader = ({ toggleSidebar }) => {
             
             {/* Dropdown Menu */}
             {isProfileOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-30 border border-gray-100">
-                <div className="px-4 py-2 text-xs text-gray-400">Manage Account</div>
-                <Link
-                  to="/admin/settings"
-                  onClick={() => setProfileOpen(false)}
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  Settings
-                </Link>
-                <div className="border-t border-gray-100"></div>
+              <div 
+                className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-30 border border-gray-100"
+                onMouseLeave={() => setProfileOpen(false)} // Added for better UX
+              >
                 <button
                   onClick={handleLogout}
                   className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"

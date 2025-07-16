@@ -1,61 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../../api/axios';
+import { useNotifications } from '../../contexts/NotificationsContext'; // Adjust path if needed
 
 const NotificationsPage = () => {
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Use state and functions from the centralized context
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    error,
+    fetchNotifications,
+    markAsRead,
+    markAllAsRead
+  } = useNotifications();
+
+  // Local state for UI elements specific to this page
   const [activeTab, setActiveTab] = useState('all');
   const [limit, setLimit] = useState(20);
   const [refreshing, setRefreshing] = useState(false);
-
+  
   const navigate = useNavigate();
 
-  // Fetch notifications from API
-  const fetchNotifications = async (fetchLimit = limit, showRefreshing = false) => {
-    try {
-      if (showRefreshing) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      setError(null);
-      
-      const response = await api.get('/admin/fetch-notifications', { params: { limit: fetchLimit } });
-      
-      if (response.data.code === 200) {
-        // Get read notification IDs from localStorage
-        const readIds = new Set(JSON.parse(localStorage.getItem('readNotificationIds')) || []);
-
-        // Transform API data to match component structure
-        const transformedNotifications = response.data.notifications.map(notification => ({
-          id: notification.id,
-          type: notification.type,
-          type_id: notification.type_id,
-          title: notification.title,
-          message: notification.description,
-          time: formatTimeAgo(notification.created_at),
-          read: readIds.has(notification.id), // Check against localStorage
-          date: formatDate(notification.created_at),
-          created_at: notification.created_at,
-          raw_description: notification.description
-        }));
-        
-        setNotifications(transformedNotifications);
-      } else {
-        throw new Error(response.data.message || 'Failed to fetch notifications');
-      }
-    } catch (err) {
-      console.error('Error fetching notifications:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to fetch notifications');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+  // Local handler for the manual refresh button
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchNotifications(limit);
+    setRefreshing(false);
   };
-
-  // Format time ago
+  
+  // Helper functions for formatting
   const formatTimeAgo = (dateString) => {
     const now = new Date();
     const notificationDate = new Date(dateString);
@@ -68,71 +41,21 @@ const NotificationsPage = () => {
     return notificationDate.toLocaleDateString();
   };
 
-  // Format date for grouping
   const formatDate = (dateString) => {
     const today = new Date();
     const notificationDate = new Date(dateString);
-    const diffInDays = Math.floor((today - notificationDate) / (1000 * 60 * 60 * 24));
+    // Standardize to midnight for accurate day difference
+    const diffInDays = Math.floor((today.setHours(0,0,0,0) - notificationDate.setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
     
     if (diffInDays === 0) return 'Today';
     if (diffInDays === 1) return 'Yesterday';
     if (diffInDays < 7) return `${diffInDays} days ago`;
-    return notificationDate.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
+    return new Date(dateString).toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      month: 'long', 
       day: 'numeric' 
     });
   };
-
-  // Load notifications on component mount
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
-
-  // Auto-refresh notifications every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchNotifications(limit, true);
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [limit]);
-
-  const markAsRead = (id) => {
-    // Get current read IDs, add the new one, and save back to localStorage
-    const readIds = new Set(JSON.parse(localStorage.getItem('readNotificationIds')) || []);
-    readIds.add(id);
-    localStorage.setItem('readNotificationIds', JSON.stringify([...readIds]));
-
-    // Update component state
-    setNotifications(prev => prev.map(notification => 
-      notification.id === id ? { ...notification, read: true } : notification
-    ));
-  };
-
-  const markAllAsRead = () => {
-    // Get all current notification IDs
-    const allIds = notifications.map(n => n.id);
-    
-    // Get existing read IDs from localStorage
-    const readIds = new Set(JSON.parse(localStorage.getItem('readNotificationIds')) || []);
-
-    // Add all current IDs to the set and save back to localStorage
-    allIds.forEach(id => readIds.add(id));
-    localStorage.setItem('readNotificationIds', JSON.stringify([...readIds]));
-
-    // Update component state
-    setNotifications(prev => prev.map(notification => ({
-      ...notification,
-      read: true
-    })));
-  };
-
-  const filteredNotifications = notifications.filter(notification => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'unread') return !notification.read;
-    return notification.type === activeTab;
-  });
 
   const getNotificationIcon = (type) => {
     switch (type) {
@@ -169,69 +92,48 @@ const NotificationsPage = () => {
     }
   };
 
-  const getNotificationAction = (type, typeId) => {
-    /**
-     * Enhanced navigation with proper ID targeting
-     * This function now ensures the type_id is properly passed to target specific items
-     */
+  const getNotificationAction = (type, typeId, notificationId) => {
     const handleClick = (e) => {
       e.stopPropagation();
+      markAsRead(notificationId);
       
-      // Construct the navigation URL with proper query parameters
-      let route = '/admin/dashboard'; // Default fallback
-      
+      let route = '/admin/dashboard';
       switch (type) {
         case 'consultations':
-          // Use bookingId parameter to target specific consultation
           route = `/admin/bookings?bookingId=${typeId}&highlight=true`;
           break;
         case 'orders':
-          // Use orderId parameter to target specific order
           route = `/admin/orders?orderId=${typeId}&highlight=true`;
           break;
         case 'products':
-          // Use productId parameter to target specific product
           route = `/admin/products/stock?productId=${typeId}&highlight=true`;
           break;
         case 'contact_submissions':
-          // Use messageId parameter to target specific message
           route = `/admin/inbox?messageId=${typeId}&highlight=true`;
           break;
         default:
           route = '/admin/dashboard';
       }
-      
-      // Navigate to the target page
       navigate(route);
     };
     
     const getActionText = () => {
       switch (type) {
-        case 'consultations':
-          return '📅 View Booking';
-        case 'orders':
-          return '🛒 View Order';
-        case 'products':
-          return '📦 Manage Stock';
-        case 'contact_submissions':
-          return '✉️ View Message';
-        default:
-          return '👁️ View Details';
+        case 'consultations': return '📅 View Booking';
+        case 'orders': return '🛒 View Order';
+        case 'products': return '📦 Manage Stock';
+        case 'contact_submissions': return '✉️ View Message';
+        default: return '👁️ View Details';
       }
     };
 
     const getColorClass = () => {
       switch (type) {
-        case 'consultations':
-          return 'text-pink-600 hover:text-pink-800 bg-pink-50 hover:bg-pink-100 border-pink-200';
-        case 'orders':
-          return 'text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border-blue-200';
-        case 'products':
-          return 'text-yellow-600 hover:text-yellow-800 bg-yellow-50 hover:bg-yellow-100 border-yellow-200';
-        case 'contact_submissions':
-          return 'text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 border-green-200';
-        default:
-          return 'text-gray-600 hover:text-gray-800 bg-gray-50 hover:bg-gray-100 border-gray-200';
+        case 'consultations': return 'text-pink-600 hover:text-pink-800 bg-pink-50 hover:bg-pink-100 border-pink-200';
+        case 'orders': return 'text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border-blue-200';
+        case 'products': return 'text-yellow-600 hover:text-yellow-800 bg-yellow-50 hover:bg-yellow-100 border-yellow-200';
+        case 'contact_submissions': return 'text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 border-green-200';
+        default: return 'text-gray-600 hover:text-gray-800 bg-gray-50 hover:bg-gray-100 border-gray-200';
       }
     };
 
@@ -245,7 +147,7 @@ const NotificationsPage = () => {
       </button>
     );
   };
-
+  
   const getTabDisplayName = (tab) => {
     switch (tab) {
       case 'consultations': return 'Bookings';
@@ -256,28 +158,33 @@ const NotificationsPage = () => {
     }
   };
 
-  // Get unique notification types for tabs
+  const filteredNotifications = notifications.filter(notification => {
+    if (activeTab === 'all') return true;
+    if (activeTab === 'unread') return !notification.read;
+    return notification.type === activeTab;
+  });
+
   const uniqueTypes = [...new Set(notifications.map(n => n.type))];
 
-  // Group notifications by date
   const groupedNotifications = filteredNotifications.reduce((acc, notification) => {
-    if (!acc[notification.date]) {
-      acc[notification.date] = [];
+    const dateKey = notification.created_at ? formatDate(notification.created_at) : 'Unknown Date';
+    if (!acc[dateKey]) {
+      acc[dateKey] = [];
     }
-    acc[notification.date].push(notification);
+    acc[dateKey].push(notification);
     return acc;
   }, {});
 
-  // Sort dates with Today first, then Yesterday, then chronologically
   const sortedDates = Object.keys(groupedNotifications).sort((a, b) => {
     if (a === 'Today') return -1;
     if (b === 'Today') return 1;
     if (a === 'Yesterday') return -1;
     if (b === 'Yesterday') return 1;
-    return new Date(b) - new Date(a);
+    const dateA = groupedNotifications[a][0]?.created_at;
+    const dateB = groupedNotifications[b][0]?.created_at;
+    if (!dateA || !dateB) return 0;
+    return new Date(dateB) - new Date(dateA);
   });
-
-  const unreadCount = notifications.filter(n => !n.read).length;
 
   if (loading) {
     return (
@@ -352,7 +259,7 @@ const NotificationsPage = () => {
           </div>
           <div className="flex items-center space-x-4">
             <button 
-              onClick={() => fetchNotifications(limit, true)}
+              onClick={handleRefresh}
               disabled={refreshing}
               className={`text-sm font-medium transition-all duration-200 px-3 py-1.5 rounded-md border ${
                 refreshing 
@@ -362,16 +269,12 @@ const NotificationsPage = () => {
             >
               {refreshing ? (
                 <span className="flex items-center space-x-1">
-                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
+                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                   <span>Refreshing...</span>
                 </span>
               ) : (
                 <span className="flex items-center space-x-1">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                   <span>Refresh</span>
                 </span>
               )}
@@ -391,33 +294,19 @@ const NotificationsPage = () => {
       {/* Tabs */}
       <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50">
         <button
-          className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-all duration-200 relative ${
-            activeTab === 'all' 
-              ? 'text-pink-600 border-b-2 border-pink-500 bg-white' 
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-          }`}
+          className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-all duration-200 relative ${activeTab === 'all' ? 'text-pink-600 border-b-2 border-pink-500 bg-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
           onClick={() => setActiveTab('all')}
         >
           All ({notifications.length})
-          {activeTab === 'all' && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-pink-500 rounded-full"></div>
-          )}
         </button>
         <button
-          className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-all duration-200 relative ${
-            activeTab === 'unread' 
-              ? 'text-pink-600 border-b-2 border-pink-500 bg-white' 
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-          }`}
+          className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-all duration-200 relative ${activeTab === 'unread' ? 'text-pink-600 border-b-2 border-pink-500 bg-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
           onClick={() => setActiveTab('unread')}
         >
           <span className="flex items-center space-x-1">
             <span>Unread ({unreadCount})</span>
             {unreadCount > 0 && <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>}
           </span>
-          {activeTab === 'unread' && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-pink-500 rounded-full"></div>
-          )}
         </button>
         {uniqueTypes.map(type => {
           const count = notifications.filter(n => n.type === type).length;
@@ -425,17 +314,10 @@ const NotificationsPage = () => {
           return (
             <button
               key={type}
-              className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-all duration-200 relative ${
-                isActive 
-                  ? 'text-pink-600 border-b-2 border-pink-500 bg-white' 
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-              }`}
+              className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-all duration-200 relative ${isActive ? 'text-pink-600 border-b-2 border-pink-500 bg-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
               onClick={() => setActiveTab(type)}
             >
               {getTabDisplayName(type)} ({count})
-              {isActive && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-pink-500 rounded-full"></div>
-              )}
             </button>
           );
         })}
@@ -449,15 +331,13 @@ const NotificationsPage = () => {
             <div className="max-w-sm mx-auto">
               <h3 className="text-lg font-medium text-gray-600 mb-2">No notifications found</h3>
               <p className="text-gray-400 text-sm">
-                {activeTab === 'all' 
-                  ? 'You have no notifications yet. Check back later for updates!' 
-                  : `No ${getTabDisplayName(activeTab).toLowerCase()} notifications.`}
+                {activeTab === 'all' ? 'You have no notifications yet. Check back later!' : `No ${getTabDisplayName(activeTab).toLowerCase()} notifications.`}
               </p>
             </div>
             <div className="mt-6">
               <button 
                 onClick={() => fetchNotifications()}
-                className="text-sm text-pink-500 hover:text-pink-700 font-medium transition-colors duration-200"
+                className="text-sm text-pink-500 hover:text-pink-700 font-medium transition-colors"
               >
                 🔄 Refresh now
               </button>
@@ -468,43 +348,31 @@ const NotificationsPage = () => {
             <div key={date}>
               <div className="px-6 py-3 bg-gray-50 sticky top-0 z-10 border-b border-gray-100">
                 <h3 className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                   <span>{date}</span>
                 </h3>
               </div>
               {groupedNotifications[date].map(notification => (
                 <div 
                   key={notification.id} 
-                  className={`px-6 py-4 hover:bg-gray-50 cursor-pointer transition-all duration-200 group ${
-                    !notification.read 
-                      ? 'bg-pink-50 border-l-4 border-pink-500 hover:bg-pink-100' 
-                      : 'hover:border-l-4 hover:border-gray-300'
-                  }`}
+                  className={`px-6 py-4 hover:bg-gray-50 cursor-pointer transition-all duration-200 group ${!notification.read ? 'bg-pink-50 border-l-4 border-pink-500 hover:bg-pink-100' : 'hover:border-l-4 hover:border-gray-300'}`}
                   onClick={() => markAsRead(notification.id)}
                 >
                   <div className="flex items-start space-x-4">
                     <div className="flex-shrink-0 pt-1">
-                      <div className={`p-2 rounded-lg transition-colors duration-200 ${
-                        !notification.read ? 'bg-white shadow-sm' : 'bg-gray-100 group-hover:bg-white group-hover:shadow-sm'
-                      }`}>
+                      <div className={`p-2 rounded-lg transition-colors duration-200 ${!notification.read ? 'bg-white shadow-sm' : 'bg-gray-100 group-hover:bg-white group-hover:shadow-sm'}`}>
                         {getNotificationIcon(notification.type)}
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-2">
-                        <p className={`text-sm font-medium truncate ${
-                          !notification.read ? 'text-gray-900' : 'text-gray-600'
-                        }`}>
+                        <p className={`text-sm font-medium truncate ${!notification.read ? 'text-gray-900' : 'text-gray-600'}`}>
                           {notification.title}
                         </p>
                         <div className="flex items-center space-x-2 ml-4">
                           <span className="text-xs text-gray-500 whitespace-nowrap flex items-center space-x-1">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span>{notification.time}</span>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <span>{notification.created_at ? formatTimeAgo(notification.created_at) : ''}</span>
                           </span>
                           {!notification.read && (
                             <div className="relative">
@@ -515,12 +383,11 @@ const NotificationsPage = () => {
                         </div>
                       </div>
                       <p className="text-sm text-gray-600 mb-3 line-clamp-2 leading-relaxed">
-                        {notification.message.replace(/<[^>]*>/g, '')}
+                        {notification.message?.replace(/<[^>]*>/g, '')}
                       </p>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
-                          {/* Enhanced action button with proper targeting */}
-                          {getNotificationAction(notification.type, notification.type_id)}
+                          {getNotificationAction(notification.type, notification.type_id, notification.id)}
                           <span className="text-xs text-gray-400 font-mono bg-gray-100 px-2 py-1 rounded">
                             ID: {notification.type_id}
                           </span>
@@ -549,9 +416,7 @@ const NotificationsPage = () => {
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-500 flex items-center space-x-2">
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4" />
-              </svg>
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4" /></svg>
               <span>
                 Showing {filteredNotifications.length} of {notifications.length} notifications
               </span>

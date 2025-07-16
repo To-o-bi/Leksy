@@ -11,7 +11,6 @@ const getSavedStatuses = () => {
     const saved = localStorage.getItem(MESSAGE_STATUS_KEY);
     return saved ? JSON.parse(saved) : {};
   } catch (error) {
-    console.error('Failed to parse message statuses from localStorage', error);
     return {};
   }
 };

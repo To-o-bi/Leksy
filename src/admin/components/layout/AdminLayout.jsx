@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
+import { NotificationsProvider } from '../../../contexts/NotificationsContext'; // Import the provider
 import AdminHeader from './AdminHeader';
 import AdminSidebar from './AdminSidebar';
 
 const AdminLayout = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(() => {
-    // Initialize from localStorage or default based on screen size
     const saved = localStorage.getItem('admin-sidebar-open');
     if (saved !== null) {
       return JSON.parse(saved);
     }
-    // Default: open on desktop, closed on mobile
     return window.innerWidth >= 1024;
   });
   
@@ -24,7 +23,6 @@ const AdminLayout = () => {
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
       
-      // Auto-close sidebar on mobile when resizing from desktop
       if (mobile && sidebarOpen) {
         setSidebarOpen(false);
       }
@@ -73,7 +71,6 @@ const AdminLayout = () => {
       document.body.style.overflow = 'unset';
     }
 
-    // Cleanup on unmount
     return () => {
       document.body.style.overflow = 'unset';
     };
@@ -104,40 +101,43 @@ const AdminLayout = () => {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
-      {/* Mobile Overlay */}
-      {isMobile && sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={handleOverlayClick}
-          aria-label="Close sidebar"
-        />
-      )}
+    // Wrap the entire layout with the NotificationsProvider
+    <NotificationsProvider>
+      <div className="flex h-screen bg-gray-100 overflow-hidden">
+        {/* Mobile Overlay */}
+        {isMobile && sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            onClick={handleOverlayClick}
+            aria-label="Close sidebar"
+          />
+        )}
 
-      {/* Sidebar */}
-      <AdminSidebar 
-        isOpen={sidebarOpen} 
-        isMobile={isMobile}
-        onClose={() => setSidebarOpen(false)}
-      />
-
-      {/* Main content */}
-      <div className="flex flex-col flex-1 overflow-hidden min-w-0">
-        {/* Header */}
-        <AdminHeader 
-          toggleSidebar={toggleSidebar} 
-          sidebarOpen={sidebarOpen}
+        {/* Sidebar */}
+        <AdminSidebar 
+          isOpen={sidebarOpen} 
           isMobile={isMobile}
+          onClose={() => setSidebarOpen(false)}
         />
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50">
-          <div className="p-4 sm:p-6">
-            <Outlet />
-          </div>
-        </main>
+        {/* Main content */}
+        <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+          {/* Header */}
+          <AdminHeader 
+            toggleSidebar={toggleSidebar} 
+            sidebarOpen={sidebarOpen}
+            isMobile={isMobile}
+          />
+
+          {/* Page content */}
+          <main className="flex-1 overflow-y-auto bg-gray-50">
+            <div className="p-4 sm:p-6">
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </NotificationsProvider>
   );
 };
 

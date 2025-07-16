@@ -162,33 +162,20 @@ const AllOrders = () => {
         throw new Error('Admin privileges required to view orders.');
       }
       
-      console.log('🔄 Fetching orders with auth check passed');
-      
       const filters = {};
       if (orderStatus !== 'all') filters.order_status = orderStatus;
       if (deliveryStatus !== 'all') filters.delivery_status = deliveryStatus;
       filters.limit = 200;
       
-      console.log('📡 Calling orderService.fetchOrders with filters:', filters);
-      
       const result = await orderService.fetchOrders(filters);
-      
-      console.log('✅ Orders fetch result:', {
-        code: result?.code,
-        message: result?.message,
-        productsCount: result?.products?.length || 0
-      });
       
       if (result?.code === 200) {
         const formattedOrders = formatOrderData(result.orders || []);
         setOrders(formattedOrders);
-        console.log(`✅ Successfully loaded ${formattedOrders.length} orders`);
       } else {
         throw new Error(result?.message || 'Failed to fetch orders');
       }
     } catch (err) {
-      console.error('❌ Error fetching orders:', err);
-      
       let errorMessage = 'Failed to load orders';
       
       // Handle specific error types
@@ -222,8 +209,6 @@ const AllOrders = () => {
       setIsUpdating(true);
       checkAuth();
 
-      console.log('🔄 Updating delivery status:', { orderId, newStatus });
-
       await orderService.changeDeliveryStatus(orderId, newStatus);
       
       // Update local state
@@ -240,8 +225,6 @@ const AllOrders = () => {
       showNotification('success', `Status updated to "${newStatus}" successfully`);
       
     } catch (err) {
-      console.error('❌ Error updating delivery status:', err);
-      
       let errorMessage = 'Failed to update delivery status';
       if (err.message.includes('precondition') || 
           err.message.includes('Unauthorized') || 
