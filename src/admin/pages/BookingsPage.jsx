@@ -57,12 +57,12 @@ const BookingsPage = () => {
 
   const getStatusBadgeStyle = (status) => {
     const styles = {
-      completed: 'bg-green-100 text-green-600',
-      'in-session': 'bg-blue-100 text-blue-600',
-      unheld: 'bg-yellow-100 text-yellow-600',
-      cancelled: 'bg-red-100 text-red-600',
+      completed: 'bg-green-100 text-green-700 border-green-200',
+      'in-session': 'bg-blue-100 text-blue-700 border-blue-200',
+      unheld: 'bg-amber-100 text-amber-700 border-amber-200',
+      cancelled: 'bg-red-100 text-red-700 border-red-200',
     };
-    return styles[status?.toLowerCase()] || 'bg-gray-100 text-gray-600';
+    return styles[status?.toLowerCase()] || 'bg-gray-100 text-gray-700 border-gray-200';
   };
 
   const getPaymentStatusStyle = (status) => {
@@ -146,31 +146,31 @@ const BookingsPage = () => {
   };
 
   const filterBookings = () => {
-  let filtered = [...bookings];
+    let filtered = [...bookings];
 
-  // Current filtering by status tab
-  if (activeTab !== 'all') {
-    const filters = {
-      upcoming: b => b.sessionStatus === 'unheld' && b.paymentStatus === 'successful',
-      paid: b => b.paymentStatus === 'successful',
-      unpaid: b => b.paymentStatus === 'unsuccessful',
-      default: b => b.sessionStatus === activeTab
-    };
-    const filterFn = filters[activeTab] || filters.default;
-    filtered = filtered.filter(filterFn);
-  }
+    // Current filtering by status tab
+    if (activeTab !== 'all') {
+      const filters = {
+        upcoming: b => b.sessionStatus === 'unheld' && b.paymentStatus === 'successful',
+        paid: b => b.paymentStatus === 'successful',
+        unpaid: b => b.paymentStatus === 'unsuccessful',
+        default: b => b.sessionStatus === activeTab
+      };
+      const filterFn = filters[activeTab] || filters.default;
+      filtered = filtered.filter(filterFn);
+    }
 
-  // Current filtering by search term
-  if (searchTerm.trim()) {
-    const query = searchTerm.toLowerCase();
-    filtered = filtered.filter(b => [b.id, b.fullName, b.email, b.phone, b.skinConcerns].some(f => f?.toLowerCase().includes(query)));
-  }
+    // Current filtering by search term
+    if (searchTerm.trim()) {
+      const query = searchTerm.toLowerCase();
+      filtered = filtered.filter(b => [b.id, b.fullName, b.email, b.phone, b.skinConcerns].some(f => f?.toLowerCase().includes(query)));
+    }
 
-  // Add this line to sort by the booking date (latest first)
-  filtered.sort((a, b) => new Date(b.bookingDate) - new Date(a.bookingDate));
+    // Add this line to sort by the booking date (latest first)
+    filtered.sort((a, b) => new Date(b.bookingDate) - new Date(a.bookingDate));
 
-  setFilteredBookings(filtered);
-};
+    setFilteredBookings(filtered);
+  };
 
   const updateSessionStatus = async (id, newStatus) => {
     try {
@@ -338,8 +338,18 @@ const BookingsPage = () => {
                   <td className="py-4"><div className="flex items-center"><Clock className="h-4 w-4 mr-1 text-gray-400" /><div><div className="text-sm font-medium">{formatDate(booking.bookingDate)}</div><div className="text-xs text-gray-500">{booking.bookingDate ? formatDateTime(booking.bookingDate).split(', ')[1] : ''}</div></div></div></td>
                   <td className="py-4"><div><div className="text-sm font-medium">{booking.fullName}</div><div className="text-xs text-gray-500">{booking.email}</div><div className="text-xs text-gray-500">{booking.phone}</div></div></td>
                   <td className="py-4"><div><div className="text-sm font-medium">{formatDate(booking.consultationDate)}</div><div className="text-xs text-gray-500">{formatTime(booking.timeRange)}</div><div className="text-xs text-gray-500 capitalize">{booking.channel}</div></div></td>
-                  <td className="py-4"><div><span className={`text-xs px-2 py-1 rounded-full font-medium ${getPaymentStatusStyle(booking.paymentStatus)}`}>{booking.paymentStatus}</span><div className="text-sm font-bold text-green-600 mt-1">{formatPrice(booking.amountPaid)}</div></div></td>
-                  <td className="py-4"><select value={booking.sessionStatus} onChange={(e) => updateSessionStatus(booking.id, e.target.value)} disabled={isUpdating} className={`text-xs px-2 py-1 rounded-full border-0 cursor-pointer font-medium ${getStatusBadgeStyle(booking.sessionStatus)}`}><option value="unheld">Unheld</option><option value="in-session">In Session</option><option value="completed">Completed</option></select></td>
+                  <td className="py-4">
+                    <div><span className={`text-xs px-2 py-1 rounded-full font-medium ${getPaymentStatusStyle(booking.paymentStatus)}`}>{booking.paymentStatus}</span><div className="text-sm font-bold text-green-600 mt-1">{formatPrice(booking.amountPaid)}</div></div>
+                  </td>
+                  <td className="py-4">
+                    <div className="flex justify-start">
+                      <span
+                        className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold border-2 capitalize min-w-[100px] justify-center shadow-sm ${getStatusBadgeStyle(booking.sessionStatus)}`}
+                      >
+                        {booking.sessionStatus}
+                      </span>
+                    </div>
+                  </td>
                   <td className="py-4"><button className="text-pink-500 border border-pink-500 rounded-lg px-4 py-2 text-sm hover:bg-pink-50 flex items-center" onClick={() => viewBookingDetails(booking)}><Eye className="h-4 w-4 mr-1" /> View Details</button></td>
                 </tr>
               )) : (
@@ -383,35 +393,85 @@ const BookingsPage = () => {
                 </div>
                 {selectedBooking.additionalDetails && (<div><h4 className="font-semibold border-b pb-2 mb-4">Additional Details</h4><div className="bg-gray-50 p-4 rounded-lg"><p className="text-gray-700 whitespace-pre-wrap">{selectedBooking.additionalDetails}</p></div></div>)}
                 <div>
-                  <h4 className="font-semibold border-b pb-2 mb-4">Actions</h4>
+                  <h4 className="font-semibold text-gray-900 border-b pb-2 mb-4">Actions</h4>
                   <div className="space-y-3">
                     {selectedBooking.sessionStatus === 'completed' ? (
                       <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded-r-lg">
                         <div className="flex">
-                          <div className="flex-shrink-0"><CheckCircle className="h-5 w-5 text-green-400" /></div>
-                          <div className="ml-3"><p className="text-sm text-green-700">This consultation has been completed. Actions are disabled.</p></div>
+                          <div className="flex-shrink-0">
+                            <CheckCircle className="h-5 w-5 text-green-400" />
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm text-green-700">
+                              This consultation has been completed. Actions are disabled.
+                            </p>
+                          </div>
                         </div>
                       </div>
                     ) : (
                       <>
-                        <div className="space-y-2">
-                          <label htmlFor="meetLink" className="text-sm font-medium text-gray-700">Meeting Link</label>
-                          <div className="flex space-x-2">
-                            <input id="meetLink" type="url" value={meetLink} onChange={(e) => setMeetLink(e.target.value)} placeholder="https://meet.google.com/..." className="flex-grow px-3 py-2 border rounded-md focus:ring-2 focus:ring-pink-500" disabled={isSendingLink} />
-                            <button onClick={() => sendMeetingLink(selectedBooking.id, overrideLink)} disabled={isSendingLink || !meetLink.trim()} className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm flex items-center justify-center disabled:bg-blue-300">{isSendingLink ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Send'}</button>
-                          </div>
-                          {selectedBooking.meetLink && (
-                            <div className="pt-2">
-                              <p className="text-xs text-gray-500">Current link: <a href={selectedBooking.meetLink} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline break-all">{selectedBooking.meetLink}</a></p>
-                              <div className="flex items-center mt-2">
-                                <input id="override" type="checkbox" checked={overrideLink} onChange={(e) => setOverrideLink(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500" />
-                                <label htmlFor="override" className="ml-2 block text-sm text-gray-900">Resend and override link</label>
-                              </div>
+                        {selectedBooking.channel?.toLowerCase() !== 'whatsapp' && (
+                          <div className="space-y-2">
+                            <label htmlFor="meetLink" className="text-sm font-medium text-gray-700">
+                              Meeting Link
+                            </label>
+                            <div className="flex space-x-2">
+                              <input
+                                id="meetLink"
+                                type="url"
+                                value={meetLink}
+                                onChange={(e) => setMeetLink(e.target.value)}
+                                placeholder="https://meet.google.com/..."
+                                className="flex-grow px-3 py-2 border rounded-md focus:ring-2 focus:ring-pink-500"
+                                disabled={isSendingLink}
+                              />
+                              <button
+                                onClick={() => {
+                                  // If there's no existing link, force override to true.
+                                  // Otherwise, use the value from the checkbox.
+                                  const shouldOverride = !selectedBooking.meetLink || overrideLink;
+                                  sendMeetingLink(selectedBooking.id, shouldOverride);
+                                }}
+                                disabled={isSendingLink || !meetLink.trim()}
+                                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm flex items-center justify-center disabled:bg-blue-300"
+                              >
+                                {isSendingLink ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Send'}
+                              </button>
                             </div>
-                          )}
-                        </div>
-                        <button onClick={() => sendReminder(selectedBooking.email)} className="w-full px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 text-sm">Send Reminder</button>
-                        <button onClick={() => updateSessionStatus(selectedBooking.id, 'completed')} className="w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm flex items-center justify-center"><CheckCircle className="h-4 w-4 mr-2" /> Mark as Completed</button>
+                            {selectedBooking.meetLink && (
+                              <div className="pt-2">
+                                <p className="text-xs text-gray-500">
+                                  Current link: <a href={selectedBooking.meetLink} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline break-all">{selectedBooking.meetLink}</a>
+                                </p>
+                                <div className="flex items-center mt-2">
+                                  <input
+                                    id="override"
+                                    type="checkbox"
+                                    checked={overrideLink}
+                                    onChange={(e) => setOverrideLink(e.target.checked)}
+                                    className="h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+                                  />
+                                  <label htmlFor="override" className="ml-2 block text-sm text-gray-900">
+                                    Resend and override link
+                                  </label>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <button
+                          onClick={() => sendReminder(selectedBooking.email)}
+                          className="w-full px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 text-sm"
+                        >
+                          Send Reminder
+                        </button>
+                        <button
+                          onClick={() => updateSessionStatus(selectedBooking.id, 'completed')}
+                          className="w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm flex items-center justify-center"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" /> Mark as Completed
+                        </button>
                       </>
                     )}
                   </div>
