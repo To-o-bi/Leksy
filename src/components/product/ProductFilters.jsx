@@ -1,3 +1,5 @@
+// src/components/product/ProductFilters.js
+
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { getCategories, getCategoryDisplayName, getSkinConcerns } from '../../utils/api';
@@ -27,7 +29,6 @@ export default function ProductFilters({ selectedFilters, onFilterChange, horizo
         setIsFilterOpen(false);
     }, [onFilterChange]);
 
-    // Simplified concern toggle logic
     const toggleConcern = useCallback((concern) => {
         const currentConcerns = selectedFilters.concerns || [];
         const newConcerns = currentConcerns.includes(concern)
