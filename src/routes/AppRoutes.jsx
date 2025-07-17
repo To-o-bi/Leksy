@@ -6,12 +6,12 @@ import { useAuth } from '../contexts/AuthContext';
 
 // Loading fallback for lazy-loaded components
 const LoadingFallback = () => (
-  <div className="flex items-center justify-center h-screen bg-gray-100">
-    <div className="bg-white p-8 rounded-lg shadow-md">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-500 mx-auto"></div>
-      <p className="text-center text-gray-600 mt-4">Loading...</p>
+    <div className="flex items-center justify-center h-screen bg-gray-100">
+        <div className="bg-white p-8 rounded-lg shadow-md">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-500 mx-auto"></div>
+            <p className="text-center text-gray-600 mt-4">Loading...</p>
+        </div>
     </div>
-  </div>
 );
 
 // Public pages
@@ -26,6 +26,11 @@ const WishlistPage = lazy(() => import('../pages/public/WishlistPage'));
 const ConsultationPage = lazy(() => import('../pages/public/ConsultationPage'));
 const ConsultationSuccessPage = lazy(() => import('../components/consultation/ConsultationSuccess'));
 const CheckoutSuccessPage = lazy(() => import('../pages/public/CheckoutSuccessPage'));
+const PrivacyPolicyPage = lazy(() => import('../pages/public/PolicyPages/PrivacyPolicyPage'));
+const TermsAndConditionsPage = lazy(() => import('../pages/public/PolicyPages/TermsAndConditionsPage'));
+// --- ADDED: Import for the new Shipping Policy page ---
+const ShippingPolicyPage = lazy(() => import('../pages/public/PolicyPages/ShippingPolicyPage'));
+
 
 // Admin pages
 const DashboardPage = lazy(() => import('../admin/pages/DashboardPage'));
@@ -39,75 +44,68 @@ const BookingsPage = lazy(() => import('../admin/pages/BookingsPage'));
 const NewsletterAdmin = lazy(() => import('../admin/pages/NewsletterAdmin'));
 const DeliveryFees = lazy(() => import('../admin/pages/DeliveryFees'));
 
-// Improved LoginWrapper with better redirect handling
+// Improved LoginWrapper
 const LoginWrapper = () => {
-  const { isAuthenticated, isLoading } = useAuth();
-  const location = useLocation();
-  
-  // Show loading state while checking authentication
-  if (isLoading) {
-    return <LoadingFallback />;
-  }
-  
-  // If user is already authenticated, redirect to dashboard or the intended location
-  if (isAuthenticated) {
-    const from = location.state?.from?.pathname || "/admin/dashboard";
-    return <Navigate to={from} replace />;
-  }
-  
-  // Otherwise show login page
-  return <LoginPage />;
+    const { isAuthenticated, isLoading } = useAuth();
+    const location = useLocation();
+    
+    if (isLoading) return <LoadingFallback />;
+    if (isAuthenticated) {
+        const from = location.state?.from?.pathname || "/admin/dashboard";
+        return <Navigate to={from} replace />;
+    }
+    return <LoginPage />;
 };
 
 const AppRoutes = () => {
-  return (
-    <Suspense fallback={<LoadingFallback />}>
-      <Routes>
-        {/* Login Route */}
-        <Route path="admin/login" element={<LoginWrapper />} />
-        
-        {/* Public Routes */}
-        <Route element={<PublicRoutes />}>
-          <Route index element={<HomePage />} />
-          <Route path="/shop" element={<ShopPage />} />
-          <Route path="/product/:productId" element={<ProductDetailPage />} />
-          <Route path="/cart" element={<CartPage />} />
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/checkout/checkout-success" element={<CheckoutSuccessPage />} />
-          <Route path="/wishlist" element={<WishlistPage />} />
-          <Route path="/consultation" element={<ConsultationPage />} />
-          <Route path="/consultation/success" element={<ConsultationSuccessPage />} />
-        </Route>
-        
-        {/* Protected Admin Routes - now using ProtectedRoute that includes AdminLayout */}
-        <Route path="/admin" element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="orders" element={<OrdersPage />} />
-          
-          {/* Product Management Routes */}
-          <Route path="products">
-            <Route index element={<Navigate to="stock" replace />} />
-            <Route path="stock" element={<ProductStock />} />
-            <Route path="add" element={<AddProductPage />} />
-            <Route path="edit/:id" element={<EditProductPage />} />
-          </Route>
-          
-          <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="inbox" element={<InboxPage />} />
-          <Route path="bookings" element={<BookingsPage />} />
-          <Route path="bookings/:id" element={<BookingsPage />} />       
+    return (
+        <Suspense fallback={<LoadingFallback />}>
+            <Routes>
+                <Route path="admin/login" element={<LoginWrapper />} />
+                
+                <Route element={<PublicRoutes />}>
+                    <Route index element={<HomePage />} />
+                    <Route path="/shop" element={<ShopPage />} />
+                    <Route path="/product/:productId" element={<ProductDetailPage />} />
+                    <Route path="/cart" element={<CartPage />} />
+                    <Route path="/contact" element={<ContactPage />} />
+                    <Route path="/checkout" element={<CheckoutPage />} />
+                    <Route path="/checkout/checkout-success" element={<CheckoutSuccessPage />} />
+                    <Route path="/wishlist" element={<WishlistPage />} />
+                    <Route path="/consultation" element={<ConsultationPage />} />
+                    <Route path="/consultation/success" element={<ConsultationSuccessPage />} />
+                    <Route path="/policies/privacy" element={<PrivacyPolicyPage />} />
+                    <Route path="/policies/terms-and-conditions" element={<TermsAndConditionsPage />} />
 
-          <Route path="newletter" element={<NewsletterAdmin />} />
-          <Route path="delivery" element={<DeliveryFees />} />
-        </Route>
+                    {/* --- ADDED: Route for the Shipping Policy page --- */}
+                    <Route path="/policies/shipping" element={<ShippingPolicyPage />} />
+                </Route>
+                
+                <Route path="/admin" element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
+                    <Route index element={<Navigate to="dashboard" replace />} />
+                    <Route path="dashboard" element={<DashboardPage />} />
+                    <Route path="orders" element={<OrdersPage />} />
+                    
+                    <Route path="products">
+                        <Route index element={<Navigate to="stock" replace />} />
+                        <Route path="stock" element={<ProductStock />} />
+                        <Route path="add" element={<AddProductPage />} />
+                        <Route path="edit/:id" element={<EditProductPage />} />
+                    </Route>
+                    
+                    <Route path="notifications" element={<NotificationsPage />} />
+                    <Route path="inbox" element={<InboxPage />} />
+                    <Route path="bookings" element={<BookingsPage />} />
+                    <Route path="bookings/:id" element={<BookingsPage />} />      
 
-        {/* Fallback route */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
-  );
+                    <Route path="newletter" element={<NewsletterAdmin />} />
+                    <Route path="delivery" element={<DeliveryFees />} />
+                </Route>
+
+                <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+        </Suspense>
+    );
 };
 
 export default AppRoutes;

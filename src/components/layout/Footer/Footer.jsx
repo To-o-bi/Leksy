@@ -68,13 +68,13 @@ const Footer = () => {
     { label: 'About Us', path: '/about' },
     { label: 'Contact Us', path: '/contact' },
     { label: 'Shipping Policy', path: '/policies/shipping' },
-    { label: 'Returns & Refunds', path: '/policies/returns' },
-    { label: 'Privacy Policy', path: '/policies/privacy' }
+    { label: 'Privacy Policy', path: '/policies/privacy' },
+    // --- ADDED: Link to the new Terms & Conditions page ---
+    { label: 'Terms & Conditions', path: '/policies/terms-and-conditions' },
   ];
 
   return (
     <footer className="bg-white">
-      {/* Add the keyframes animation styles */}
       <style>{bubbleAnimationStyles}</style>
       
       <div>
@@ -91,7 +91,6 @@ const Footer = () => {
             backgroundBlendMode: 'multiply' 
           }}
         >
-          {/* Decorative bubbles overlay with optimized animation */}
           <div className="absolute inset-0">
             <div className="absolute inset-0 bg-pink-500 opacity-80"></div>
             <div className="absolute inset-0">
@@ -109,7 +108,6 @@ const Footer = () => {
                   }}
                 ></div>
               ))}
-              {/* Additional bubbles for larger screens */}
               {[...Array(8)].map((_, i) => (
                 <div 
                   key={i + 12}
@@ -127,11 +125,9 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Footer content - responsive container */}
           <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12">
             <div className="flex flex-wrap -mx-2 sm:-mx-3 lg:-mx-4">
-              {/* About section */}
-              <div className="w-full sm:w-1/2 xl:w-1/4 px-2 sm:px-3 lg:px-4 mb-8 sm:mb-10 xl:mb-10">          
+              <div className="w-full sm:w-1/2 xl:w-1/4 px-2 sm:px-3 lg:px-4 mb-8 sm:mb-10 xl:mb-10">        
                 <div className="flex items-center mb-4 sm:mb-6">
                   <h3 className="text-white font-bold text-lg sm:text-xl">About Leksy Cosmetics</h3>
                 </div>
@@ -143,13 +139,11 @@ const Footer = () => {
                 </div>
               </div>
               
-              {/* Link sections using the reusable component */}
               <FooterLinkGroup title="My Account" links={accountLinks} />
               <FooterLinkGroup title="Shop" links={shopLinks} />
               <FooterLinkGroup title="Information" links={infoLinks} />
             </div>
             
-            {/* Copyright section */}
             <div className="pt-6 sm:pt-8 mt-6 sm:mt-8 border-t border-pink-300 border-opacity-30 relative z-10">
               <div className="flex flex-col lg:flex-row justify-between items-center space-y-4 lg:space-y-0">
                 <div className="order-2 lg:order-1">
