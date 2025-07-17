@@ -67,8 +67,7 @@ const AdminSidebar = ({ isOpen, isMobile, onClose }) => {
           </button>
         </div>
 
-        {/* User Info Section has been removed */}
-
+  
         {/* REMOVED: `overflow-y-auto` to prevent scrollbar */}
         <nav className="flex-1">
           <ul className="space-y-1">

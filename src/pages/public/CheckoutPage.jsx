@@ -8,7 +8,7 @@ import {
   formatPrice,
   validateCheckoutForm,
   initiateCheckout,
-  storeOrderDetails,
+  storeOrderDetails, // This can be kept if it serves another purpose
   nigerianStates,
   fetchLGADeliveryFees,
   fetchBusParkDeliveryFee,
@@ -57,44 +57,32 @@ const CheckoutPage = () => {
   }, []);
 
   useEffect(() => {
-    // Set shipping to 0 if the method is pickup
     if (deliveryMethod === 'pickup') {
       setShipping(0);
       return;
     }
 
-    // Set the bus park fee if that method is selected
     if (deliveryMethod === 'bus-park') {
       setShipping(busParkFee || 2000);
       return;
     }
 
-    // Logic for Home Delivery
     if (deliveryMethod === 'address') {
-      // If no state is selected, shipping is 0
       if (!formData.state) {
         setShipping(0);
         return;
       }
 
-      // Logic for Lagos
       if (formData.state === 'Lagos' && formData.city) {
         setIsCalculatingShipping(true);
-        
-        // Find the selected LGA in the data we already have in our component
         const selectedLGA = availableLGAs.find(lga => lga.lga === formData.city);
-
-        // If we found it, use its delivery fee
         if (selectedLGA) {
-          console.log(`%cFound fee locally: ${selectedLGA.delivery_fee}`, 'color: purple; font-weight: bold;');
           setShipping(selectedLGA.delivery_fee);
         }
-        
         setIsCalculatingShipping(false);
         return;
       }
 
-      // Fallback logic for any other state
       const getOtherStateFee = async () => {
         setIsCalculatingShipping(true);
         const cost = await fetchDeliveryFeeForState(formData.state);
@@ -146,31 +134,21 @@ const CheckoutPage = () => {
     });
 
     if (formErrors[name]) {
-      setFormErrors({
-        ...formErrors,
-        [name]: ''
-      });
+      setFormErrors({ ...formErrors, [name]: '' });
     }
   };
 
   const handleDeliveryMethodChange = (method) => {
     setDeliveryMethod(method);
     if (method === 'pickup') {
-      setFormData(prev => ({
-        ...prev,
-        state: '',
-        city: '',
-        street_address: ''
-      }));
-
+      setFormData(prev => ({ ...prev, state: '', city: '', street_address: '' }));
       const newErrors = { ...formErrors };
       delete newErrors.state;
       delete newErrors.city;
       delete newErrors.street_address;
       setFormErrors(newErrors);
       setAvailableLGAs([]);
-    }
-    else if (method === 'bus-park') {
+    } else if (method === 'bus-park') {
       setAvailableLGAs([]);
     }
   };
@@ -194,10 +172,8 @@ const CheckoutPage = () => {
       if (!formData.state || !nigerianStates.includes(formData.state)) {
         throw new Error('Please select a valid delivery state');
       }
-
       checkoutData.state = formData.state;
       checkoutData.city = formData.city;
-
       if (deliveryMethod === 'address') {
         checkoutData.street_address = formData.street_address;
         if (formData.state === 'Lagos' && formData.city) {
@@ -207,53 +183,61 @@ const CheckoutPage = () => {
         checkoutData.street_address = formData.street_address || '';
       }
     }
-
     return checkoutData;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!validateForm()) {
-      setNotification({
-        type: 'error',
-        message: 'Please fill in all required fields correctly'
-      });
+      setNotification({ type: 'error', message: 'Please fill in all required fields correctly' });
       return;
     }
 
     try {
       setIsProcessingOrder(true);
       const checkoutData = prepareCheckoutData();
-
-      console.log('Checkout attempt:', {
-        deliveryMethod,
-        formData: checkoutData,
-        hasValidState: deliveryMethod === 'pickup' || nigerianStates.includes(checkoutData.state)
-      });
-
       const result = await initiateCheckout(checkoutData, deliveryMethod, cart, SUCCESS_REDIRECT_URL);
 
       if (result.code === 200 && result.authorization_url) {
+
+        // --- ⬇️ ADDED LOGIC HERE ⬇️ ---
+        // 1. Prepare the data object for the success page.
+        const detailsForSuccessPage = {
+          cart_obj: cart.map(item => ({
+            product_name: item.name,
+            ordered_quantity: item.quantity,
+            product_price: item.price,
+            product_image: item.image,
+          })),
+          customerInfo: {
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+          },
+          amount_paid: finalTotal,
+        };
+
+        // 2. Store it in sessionStorage.
+        sessionStorage.setItem('pendingOrderDetails', JSON.stringify(detailsForSuccessPage));
+        // --- ⬆️ END OF ADDED LOGIC ⬆️ ---
+
+        // The old storeOrderDetails can be removed if it's no longer needed,
+        // but we'll leave it in case it serves other functions.
         storeOrderDetails(formData, deliveryMethod, cart, totalPrice, shipping, finalTotal);
 
-        setNotification({
-          type: 'success',
-          message: 'Redirecting to payment gateway...'
-        });
+        setNotification({ type: 'success', message: 'Redirecting to payment gateway...' });
 
         setTimeout(() => {
           clearCart();
           window.location.href = result.authorization_url;
         }, 1000);
+
       } else {
         throw new Error(result.message || 'Failed to initiate checkout');
       }
     } catch (error) {
       console.error('Checkout initiation error:', error);
-
       let errorMessage = 'Failed to initiate checkout. Please try again.';
-
       if (error.message.includes('Invalid/No delivery found')) {
         errorMessage = deliveryMethod === 'pickup'
           ? 'Store pickup is currently unavailable. Please try home delivery or contact support.'
@@ -263,11 +247,7 @@ const CheckoutPage = () => {
       } else if (error.message.includes('valid delivery state')) {
         errorMessage = 'Please select a valid delivery state from the dropdown.';
       }
-
-      setNotification({
-        type: 'error',
-        message: errorMessage
-      });
+      setNotification({ type: 'error', message: errorMessage });
     } finally {
       setIsProcessingOrder(false);
     }
@@ -310,7 +290,6 @@ const CheckoutPage = () => {
       />
 
       <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">Checkout</h1>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <form onSubmit={handleSubmit} className="lg:col-span-3">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -326,21 +305,10 @@ const CheckoutPage = () => {
                     onClick={() => handleDeliveryMethodChange('address')}
                   >
                     <div className="flex items-center">
-                      <input
-                        type="radio"
-                        name="deliveryMethod"
-                        value="address"
-                        checked={deliveryMethod === 'address'}
-                        onChange={() => handleDeliveryMethodChange('address')}
-                        className="h-4 w-4 text-pink-600 focus:ring-pink-500"
-                      />
+                      <input type="radio" name="deliveryMethod" value="address" checked={deliveryMethod === 'address'} onChange={() => handleDeliveryMethodChange('address')} className="h-4 w-4 text-pink-600 focus:ring-pink-500" />
                       <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">
-                          Home Delivery
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          Delivery to your address
-                        </div>
+                        <div className="text-sm font-medium text-gray-900">Home Delivery</div>
+                        <div className="text-sm text-gray-500">Delivery to your address</div>
                       </div>
                     </div>
                   </div>
@@ -352,21 +320,10 @@ const CheckoutPage = () => {
                     onClick={() => handleDeliveryMethodChange('bus-park')}
                   >
                     <div className="flex items-center">
-                      <input
-                        type="radio"
-                        name="deliveryMethod"
-                        value="bus-park"
-                        checked={deliveryMethod === 'bus-park'}
-                        onChange={() => handleDeliveryMethodChange('bus-park')}
-                        className="h-4 w-4 text-pink-600 focus:ring-pink-500"
-                      />
+                      <input type="radio" name="deliveryMethod" value="bus-park" checked={deliveryMethod === 'bus-park'} onChange={() => handleDeliveryMethodChange('bus-park')} className="h-4 w-4 text-pink-600 focus:ring-pink-500" />
                       <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">
-                          Bus Park Delivery
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {busParkFee === null ? 'Calculating...' : `Delivery to bus park (${formatPrice(busParkFee)})`}
-                        </div>
+                        <div className="text-sm font-medium text-gray-900">Bus Park Delivery</div>
+                        <div className="text-sm text-gray-500">{busParkFee === null ? 'Calculating...' : `Delivery to bus park (${formatPrice(busParkFee)})`}</div>
                       </div>
                     </div>
                   </div>
@@ -378,166 +335,60 @@ const CheckoutPage = () => {
                     onClick={() => handleDeliveryMethodChange('pickup')}
                   >
                     <div className="flex items-center">
-                      <input
-                        type="radio"
-                        name="deliveryMethod"
-                        value="pickup"
-                        checked={deliveryMethod === 'pickup'}
-                        onChange={() => handleDeliveryMethodChange('pickup')}
-                        className="h-4 w-4 text-pink-600 focus:ring-pink-500"
-                      />
+                      <input type="radio" name="deliveryMethod" value="pickup" checked={deliveryMethod === 'pickup'} onChange={() => handleDeliveryMethodChange('pickup')} className="h-4 w-4 text-pink-600 focus:ring-pink-500" />
                       <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">
-                          Store Pickup
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          Pick up from our store (Free)
-                        </div>
+                        <div className="text-sm font-medium text-gray-900">Store Pickup</div>
+                        <div className="text-sm text-gray-500">Pick up from our store (Free)</div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-
               <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-6">Customer Information</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <div className="md:col-span-2">
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                      Full Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${formErrors.name ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                      placeholder="Your full name"
-                      disabled={isProcessingOrder}
-                      required
-                    />
-                    {formErrors.name && (
-                      <p className="mt-1 text-sm text-red-500">{formErrors.name}</p>
-                    )}
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Full Name <span className="text-red-500">*</span></label>
+                    <input type="text" id="name" name="name" value={formData.name} onChange={handleInputChange} className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${formErrors.name ? 'border-red-500' : 'border-gray-300'}`} placeholder="Your full name" disabled={isProcessingOrder} required />
+                    {formErrors.name && (<p className="mt-1 text-sm text-red-500">{formErrors.name}</p>)}
                   </div>
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                      Email <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${formErrors.email ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                      placeholder="your@email.com"
-                      disabled={isProcessingOrder}
-                      required
-                    />
-                    {formErrors.email && (
-                      <p className="mt-1 text-sm text-red-500">{formErrors.email}</p>
-                    )}
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
+                    <input type="email" id="email" name="email" value={formData.email} onChange={handleInputChange} className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${formErrors.email ? 'border-red-500' : 'border-gray-300'}`} placeholder="your@email.com" disabled={isProcessingOrder} required />
+                    {formErrors.email && (<p className="mt-1 text-sm text-red-500">{formErrors.email}</p>)}
                   </div>
                   <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                      Phone <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      id="phone"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${formErrors.phone ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                      placeholder="+234 8012345678"
-                      disabled={isProcessingOrder}
-                      required
-                    />
-                    {formErrors.phone && (
-                      <p className="mt-1 text-sm text-red-500">{formErrors.phone}</p>
-                    )}
+                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">Phone <span className="text-red-500">*</span></label>
+                    <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${formErrors.phone ? 'border-red-500' : 'border-gray-300'}`} placeholder="+234 8012345678" disabled={isProcessingOrder} required />
+                    {formErrors.phone && (<p className="mt-1 text-sm text-red-500">{formErrors.phone}</p>)}
                   </div>
                 </div>
               </div>
-
               {(deliveryMethod === 'address' || deliveryMethod === 'bus-park') && (
                 <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-                  <h2 className="text-xl font-semibold text-gray-800 mb-6">
-                    {deliveryMethod === 'address' ? 'Delivery Address' : 'Bus Park Location'}
-                  </h2>
+                  <h2 className="text-xl font-semibold text-gray-800 mb-6">{deliveryMethod === 'address' ? 'Delivery Address' : 'Bus Park Location'}</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
-                      <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
-                        State <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        id="state"
-                        name="state"
-                        value={formData.state}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${formErrors.state ? 'border-red-500' : 'border-gray-300'
-                          }`}
-                        disabled={isProcessingOrder}
-                        required
-                      >
+                      <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">State <span className="text-red-500">*</span></label>
+                      <select id="state" name="state" value={formData.state} onChange={handleInputChange} className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${formErrors.state ? 'border-red-500' : 'border-gray-300'}`} disabled={isProcessingOrder} required>
                         <option value="">Select State</option>
-                        {nigerianStates.map(state => (
-                          <option key={state} value={state}>{state}</option>
-                        ))}
+                        {nigerianStates.map(state => (<option key={state} value={state}>{state}</option>))}
                       </select>
-                      {formErrors.state && (
-                        <p className="mt-1 text-sm text-red-500">{formErrors.state}</p>
-                      )}
+                      {formErrors.state && (<p className="mt-1 text-sm text-red-500">{formErrors.state}</p>)}
                     </div>
                     <div>
-                      <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
-                        City <span className="text-red-500">*</span>
-                        {deliveryMethod === 'address' && formData.state === 'Lagos' && availableLGAs.length > 0 && (
-                          <span className="text-xs text-gray-500 ml-1">- Select LGA for precise delivery cost</span>
-                        )}
+                      <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">City <span className="text-red-500">*</span>
+                        {deliveryMethod === 'address' && formData.state === 'Lagos' && availableLGAs.length > 0 && (<span className="text-xs text-gray-500 ml-1">- Select LGA for precise delivery cost</span>)}
                       </label>
                       {deliveryMethod === 'address' && formData.state === 'Lagos' ? (
-                        <select
-                          id="city"
-                          name="city"
-                          value={formData.city}
-                          onChange={handleInputChange}
-                          className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${formErrors.city ? 'border-red-500' : 'border-gray-300'
-                            }`}
-                          disabled={isProcessingOrder || isLoadingLGAs}
-                          required
-                        >
-                          <option value="">
-                            {isLoadingLGAs ? 'Loading LGAs...' : 'Select LGA'}
-                          </option>
-                          {availableLGAs.map(lga => (
-                            <option key={lga.lga} value={lga.lga}>
-                              {lga.lga} - {formatPrice(lga.delivery_fee)}
-                            </option>
-                          ))}
+                        <select id="city" name="city" value={formData.city} onChange={handleInputChange} className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${formErrors.city ? 'border-red-500' : 'border-gray-300'}`} disabled={isProcessingOrder || isLoadingLGAs} required>
+                          <option value="">{isLoadingLGAs ? 'Loading LGAs...' : 'Select LGA'}</option>
+                          {availableLGAs.map(lga => (<option key={lga.lga} value={lga.lga}>{lga.lga} - {formatPrice(lga.delivery_fee)}</option>))}
                         </select>
                       ) : (
-                        <input
-                          type="text"
-                          id="city"
-                          name="city"
-                          value={formData.city}
-                          onChange={handleInputChange}
-                          className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${formErrors.city ? 'border-red-500' : 'border-gray-300'
-                            }`}
-                          placeholder="Enter your city"
-                          disabled={isProcessingOrder}
-                          required
-                        />
+                        <input type="text" id="city" name="city" value={formData.city} onChange={handleInputChange} className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${formErrors.city ? 'border-red-500' : 'border-gray-300'}`} placeholder="Enter your city" disabled={isProcessingOrder} required />
                       )}
-                      {formErrors.city && (
-                        <p className="mt-1 text-sm text-red-500">{formErrors.city}</p>
-                      )}
+                      {formErrors.city && (<p className="mt-1 text-sm text-red-500">{formErrors.city}</p>)}
                     </div>
                   </div>
                   <div className="mb-6">
@@ -546,49 +397,19 @@ const CheckoutPage = () => {
                       {deliveryMethod === 'address' && <span className="text-red-500">*</span>}
                       {deliveryMethod === 'bus-park' && <span className="text-gray-500 text-xs ml-1">(Optional)</span>}
                     </label>
-                    <input
-                      type="text"
-                      id="street_address"
-                      name="street_address"
-                      value={formData.street_address}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${formErrors.street_address ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                      placeholder={
-                        deliveryMethod === 'address'
-                          ? "Your full address"
-                          : "Bus park name or nearest landmark (optional)"
-                      }
-                      disabled={isProcessingOrder}
-                      required={deliveryMethod === 'address'}
-                    />
-                    {formErrors.street_address && (
-                      <p className="mt-1 text-sm text-red-500">{formErrors.street_address}</p>
-                    )}
+                    <input type="text" id="street_address" name="street_address" value={formData.street_address} onChange={handleInputChange} className={`w-full px-4 py-2 border rounded-md focus:ring-pink-500 focus:border-pink-500 ${formErrors.street_address ? 'border-red-500' : 'border-gray-300'}`} placeholder={deliveryMethod === 'address' ? "Your full address" : "Bus park name or nearest landmark (optional)"} disabled={isProcessingOrder} required={deliveryMethod === 'address'} />
+                    {formErrors.street_address && (<p className="mt-1 text-sm text-red-500">{formErrors.street_address}</p>)}
                   </div>
                 </div>
               )}
-
               <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-6">Additional Info</h2>
                 <div>
-                  <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
-                    Order Notes (Optional)
-                  </label>
-                  <textarea
-                    id="notes"
-                    name="notes"
-                    value={formData.notes}
-                    onChange={handleInputChange}
-                    rows="4"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-pink-500 focus:border-pink-500"
-                    placeholder="Notes about your order, e.g. special delivery instructions"
-                    disabled={isProcessingOrder}
-                  ></textarea>
+                  <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">Order Notes (Optional)</label>
+                  <textarea id="notes" name="notes" value={formData.notes} onChange={handleInputChange} rows="4" className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-pink-500 focus:border-pink-500" placeholder="Notes about your order, e.g. special delivery instructions" disabled={isProcessingOrder}></textarea>
                 </div>
               </div>
             </div>
-
             <div className="lg:col-span-1">
               <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-6">Order Summary</h2>
@@ -596,25 +417,13 @@ const CheckoutPage = () => {
                   {cart.map((item) => (
                     <div key={`${item.id}-${item.variant?.id || 'default'}`} className="flex items-center gap-4">
                       <div className="w-16 h-16 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-grow">
-                        <div className="text-sm font-medium text-gray-800">
-                          {item.name} {item.quantity > 1 && `x${item.quantity}`}
-                        </div>
-                        {item.variant && (
-                          <div className="text-xs text-gray-500">
-                            {item.variant.name}
-                          </div>
-                        )}
+                        <div className="text-sm font-medium text-gray-800">{item.name} {item.quantity > 1 && `x${item.quantity}`}</div>
+                        {item.variant && (<div className="text-xs text-gray-500">{item.variant.name}</div>)}
                       </div>
-                      <div className="text-sm font-medium text-gray-800">
-                        {formatPrice(item.price * item.quantity)}
-                      </div>
+                      <div className="text-sm font-medium text-gray-800">{formatPrice(item.price * item.quantity)}</div>
                     </div>
                   ))}
                 </div>
@@ -624,79 +433,31 @@ const CheckoutPage = () => {
                     <span className="font-medium">{formatPrice(totalPrice)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">
-                      {deliveryMethod === 'pickup' ? 'Store Pickup' : deliveryMethod === 'bus-park' ? 'Bus Park Delivery' : 'Home Delivery'}:
-                    </span>
-                    <span className="font-medium">
-                      {getDeliveryPrice()}
-                    </span>
+                    <span className="text-gray-600">{deliveryMethod === 'pickup' ? 'Store Pickup' : deliveryMethod === 'bus-park' ? 'Bus Park Delivery' : 'Home Delivery'}:</span>
+                    <span className="font-medium">{getDeliveryPrice()}</span>
                   </div>
                   <div className="flex justify-between text-lg font-semibold pt-2 border-t border-gray-200">
                     <span>Total:</span>
-                    <span className="text-pink-600">
-                      {isCalculatingShipping ? 'Calculating...' : formatPrice(finalTotal)}
-                    </span>
+                    <span className="text-pink-600">{isCalculatingShipping ? 'Calculating...' : formatPrice(finalTotal)}</span>
                   </div>
                 </div>
                 <div className="mb-6">
-                  <p className="text-sm text-gray-600 mb-4">
-                    Your personal data will be used to process your order, support your experience throughout this website, and for other purposes described in our{' '}
-                    <Link to="/privacy-policy" className="text-pink-500 hover:text-pink-600">
-                      privacy policy
-                    </Link>.
-                  </p>
+                  <p className="text-sm text-gray-600 mb-4">Your personal data will be used to process your order, support your experience throughout this website, and for other purposes described in our <Link to="/privacy-policy" className="text-pink-500 hover:text-pink-600">privacy policy</Link>.</p>
                   <div className="flex items-start mb-6">
-                    <input
-                      type="checkbox"
-                      id="agreeToTerms"
-                      name="agreeToTerms"
-                      checked={formData.agreeToTerms}
-                      onChange={handleInputChange}
-                      className={`mt-1 mr-2 h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded ${formErrors.agreeToTerms ? 'border-red-500' : ''
-                        }`}
-                      disabled={isProcessingOrder}
-                      required
-                    />
-                    <label htmlFor="agreeToTerms" className="text-sm text-gray-600">
-                      I have read and agree to the website{' '}
-                      <Link to="/terms" className="text-pink-500 hover:text-pink-600">
-                        terms and conditions
-                      </Link>{' '}
-                      <span className="text-red-500">*</span>
-                    </label>
+                    <input type="checkbox" id="agreeToTerms" name="agreeToTerms" checked={formData.agreeToTerms} onChange={handleInputChange} className={`mt-1 mr-2 h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded ${formErrors.agreeToTerms ? 'border-red-500' : ''}`} disabled={isProcessingOrder} required />
+                    <label htmlFor="agreeToTerms" className="text-sm text-gray-600">I have read and agree to the website <Link to="/terms" className="text-pink-500 hover:text-pink-600">terms and conditions</Link> <span className="text-red-500">*</span></label>
                   </div>
-                  {formErrors.agreeToTerms && (
-                    <p className="mt-1 text-sm text-red-500 mb-4">{formErrors.agreeToTerms}</p>
-                  )}
-                  <Button
-                    type="submit"
-                    disabled={isProcessingOrder || isCalculatingShipping}
-                    className={`w-full py-3 rounded-md font-medium transition-colors ${isProcessingOrder || isCalculatingShipping
-                      ? 'bg-gray-400 cursor-not-allowed text-gray-200'
-                      : 'bg-pink-500 hover:bg-pink-600 text-white'
-                      }`}
-                  >
+                  {formErrors.agreeToTerms && (<p className="mt-1 text-sm text-red-500 mb-4">{formErrors.agreeToTerms}</p>)}
+                  <Button type="submit" disabled={isProcessingOrder || isCalculatingShipping} className={`w-full py-3 rounded-md font-medium transition-colors ${isProcessingOrder || isCalculatingShipping ? 'bg-gray-400 cursor-not-allowed text-gray-200' : 'bg-pink-500 hover:bg-pink-600 text-white'}`}>
                     {isProcessingOrder ? (
                       <div className="flex items-center justify-center">
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         Initiating Payment...
                       </div>
-                    ) : isCalculatingShipping ? (
-                      'Calculating Total...'
-                    ) : (
-                      `Proceed to Payment - ${formatPrice(finalTotal)}`
-                    )}
+                    ) : isCalculatingShipping ? ('Calculating Total...') : (`Proceed to Payment - ${formatPrice(finalTotal)}`)}
                   </Button>
                 </div>
-                <Link
-                  to="/cart"
-                  className="flex items-center justify-center text-pink-500 hover:text-pink-600"
-                >
-                  <span className="mr-1">«</span> Back to Cart
-                </Link>
+                <Link to="/cart" className="flex items-center justify-center text-pink-500 hover:text-pink-600"><span className="mr-1">«</span> Back to Cart</Link>
               </div>
             </div>
           </div>
