@@ -21,7 +21,6 @@ const AllOrders = () => {
   const [notification, setNotification] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [highlightedOrderId, setHighlightedOrderId] = useState(null);
-  const [isModalLoading, setIsModalLoading] = useState(false);
   
   const ORDERS_PER_PAGE = 9;
 
@@ -136,10 +135,28 @@ const AllOrders = () => {
     setNotification({ type, message });
   }, []);
 
-  // Format order data, ensuring cart data is properly parsed
-  const formatOrderData = useCallback((ordersData) => {
-    return ordersData.map(order => {
-      // Cart data will be fetched on demand, so initialize as empty
+  // Format order data from the main list fetch, including cart items
+  const formatOrderListData = useCallback((ordersData) => {
+    const ordersArray = ordersData.products || ordersData.orders || [];
+    return ordersArray.map(order => {
+      let cartItems = [];
+      const cartData = order.cart_obj;
+
+      if (cartData) {
+        if (typeof cartData === 'string') {
+          try {
+            const parsedCart = JSON.parse(cartData);
+            if (Array.isArray(parsedCart)) {
+              cartItems = parsedCart;
+            }
+          } catch (e) {
+            console.error(`Failed to parse cart JSON for order ${order.order_id}:`, e);
+          }
+        } else if (Array.isArray(cartData)) {
+          cartItems = cartData;
+        }
+      }
+
       return {
         id: order.order_id,
         name: order.name,
@@ -156,7 +173,7 @@ const AllOrders = () => {
         state: order.state,
         city: order.city,
         streetAddress: order.street_address,
-        cart: [], // Initialize cart as empty
+        cart: cartItems, // Populate cart directly from the list
         rawData: order
       };
     });
@@ -176,7 +193,7 @@ const AllOrders = () => {
       const result = await orderService.fetchOrders(filters);
       
       if (result?.code === 200) {
-        const formattedOrders = formatOrderData(result.orders || []);
+        const formattedOrders = formatOrderListData(result);
         setOrders(formattedOrders);
       } else {
         throw new Error(result?.message || 'Failed to fetch orders');
@@ -196,7 +213,7 @@ const AllOrders = () => {
     } finally {
       setLoading(false);
     }
-  }, [orderStatus, deliveryStatus, checkAuth, formatOrderData]);
+  }, [orderStatus, deliveryStatus, checkAuth, formatOrderListData]);
 
   // Handle delivery status change
   const handleDeliveryStatusChange = useCallback(async (orderId, newStatus) => {
@@ -262,50 +279,11 @@ const AllOrders = () => {
     setCurrentPage(1);
   }, []);
 
-  const viewOrderDetails = useCallback(async (order) => {
-    setShowModal(true);
+  // Simplified function to show the modal with already-loaded data
+  const viewOrderDetails = useCallback((order) => {
     setSelectedOrder(order);
-    setIsModalLoading(true);
-
-    try {
-      const result = await orderService.fetchOrder(order.id);
-
-      if (result?.code === 200 && result.order) {
-        const detailedOrder = result.order;
-        let cartItems = [];
-        const cartData = detailedOrder.cart_obj;
-
-        if (cartData) {
-          if (typeof cartData === 'string') {
-            try {
-              const parsedCart = JSON.parse(cartData);
-              if (Array.isArray(parsedCart)) {
-                cartItems = parsedCart;
-              }
-            } catch (e) {
-              console.error(`Failed to parse cart JSON for order ${detailedOrder.order_id}:`, e);
-            }
-          } else if (Array.isArray(cartData)) {
-            cartItems = cartData;
-          }
-        }
-        
-        setSelectedOrder(prevOrder => ({
-          ...prevOrder,
-          ...detailedOrder,
-          cart: cartItems,
-        }));
-
-      } else {
-        showNotification('error', 'Could not fetch full order details.');
-      }
-    } catch (err) {
-      console.error('Failed to fetch order details:', err);
-      showNotification('error', 'Could not fetch full order details.');
-    } finally {
-      setIsModalLoading(false);
-    }
-  }, [showNotification]);
+    setShowModal(true);
+  }, []);
 
   useEffect(() => {
     if (notification) {
@@ -604,11 +582,7 @@ const AllOrders = () => {
 
             <div className="mt-6">
               <h4 className="font-semibold mb-3">Order Items</h4>
-              {isModalLoading ? (
-                <div className="text-center p-4 text-gray-500">
-                  <p>Loading items...</p>
-                </div>
-              ) : selectedOrder.cart?.length > 0 ? (
+              {selectedOrder.cart?.length > 0 ? (
                 <div className="space-y-2">
                   {selectedOrder.cart.map((item, index) => (
                     <div key={item.product_id || index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
