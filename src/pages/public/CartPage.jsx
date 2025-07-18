@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../hooks/useCart';
 import Breadcrumb from '../../components/common/Breadcrumb';
@@ -7,71 +7,62 @@ import Notification from '../../components/common/Notification';
 import { SiVisa, SiMastercard, SiPaypal } from 'react-icons/si';
 
 const CartPage = () => {
-  const { cart, removeFromCart, updateQuantity, clearCart, totalItems, totalPrice } = useCart();
+  const { cart, removeFromCart, updateQuantity, clearCart, totalItems, totalPrice, validateCart } = useCart();
   const navigate = useNavigate();
-  const [notification, setNotification] = React.useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Format price as currency
+  // Perform validation when the component mounts
+  useEffect(() => {
+    const performValidation = async () => {
+      setIsLoading(true);
+      if (cart.length > 0) {
+        const result = await validateCart();
+        if (result.notifications.length > 0) {
+          setNotifications(result.notifications);
+        }
+      }
+      setIsLoading(false);
+    };
+    performValidation();
+  }, []);
+
   const formatPrice = (price) => {
+    if (isNaN(price)) {
+        return '₦0.00';
+    }
     return `₦${parseFloat(price).toFixed(2)}`;
   };
-  
-  const handleContinueShopping = () => {
-    navigate('/shop');
-  };
-  
-  const handleCheckout = () => {
-    navigate('/checkout');
-  };
-  
-  const handleRemoveItem = (productId) => {
-    removeFromCart(productId);
-    
-    setNotification({
-      type: 'success',
-      message: 'Product removed from cart!',
-    });
 
-    setTimeout(() => {
-      setNotification(null);
-    }, 3000);
-  };
-  
-  const handleQuantityChange = (productId, newQuantity) => {
-    if (newQuantity > 0) {
-      updateQuantity(productId, newQuantity);
-    }
-  };
-  
-  const handleClearCart = () => {
-    clearCart();
-    
-    setNotification({
-      type: 'info',
-      message: 'Cart has been cleared!',
-    });
+  const handleCheckout = () => navigate('/checkout');
+  const handleContinueShopping = () => navigate('/shop');
+  const handleQuantityChange = (productId, newQuantity) => updateQuantity(productId, newQuantity);
+  const handleRemoveItem = (productId) => removeFromCart(productId);
+  const handleClearCart = () => clearCart();
 
-    setTimeout(() => {
-      setNotification(null);
-    }, 3000);
-  };
+  if (isLoading) {
+    return (
+        <div className="container mx-auto px-4 py-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Verifying your cart...</p>
+        </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {notification && (
-        <Notification 
-          type={notification.type} 
-          message={notification.message} 
-          onClose={() => setNotification(null)} 
-        />
-      )}
+      <div className="fixed top-5 right-5 z-50 w-full max-w-sm space-y-2">
+        {notifications.map((note, index) => (
+          <Notification
+            key={index}
+            type={note.type}
+            message={note.message}
+            onClose={() => setNotifications(prev => prev.filter((_, i) => i !== index))}
+          />
+        ))}
+      </div>
       
-      <Breadcrumb 
-        items={[
-          { label: 'Home', path: '/' },
-          { label: 'Cart', path: '/cart' }
-        ]} 
-      />
+      <Breadcrumb items={[{ label: 'Home', path: '/' }, { label: 'Cart' }]} />
       
       <h1 className="text-3xl font-bold mb-8 text-gray-800">Your Shopping Cart</h1>
       
@@ -85,7 +76,7 @@ const CartPage = () => {
           <h2 className="text-2xl font-semibold text-gray-700 mb-4">Your cart is empty</h2>
           <p className="text-gray-500 mb-8">Looks like you haven't added anything to your cart yet.</p>
           <Button 
-            className="bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-md font-medium"
+            className="bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded-md font-medium"
             onClick={handleContinueShopping}
           >
             Start Shopping
@@ -93,30 +84,30 @@ const CartPage = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Cart Items */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="p-6 border-b">
                 <h2 className="text-xl font-semibold text-gray-800">Cart Items ({totalItems})</h2>
               </div>
-              <div className="divide-y">
+              <div className="divide-y divide-gray-200">
                 {cart.map((item) => (
-                  <div key={`${item.id}-${item.variant?.id || 'default'}`} className="p-6 flex flex-col md:flex-row items-start gap-6">
+                  <div key={item.product_id} className="p-6 flex flex-col md:flex-row items-start gap-6">
                     <div className="w-24 h-24 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                       <img 
-                        src={item.image} 
+                        src={item.images?.[0] || '/placeholder.jpg'} 
                         alt={item.name} 
                         className="w-full h-full object-cover"
+                        onError={(e) => { e.target.onerror = null; e.target.src='/placeholder.jpg' }}
                       />
                     </div>
                     
                     <div className="flex-grow">
                       <div className="flex justify-between mb-2">
-                        <Link to={`/product/${item.id}`} className="text-lg font-medium text-gray-800 hover:text-primary">
+                        <Link to={`/product/${item.product_id}`} className="text-lg font-medium text-gray-800 hover:text-pink-500">
                           {item.name}
                         </Link>
                         <button 
-                          onClick={() => handleRemoveItem(item.id)}
+                          onClick={() => handleRemoveItem(item.product_id)}
                           className="text-gray-400 hover:text-red-500"
                           aria-label="Remove item"
                         >
@@ -126,28 +117,22 @@ const CartPage = () => {
                         </button>
                       </div>
                       
-                      {item.variant && (
-                        <div className="text-sm text-gray-500 mb-2">
-                          Option: {item.variant.name}
-                        </div>
-                      )}
-                      
-                      <div className="text-primary font-medium mb-4">
+                      <div className="text-pink-500 font-medium mb-4">
                         {formatPrice(item.price)}
                       </div>
                       
                       <div className="flex items-center gap-4">
                         <div className="flex items-center border border-gray-200 rounded-md">
                           <button
-                            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-800"
-                            onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-l-md"
+                            onClick={() => handleQuantityChange(item.product_id, item.quantity - 1)}
                           >
                             -
                           </button>
-                          <span className="w-8 text-center text-gray-800">{item.quantity}</span>
+                          <span className="w-8 text-center text-gray-800 font-medium">{item.quantity}</span>
                           <button
-                            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-800"
-                            onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-r-md"
+                            onClick={() => handleQuantityChange(item.product_id, item.quantity + 1)}
                           >
                             +
                           </button>
@@ -163,30 +148,29 @@ const CartPage = () => {
               </div>
               
               <div className="p-6 bg-gray-50 flex justify-between items-center">
-                <button 
+                <Button 
                   onClick={handleClearCart}
-                  className="text-sm text-gray-500 hover:text-red-500 flex items-center gap-1"
+                  className="!bg-transparent !text-pink-700 hover:!bg-pink-50 !border !border-pink-600 font-semibold text-sm px-6 py-2 rounded-md shadow-sm flex items-center gap-2"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 !text-pink-700" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clipRule="evenodd" />
+                    <path fillRule="evenodd" d="M4 5a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z" clipRule="evenodd" />
+                    <path fillRule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                    <path fillRule="evenodd" d="M5 13a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
                   </svg>
                   Clear Cart
-                </button>
+                </Button>
                 
                 <Button
-                  className="text-sm text-primary hover:text-primary-dark flex items-center gap-1"
+                  className="bg-pink-100 text-pink-700 hover:bg-pink-200 border border-pink-300 font-medium text-sm px-4 py-2 rounded-md"
                   onClick={handleContinueShopping}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
-                  </svg>
                   Continue Shopping
                 </Button>
               </div>
             </div>
           </div>
           
-          {/* Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-6">Order Summary</h2>
@@ -204,12 +188,12 @@ const CartPage = () => {
                 
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Total</span>
-                  <span className="text-primary">{formatPrice(totalPrice)}</span>
+                  <span className="text-pink-500">{formatPrice(totalPrice)}</span>
                 </div>
               </div>
               
               <Button
-                className="w-full bg-primary hover:bg-primary-dark text-white py-3 rounded-md font-medium"
+                className="w-full bg-pink-500 hover:bg-pink-600 text-white py-3 rounded-md font-medium"
                 onClick={handleCheckout}
               >
                 Proceed to Checkout

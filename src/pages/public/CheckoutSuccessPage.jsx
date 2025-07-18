@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom'; // Assuming you use React Router for navigation
 
 // Production components for demonstration
 const Breadcrumb = ({ items }) => (
@@ -6,9 +7,9 @@ const Breadcrumb = ({ items }) => (
     {items.map((item, index) => (
       <span key={index} className="flex items-center">
         {index > 0 && <span className="mx-2 text-gray-400">/</span>}
-        <span className={index === items.length - 1 ? 'text-gray-500' : 'text-pink-500 hover:text-pink-600 cursor-pointer'}>
+        <Link to={item.path} className={index === items.length - 1 ? 'text-gray-500' : 'text-pink-500 hover:text-pink-600'}>
           {item.label}
-        </span>
+        </Link>
       </span>
     ))}
   </nav>
@@ -24,7 +25,6 @@ const CheckoutSuccessPage = () => {
   const [orderDetails, setOrderDetails] = useState(null);
   const [orderId, setOrderId] = useState(null);
 
-  // Helper function to format price
   const formatPrice = (price) => {
     if (isNaN(price)) return '₦0.00';
     return `₦${parseFloat(price).toLocaleString('en-NG', {
@@ -34,19 +34,16 @@ const CheckoutSuccessPage = () => {
   };
 
   useEffect(() => {
-    // 1. Get orderId from URL
     const urlParams = new URLSearchParams(window.location.search);
     const orderIdFromUrl = urlParams.get('order_id');
     if (orderIdFromUrl) {
       setOrderId(orderIdFromUrl);
     }
 
-    // 2. Try to get order details from sessionStorage
     const storedOrderDetails = sessionStorage.getItem('pendingOrderDetails');
     if (storedOrderDetails) {
       try {
         setOrderDetails(JSON.parse(storedOrderDetails));
-        // 3. Clean up: remove the item from storage so it's not shown again
         sessionStorage.removeItem('pendingOrderDetails');
       } catch (error) {
         console.error("Failed to parse order details from sessionStorage:", error);
@@ -66,7 +63,6 @@ const CheckoutSuccessPage = () => {
       />
 
       <div className="max-w-4xl mx-auto">
-        {/* Success Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,15 +76,23 @@ const CheckoutSuccessPage = () => {
           )}
         </div>
 
-        {/* Order Details Display (from sessionStorage) */}
         {orderDetails ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
             <h2 className="text-lg font-semibold text-gray-800 mb-6">Your Order Summary</h2>
             
-            {/* Items List */}
             <div className="space-y-4 mb-6">
               {orderDetails.cart_obj?.map((item, index) => (
                 <div key={index} className="flex items-center gap-4 py-2 border-b border-gray-100 last:border-b-0">
+                  {/* --- THIS IS THE FIX --- */}
+                  <div className="w-16 h-16 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                    <img 
+                      src={item.image || '/placeholder.jpg'} 
+                      alt={item.product_name} 
+                      className="w-full h-full object-cover"
+                      onError={(e) => { e.target.onerror = null; e.target.src='/placeholder.jpg' }}
+                    />
+                  </div>
+                  {/* --- END OF FIX --- */}
                   <div className="flex-grow">
                     <h3 className="text-sm font-medium text-gray-800">{item.product_name}</h3>
                     <p className="text-sm text-gray-600">Quantity: {item.ordered_quantity || item.quantity}</p>
@@ -102,7 +106,6 @@ const CheckoutSuccessPage = () => {
               ))}
             </div>
 
-            {/* Total */}
             <div className="border-t border-gray-200 pt-4 mt-6">
               <div className="flex justify-between items-center">
                 <span className="text-lg font-semibold text-gray-800">Total Paid:</span>
@@ -110,7 +113,6 @@ const CheckoutSuccessPage = () => {
               </div>
             </div>
 
-            {/* Customer Details */}
             {orderDetails.customerInfo && (
                 <div className="mt-6 pt-4 border-t border-gray-200">
                     <h3 className="text-md font-semibold text-gray-700 mb-3">Customer Details</h3>
@@ -125,7 +127,6 @@ const CheckoutSuccessPage = () => {
           </div>
         )}
 
-        {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button
             onClick={() => window.location.href = '/shop'}

@@ -32,10 +32,8 @@ const AllOrders = () => {
     if (orderId && shouldHighlight) {
       setHighlightedOrderId(orderId);
       
-      // Remove the highlight after 5 seconds
       const timer = setTimeout(() => {
         setHighlightedOrderId(null);
-        // Remove the query params without refreshing
         searchParams.delete('orderId');
         searchParams.delete('highlight');
         setSearchParams(searchParams, { replace: true });
@@ -72,7 +70,7 @@ const AllOrders = () => {
 
   // Utility functions
   const formatCurrency = useCallback((amount) => {
-    if (!amount) return '₦0';
+    if (typeof amount !== 'number') return '₦0';
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: 'NGN',
@@ -112,10 +110,10 @@ const AllOrders = () => {
   // Check authentication
   const checkAuth = useCallback(() => {
     if (!isAuthenticated || !user) {
-      throw new Error('Admin authentication required to view orders. Please log in as admin.');
+      throw new Error('Admin authentication required. Please log in as admin.');
     }
     if (!isAdmin) {
-      throw new Error('Admin privileges required to view orders.');
+      throw new Error('Admin privileges required.');
     }
   }, [isAuthenticated, user, isAdmin]);
 
@@ -124,27 +122,44 @@ const AllOrders = () => {
     setNotification({ type, message });
   }, []);
 
-  // Format order data
+  // Format order data, ensuring cart data is properly parsed
   const formatOrderData = useCallback((ordersData) => {
-    return ordersData.map(order => ({
-      id: order.order_id,
-      name: order.name,
-      email: order.email,
-      phone: order.phone,
-      amount: order.amount_paid || order.amount_calculated || 0,
-      date: formatDate(order.created_at),
-      rawDate: order.created_at,
-      orderStatus: order.order_status,
-      deliveryStatus: order.delivery_status,
-      deliveryMethod: order.delivery_method,
-      address: order.street_address ? 
-        `${order.street_address}, ${order.city}, ${order.state}` : 'Pickup',
-      state: order.state,
-      city: order.city,
-      streetAddress: order.street_address,
-      cart: order.cart_obj || [],
-      rawData: order
-    }));
+    return ordersData.map(order => {
+      let cartItems = [];
+      if (typeof order.cart_obj === 'string') {
+        try {
+          const parsedCart = JSON.parse(order.cart_obj);
+          if (Array.isArray(parsedCart)) {
+            cartItems = parsedCart;
+          }
+        } catch (e) {
+          console.error(`Failed to parse cart for order ${order.order_id}:`, e);
+          cartItems = [];
+        }
+      } else if (Array.isArray(order.cart_obj)) {
+        cartItems = order.cart_obj;
+      }
+
+      return {
+        id: order.order_id,
+        name: order.name,
+        email: order.email,
+        phone: order.phone,
+        amount: order.amount_paid || order.amount_calculated || 0,
+        date: formatDate(order.created_at),
+        rawDate: order.created_at,
+        orderStatus: order.order_status,
+        deliveryStatus: order.delivery_status,
+        deliveryMethod: order.delivery_method,
+        address: order.street_address ? 
+          `${order.street_address}, ${order.city}, ${order.state}` : 'Pickup',
+        state: order.state,
+        city: order.city,
+        streetAddress: order.street_address,
+        cart: cartItems,
+        rawData: order
+      };
+    });
   }, [formatDate]);
 
   // Fetch orders with enhanced error handling
@@ -152,20 +167,11 @@ const AllOrders = () => {
     try {
       setLoading(true);
       setError(null);
+      checkAuth();
       
-      // Check authentication first
-      if (!isAuthenticated || !user) {
-        throw new Error('Admin authentication required to view orders. Please log in as admin.');
-      }
-      
-      if (!isAdmin) {
-        throw new Error('Admin privileges required to view orders.');
-      }
-      
-      const filters = {};
+      const filters = { limit: 200 };
       if (orderStatus !== 'all') filters.order_status = orderStatus;
       if (deliveryStatus !== 'all') filters.delivery_status = deliveryStatus;
-      filters.limit = 200;
       
       const result = await orderService.fetchOrders(filters);
       
@@ -176,32 +182,21 @@ const AllOrders = () => {
         throw new Error(result?.message || 'Failed to fetch orders');
       }
     } catch (err) {
-      let errorMessage = 'Failed to load orders';
-      
-      // Handle specific error types
+      let errorMessage = 'Failed to load orders. Please try again.';
       if (err.message.includes('CORS')) {
-        errorMessage = 'CORS error: The server needs to allow requests from this domain. Please contact your backend administrator.';
-      } else if (err.message.includes('Network connection failed') || 
-                 err.message.includes('Failed to fetch')) {
-        errorMessage = 'Network connection failed. Please check your internet connection and ensure the API server is running.';
-      } else if (err.message.includes('precondition') || 
-                 err.message.includes('Unauthorized') || 
-                 err.message.includes('401')) {
+        errorMessage = 'CORS error: Please contact your backend administrator.';
+      } else if (err.message.includes('Network') || err.message.includes('Failed to fetch')) {
+        errorMessage = 'Network connection failed. Please check your internet.';
+      } else if (err.message.includes('precondition') || err.message.includes('Unauthorized') || err.message.includes('401')) {
         errorMessage = 'Session expired. Please log in again as admin.';
-      } else if (err.message.includes('Authentication') ||
-                 err.message.includes('Admin')) {
-        errorMessage = err.message;
-      } else if (err.message.includes('403')) {
-        errorMessage = 'Access forbidden. Admin privileges required.';
       } else if (err.message) {
         errorMessage = err.message;
       }
-      
       setError(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [orderStatus, deliveryStatus, isAuthenticated, user, isAdmin, formatOrderData]);
+  }, [orderStatus, deliveryStatus, checkAuth, formatOrderData]);
 
   // Handle delivery status change
   const handleDeliveryStatusChange = useCallback(async (orderId, newStatus) => {
@@ -211,11 +206,8 @@ const AllOrders = () => {
 
       await orderService.changeDeliveryStatus(orderId, newStatus);
       
-      // Update local state
       setOrders(prev => prev.map(order => 
-        order.id === orderId 
-          ? { ...order, deliveryStatus: newStatus }
-          : order
+        order.id === orderId ? { ...order, deliveryStatus: newStatus } : order
       ));
       
       if (selectedOrder?.id === orderId) {
@@ -223,18 +215,13 @@ const AllOrders = () => {
       }
       
       showNotification('success', `Status updated to "${newStatus}" successfully`);
-      
     } catch (err) {
-      let errorMessage = 'Failed to update delivery status';
-      if (err.message.includes('precondition') || 
-          err.message.includes('Unauthorized') || 
-          err.message.includes('Authentication') ||
-          err.message.includes('Admin')) {
+      let errorMessage = 'Failed to update delivery status.';
+      if (err.message.includes('Authentication') || err.message.includes('Admin')) {
         errorMessage = 'Admin authentication required. Please ensure you are logged in as an admin.';
       } else if (err.message) {
         errorMessage = err.message;
       }
-      
       showNotification('error', errorMessage);
     } finally {
       setIsUpdating(false);
@@ -244,7 +231,6 @@ const AllOrders = () => {
   // Filter orders based on search
   const filteredOrders = useMemo(() => {
     if (!searchQuery.trim()) return orders;
-    
     const query = searchQuery.toLowerCase();
     return orders.filter(order => 
       order.id?.toLowerCase().includes(query) ||
@@ -269,7 +255,6 @@ const AllOrders = () => {
     };
   }, [filteredOrders, currentPage]);
 
-  // Reset filters
   const resetFilter = useCallback(() => {
     setOrderStatus('successful');
     setDeliveryStatus('all');
@@ -277,13 +262,11 @@ const AllOrders = () => {
     setCurrentPage(1);
   }, []);
 
-  // View order details
   const viewOrderDetails = useCallback((order) => {
     setSelectedOrder(order);
     setShowModal(true);
   }, []);
 
-  // Auto-dismiss notifications
   useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => setNotification(null), 5000);
@@ -291,7 +274,6 @@ const AllOrders = () => {
     }
   }, [notification]);
 
-  // Fetch orders on mount and filter changes
   useEffect(() => {
     if (isAuthenticated && user) {
       fetchOrders();
@@ -301,12 +283,10 @@ const AllOrders = () => {
     }
   }, [fetchOrders, isAuthenticated, user]);
 
-  // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, orderStatus, deliveryStatus]);
 
-  // Loading state
   if (loading && orders.length === 0) {
     return (
       <div className="bg-white rounded-lg p-6 shadow-sm">
@@ -322,25 +302,17 @@ const AllOrders = () => {
     );
   }
 
-  // Error state with enhanced messaging
   if (error && orders.length === 0) {
     const isAuthError = error.includes('authentication') || error.includes('Admin') || error.includes('Session expired');
-    const isCorsError = error.includes('CORS');
-    const isNetworkError = error.includes('Network connection failed');
-    
     return (
       <div className="bg-white rounded-lg p-6 shadow-sm">
         <div className="text-center py-12">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-800 mb-2">
-            {isAuthError ? 'Authentication Required' : 
-             isCorsError ? 'Server Configuration Issue' :
-             isNetworkError ? 'Connection Problem' :
-             'Error Loading Orders'}
+            {isAuthError ? 'Authentication Required' : 'Error Loading Orders'}
           </h3>
           <p className="text-gray-600 mb-4 max-w-md mx-auto">{error}</p>
-          
-          <div className="flex gap-2 justify-center flex-wrap">
+          <div className="flex gap-2 justify-center">
             {isAuthError ? (
               <button 
                 onClick={() => window.location.href = '/admin/login'}
@@ -348,11 +320,6 @@ const AllOrders = () => {
               >
                 Go to Login
               </button>
-            ) : isCorsError ? (
-              <div className="text-sm text-gray-500 max-w-md">
-                <p className="mb-2">This error needs to be fixed by your backend administrator.</p>
-                <p>The server needs to add CORS headers to allow requests from this domain.</p>
-              </div>
             ) : (
               <button 
                 onClick={fetchOrders}
@@ -363,21 +330,6 @@ const AllOrders = () => {
               </button>
             )}
           </div>
-          
-          {/* Debug info for developers */}
-          {process.env.NODE_ENV === 'development' && (
-            <details className="mt-4 text-left text-xs text-gray-500">
-              <summary className="cursor-pointer">Debug Info</summary>
-              <pre className="mt-2 p-2 bg-gray-100 rounded text-left overflow-auto">
-                {JSON.stringify({
-                  isAuthenticated,
-                  user: user ? { ...user, token: '[HIDDEN]' } : null,
-                  isAdmin,
-                  error: error
-                }, null, 2)}
-              </pre>
-            </details>
-          )}
         </div>
       </div>
     );
@@ -385,7 +337,6 @@ const AllOrders = () => {
 
   return (
     <div className="space-y-6">
-      {/* Notification */}
       {notification && (
         <div className={`fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 ${
           notification.type === 'success' 
@@ -394,18 +345,12 @@ const AllOrders = () => {
         }`}>
           <div className="flex items-center justify-between">
             <span>{notification.message}</span>
-            <button 
-              onClick={() => setNotification(null)} 
-              className="ml-4 text-xl hover:opacity-70"
-            >
-              ×
-            </button>
+            <button onClick={() => setNotification(null)} className="ml-4 text-xl hover:opacity-70">×</button>
           </div>
         </div>
       )}
 
       <div className="bg-white rounded-lg p-6 shadow-sm">
-        {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-2xl font-semibold text-gray-800">All Orders</h1>
@@ -423,9 +368,7 @@ const AllOrders = () => {
           </button>
         </div>
 
-        {/* Search and Filters */}
         <div className="space-y-4 mb-6">
-          {/* Search Bar */}
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <input
@@ -437,7 +380,6 @@ const AllOrders = () => {
             />
           </div>
 
-          {/* Filter Controls */}
           <div className="flex gap-4 items-center flex-wrap">
             <div className="flex border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-3 bg-gray-50 border-r border-gray-200">
@@ -447,33 +389,24 @@ const AllOrders = () => {
                 <span className="text-sm font-medium">Filter By</span>
               </div>
             </div>
-            
-            {/* Order Status Filter */}
             <select 
               className="bg-gray-50 border border-gray-200 rounded-lg py-2 px-4 text-sm transition-colors hover:bg-gray-100"
               value={orderStatus}
               onChange={(e) => setOrderStatus(e.target.value)}
             >
               {ORDER_STATUS_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-
-            {/* Delivery Status Filter */}
             <select 
               className="bg-gray-50 border border-gray-200 rounded-lg py-2 px-4 text-sm transition-colors hover:bg-gray-100"
               value={deliveryStatus}
               onChange={(e) => setDeliveryStatus(e.target.value)}
             >
               {DELIVERY_STATUS_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-
             <button 
               className="px-4 py-2 rounded-lg text-pink-500 hover:bg-pink-50 transition-colors"
               onClick={resetFilter}
@@ -483,12 +416,11 @@ const AllOrders = () => {
           </div>
         </div>
         
-        {/* Orders Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-gray-200">
-                {['ORDER ID', 'CUSTOMER', 'AMOUNT', 'DATE', 'METHOD', 'PAYMENT', 'DELIVERY', 'ACTION'].map(header => (
+                {['ORDER ID', 'CUSTOMER', 'PRODUCTS', 'AMOUNT', 'DATE', 'METHOD', 'PAYMENT', 'DELIVERY', 'ACTION'].map(header => (
                   <th key={header} className="pb-3 text-sm font-medium text-gray-500 uppercase">
                     {header}
                   </th>
@@ -512,6 +444,25 @@ const AllOrders = () => {
                       <div className="text-xs text-gray-500">{order.phone}</div>
                     </div>
                   </td>
+                  <td className="py-4 text-sm">
+                    {order.cart && order.cart.length > 0 ? (
+                      <div className="flex flex-col">
+                        <span 
+                          className="font-medium truncate max-w-[150px]" 
+                          title={order.cart.map(item => `${item.product_name || 'N/A'} (Qty: ${item.ordered_quantity || 'N/A'})`).join('\n')}
+                        >
+                          {order.cart[0].product_name || 'Unknown Product'}
+                        </span>
+                        {order.cart.length > 1 && (
+                          <span className="text-xs text-gray-500">
+                            + {order.cart.length - 1} more item(s)
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 italic">No items</span>
+                    )}
+                  </td>
                   <td className="py-4 text-sm font-semibold">{formatCurrency(order.amount)}</td>
                   <td className="py-4 text-sm">{order.date}</td>
                   <td className="py-4 text-sm">
@@ -520,8 +471,7 @@ const AllOrders = () => {
                         {order.deliveryMethod === 'pickup' ? 'Pickup' : 'Delivery'}
                       </span>
                       {order.deliveryMethod === 'address' && (
-                        <span className="text-xs text-gray-500 truncate max-w-[120px]" 
-                              title={`${order.city}, ${order.state}`}>
+                        <span className="text-xs text-gray-500 truncate max-w-[120px]" title={`${order.city}, ${order.state}`}>
                           {order.city}, {order.state}
                         </span>
                       )}
@@ -540,9 +490,7 @@ const AllOrders = () => {
                       className={`text-xs px-2 py-1 rounded-full border-0 cursor-pointer font-medium transition-colors ${getStatusBadgeStyle(order.deliveryStatus)} ${!isAuthenticated || !isAdmin ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'}`}
                     >
                       {DELIVERY_UPDATE_OPTIONS.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
+                        <option key={option.value} value={option.value}>{option.label}</option>
                       ))}
                     </select>
                   </td>
@@ -558,7 +506,7 @@ const AllOrders = () => {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-gray-500">
+                  <td colSpan="9" className="py-12 text-center text-gray-500">
                     <div className="text-6xl mb-4">📦</div>
                     <p className="text-lg font-medium">No orders found</p>
                     {searchQuery && (
@@ -571,7 +519,6 @@ const AllOrders = () => {
           </table>
         </div>
         
-        {/* Pagination */}
         {paginationData.totalPages > 1 && (
           <div className="mt-6 flex items-center justify-between">
             <div className="text-sm text-gray-500">
@@ -582,38 +529,27 @@ const AllOrders = () => {
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
                 className="h-8 w-8 flex justify-center items-center rounded border border-gray-200 disabled:opacity-50 hover:bg-gray-50 transition-colors"
-              >
-                ‹
-              </button>
+              >‹</button>
               <span className="text-sm px-2">Page {currentPage} of {paginationData.totalPages}</span>
               <button 
                 onClick={() => setCurrentPage(Math.min(paginationData.totalPages, currentPage + 1))}
                 disabled={currentPage === paginationData.totalPages}
                 className="h-8 w-8 flex justify-center items-center rounded border border-gray-200 disabled:opacity-50 hover:bg-gray-50 transition-colors"
-              >
-                ›
-              </button>
+              >›</button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Order Details Modal */}
       {showModal && selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-6">
               <h3 className="text-xl font-semibold">Order Details</h3>
-              <button 
-                onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-              >
-                ×
-              </button>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Order Info */}
               <div>
                 <h4 className="font-semibold mb-3">Order Information</h4>
                 <div className="space-y-2 text-sm">
@@ -633,7 +569,6 @@ const AllOrders = () => {
                 </div>
               </div>
 
-              {/* Customer Info */}
               <div>
                 <h4 className="font-semibold mb-3">Customer Information</h4>
                 <div className="space-y-2 text-sm">
@@ -646,19 +581,23 @@ const AllOrders = () => {
               </div>
             </div>
 
-            {/* Order Items */}
             {selectedOrder.cart?.length > 0 && (
               <div className="mt-6">
-                <h4 className="font-semibold mb-3">Order Items</h4>
+                <h4 className="font-semibold mb-3">Order Items ({selectedOrder.cart.length})</h4>
                 <div className="space-y-2">
                   {selectedOrder.cart.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                    <div key={item.product_id || index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
                       <div>
-                        <p className="font-medium">{item.product_name}</p>
-                        <p className="text-sm text-gray-500">Qty: {item.ordered_quantity}</p>
+                        <p className="font-medium">{item.product_name || 'Unnamed Product'}</p>
+                        <p className="text-sm text-gray-500">Qty: {item.ordered_quantity || 'N/A'}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">{formatCurrency(item.product_price * item.ordered_quantity)}</p>
+                        <p className="font-semibold">{formatCurrency((item.product_price || 0) * (item.ordered_quantity || 1))}</p>
+                        {typeof item.product_price === 'number' && (
+                           <p className="text-xs text-gray-500">
+                             {formatCurrency(item.product_price)} each
+                           </p>
+                        )}
                       </div>
                     </div>
                   ))}
