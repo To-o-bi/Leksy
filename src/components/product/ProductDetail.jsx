@@ -121,29 +121,39 @@ const ProductDetail = ({ product }) => {
     return (
         <div className="bg-white">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
                     {/* Product Images */}
-                    <div>
-                        <div className="mb-4 relative bg-gray-100 rounded-lg overflow-hidden shadow-sm aspect-square">
+                    <div className="space-y-4">
+                        <div className="relative bg-gray-50 rounded-xl overflow-hidden shadow-lg border border-gray-100" style={{ aspectRatio: '4/3', maxHeight: '400px' }}>
                             <img 
                                 src={normalizedProduct.images[selectedImage]}
                                 alt={normalizedProduct.name} 
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                             />
                             {normalizedProduct.discount > 0 && (
-                                <div className="absolute top-4 left-4 bg-red-600 text-white text-xs font-bold px-2.5 py-1 rounded-sm">-{normalizedProduct.discount}%</div>
+                                <div className="absolute top-4 left-4 bg-red-500 text-white text-sm font-bold px-3 py-1.5 rounded-lg shadow-md">
+                                    -{normalizedProduct.discount}%
+                                </div>
                             )}
                         </div>
                         
                         {normalizedProduct.images.length > 1 && (
-                            <div className="grid grid-cols-5 gap-2">
+                            <div className="grid grid-cols-4 gap-3">
                                 {normalizedProduct.images.map((image, index) => (
                                     <div 
                                         key={index} 
-                                        className={`border rounded-md overflow-hidden cursor-pointer transition-all aspect-square ${selectedImage === index ? 'border-pink-500 border-2' : 'border-gray-200 hover:border-gray-400'}`}
+                                        className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 aspect-square ${
+                                            selectedImage === index 
+                                                ? 'border-pink-500 shadow-md ring-2 ring-pink-200' 
+                                                : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                                        }`}
                                         onClick={() => setSelectedImage(index)}
                                     >
-                                        <img src={image} alt={`${normalizedProduct.name} thumbnail ${index + 1}`} className="w-full h-full object-cover" />
+                                        <img 
+                                            src={image} 
+                                            alt={`${normalizedProduct.name} thumbnail ${index + 1}`} 
+                                            className="w-full h-full object-cover"
+                                        />
                                     </div>
                                 ))}
                             </div>
@@ -151,19 +161,31 @@ const ProductDetail = ({ product }) => {
                     </div>
                     
                     {/* Product Information */}
-                    <div>
-                        <h1 className="text-2xl lg:text-3xl font-bold text-gray-800 mb-2">{normalizedProduct.name}</h1>
-                        
-                        <div className="flex items-center space-x-3 mb-4">
-                            <span className="text-3xl font-bold text-gray-900">{formatter.formatCurrency(normalizedProduct.price)}</span>
-                            {normalizedProduct.originalPrice && (
-                                <span className="text-xl text-gray-400 line-through">{formatter.formatCurrency(normalizedProduct.originalPrice)}</span>
-                            )}
+                    <div className="space-y-6">
+                        <div className="space-y-3">
+                            <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 leading-tight">
+                                {normalizedProduct.name}
+                            </h1>
+                            
+                            <div className="flex items-baseline space-x-3">
+                                <span className="text-4xl font-bold text-gray-900">
+                                    {formatter.formatCurrency(normalizedProduct.price)}
+                                </span>
+                                {normalizedProduct.originalPrice && (
+                                    <span className="text-xl text-gray-500 line-through">
+                                        {formatter.formatCurrency(normalizedProduct.originalPrice)}
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
-                        <div className="flex items-center mb-6">
-                            <span className={`inline-block w-3 h-3 rounded-full mr-2 ${normalizedProduct.stock > 0 ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                            <span className="text-sm font-medium">
+                        <div className="flex items-center space-x-2">
+                            <div className={`w-3 h-3 rounded-full ${
+                                normalizedProduct.stock > 0 ? 'bg-green-500' : 'bg-red-500'
+                            }`}></div>
+                            <span className={`text-sm font-medium ${
+                                normalizedProduct.stock > 0 ? 'text-green-700' : 'text-red-700'
+                            }`}>
                                 {normalizedProduct.stock > 0 
                                     ? (normalizedProduct.stock <= 5 ? `Only ${normalizedProduct.stock} left in stock` : 'In Stock') 
                                     : 'Out of Stock'}
@@ -171,59 +193,95 @@ const ProductDetail = ({ product }) => {
                         </div>
                         
                         {normalizedProduct.description && (
-                            <p className="text-gray-600 mb-6 leading-relaxed">{normalizedProduct.description}</p>
+                            <div className="border-t border-gray-200 pt-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
+                                <p className="text-gray-700 leading-relaxed text-base">
+                                    {normalizedProduct.description}
+                                </p>
+                            </div>
                         )}
                         
                         {normalizedProduct.stock > 0 && (
-                            <div className="flex items-center mb-6">
-                                <span className="mr-4 text-sm font-medium text-gray-700">Quantity:</span>
-                                <div className="flex border border-gray-300 rounded-md">
-                                    <button onClick={decrementQuantity} className="px-3 py-1.5 border-r text-lg hover:bg-gray-100 disabled:opacity-50" disabled={Number(quantity) <= 1}>-</button>
+                            <div className="flex items-center space-x-4 py-4">
+                                <label className="text-sm font-semibold text-gray-900">Quantity:</label>
+                                <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                                    <button 
+                                        onClick={decrementQuantity} 
+                                        className="px-4 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-r border-gray-300"
+                                        disabled={Number(quantity) <= 1}
+                                    >
+                                        −
+                                    </button>
                                     <input
-                                        type="text" // Use text to allow empty string, validation is handled
+                                        type="text"
                                         value={quantity}
                                         onChange={handleQuantityInputChange}
-                                        onBlur={handleQuantityInputBlur} // Add blur handler for validation
-                                        className="w-12 text-center focus:outline-none"
+                                        onBlur={handleQuantityInputBlur}
+                                        className="w-16 text-center py-2 font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                                         min="1"
                                         max={normalizedProduct.stock}
                                     />
-                                    <button onClick={incrementQuantity} className="px-3 py-1.5 border-l text-lg hover:bg-gray-100 disabled:opacity-50" disabled={Number(quantity) >= normalizedProduct.stock}>+</button>
+                                    <button 
+                                        onClick={incrementQuantity} 
+                                        className="px-4 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-l border-gray-300"
+                                        disabled={Number(quantity) >= normalizedProduct.stock}
+                                    >
+                                        +
+                                    </button>
                                 </div>
                             </div>
                         )}
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                        <div className="flex gap-3">
                             <button
-                                className="bg-pink-500 hover:bg-pink-600 text-white py-3 px-6 rounded-md font-semibold w-full transition disabled:bg-gray-400"
+                                className="flex-1 bg-pink-500 hover:bg-pink-600 text-white py-3.5 px-6 rounded-lg font-semibold transition-all duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
                                 onClick={handleAddToCart}
                                 disabled={normalizedProduct.stock <= 0}
                             >
                                 Add To Cart
                             </button>
                             <button
-                                className="bg-gray-800 hover:bg-gray-900 text-white py-3 px-6 rounded-md font-semibold w-full transition disabled:bg-gray-400"
+                                className="flex-1 bg-transparent border-2 border-pink-500 text-pink-500 hover:bg-pink-50 py-3.5 px-6 rounded-lg font-semibold transition-all duration-200 disabled:border-gray-300 disabled:text-gray-300 disabled:cursor-not-allowed hover:shadow-md"
                                 onClick={handleCheckoutNow}
                                 disabled={normalizedProduct.stock <= 0}
                             >
-                                Buy Now
+                                Checkout Now
+                            </button>
+                            <button 
+                                className={`flex items-center justify-center w-14 h-14 rounded-lg border-2 font-medium transition-all duration-200 ${
+                                    isProductInWishlist 
+                                        ? 'bg-pink-50 text-pink-600 border-pink-200 shadow-sm' 
+                                        : 'bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:border-gray-400'
+                                }`}
+                                onClick={handleToggleWishlist}
+                                aria-label={isProductInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+                            >
+                                <svg 
+                                    xmlns="http://www.w3.org/2000/svg" 
+                                    className="h-5 w-5" 
+                                    fill={isProductInWishlist ? 'currentColor' : 'none'} 
+                                    viewBox="0 0 24 24" 
+                                    stroke="currentColor"
+                                >
+                                    <path 
+                                        strokeLinecap="round" 
+                                        strokeLinejoin="round" 
+                                        strokeWidth={2} 
+                                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                                    />
+                                </svg>
                             </button>
                         </div>
-                        <button 
-                            className={`w-full flex items-center justify-center rounded-md p-3 border transition-colors ${isProductInWishlist ? 'bg-pink-50 text-pink-500 border-pink-200' : 'bg-white hover:bg-gray-100 border-gray-300'}`}
-                            onClick={handleToggleWishlist}
-                            aria-label={isProductInWishlist ? "Remove from wishlist" : "Add to wishlist"}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill={isProductInWishlist ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
-                            {isProductInWishlist ? 'Added to Wishlist' : 'Add to Wishlist'}
-                        </button>
                     
                         {normalizedProduct.benefits.length > 0 && (
-                            <div className="pt-6 mt-6 border-t border-gray-200">
-                                <h3 className="text-md font-semibold mb-3 text-gray-700">Good For:</h3>
+                            <div className="border-t border-gray-200 pt-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Good For:</h3>
                                 <div className="flex flex-wrap gap-2">
                                     {normalizedProduct.benefits.map((benefit, index) => (
-                                        <span key={index} className="bg-gray-100 text-gray-700 text-xs font-medium px-3 py-1.5 rounded-full">
+                                        <span 
+                                            key={index} 
+                                            className="bg-gray-100 text-gray-700 text-sm font-medium px-4 py-2 rounded-full border border-gray-200 hover:bg-gray-200 transition-colors"
+                                        >
                                             {decodeHtmlEntities(benefit)}
                                         </span>
                                     ))}
