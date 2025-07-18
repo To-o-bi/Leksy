@@ -49,8 +49,7 @@ const FooterLinkGroup = ({ title, links }) => (
 
 const Footer = () => {
   const accountLinks = [
-    { label: 'Order History', path: '/admin/orders' },
-    { label: 'Login', path: '/admin/login' },
+    { label: 'Track Order', path: '/contact' },
     { label: 'Wishlist', path: '/wishlist' },
     { label: 'Checkout', path: '/checkout' },
     { label: 'Cart', path: '/cart' }

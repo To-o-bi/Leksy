@@ -1,204 +1,179 @@
-import React, { useContext } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { WishlistContext } from '../../contexts/WishlistContext';
-import { CartContext } from '../../contexts/CartContext';
-import { FaFacebookF, FaTwitter, FaPinterestP, FaInstagram } from 'react-icons/fa';
+import { useWishlist } from '../../contexts/WishlistContext';
+import { useCart } from '../../hooks/useCart';
+import { productService } from '../../api'; // Ensure this path is correct
+import { formatter } from '../../utils/formatter'; // Corrected import
+import ProductCard from '../../components/product/ProductCard'; 
+import Breadcrumb from '../../components/common/Breadcrumb'; // Assuming you have this component
+import { FaFacebookF, FaTwitter, FaWhatsapp } from 'react-icons/fa';
 
+/**
+ * Renders the user's wishlist page.
+ * Displays wishlist items and suggestions for related products.
+ */
 const WishlistPage = () => {
-  const { wishlist, removeFromWishlist } = useContext(WishlistContext);
-  const { addToCart } = useContext(CartContext);
+  const { wishlist, removeFromWishlist } = useWishlist();
+  const { addToCart } = useCart();
+  const [relatedProducts, setRelatedProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Fetch related/featured products when the component mounts
+  useEffect(() => {
+    const fetchRelated = async () => {
+      setIsLoading(true);
+      try {
+        // Example: Fetch 4 random or featured products
+        const response = await productService.fetchProducts({ limit: 4, sort: 'random' });
+        if (response.products) {
+          setRelatedProducts(response.products);
+        }
+      } catch (error) {
+        console.error("Failed to fetch related products:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchRelated();
+  }, []);
 
-  const handleAddToCart = (product) => {
-    addToCart(product);
-  };
+  // Handler for social media sharing
+  const handleShare = (platform) => {
+    const pageUrl = encodeURIComponent(window.location.href);
+    const message = encodeURIComponent("Check out my wishlist on Leksy Store!");
+    let shareUrl = '';
 
-  const handleRemove = (productId) => {
-    removeFromWishlist(productId);
-  };
-
-  // Format price to use NGN currency format
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('en-NG', {
-      style: 'currency',
-      currency: 'NGN',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(price).replace('NGN', '₦');
+    switch (platform) {
+      case 'twitter':
+        shareUrl = `https://twitter.com/intent/tweet?url=${pageUrl}&text=${message}`;
+        break;
+      case 'facebook':
+        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${pageUrl}`;
+        break;
+      case 'whatsapp':
+        shareUrl = `https://api.whatsapp.com/send?text=${message}%20${pageUrl}`;
+        break;
+      default:
+        return;
+    }
+    window.open(shareUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Breadcrumb */}
-      <div className="flex items-center text-sm mb-8">
-        <Link to="/" className="text-gray-500 hover:text-pink-500">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-          </svg>
-        </Link>
-        <span className="mx-2 text-gray-400">/</span>
-        <span className="text-pink-500">Wishlist</span>
-      </div>
+    <div className="bg-gray-50 min-h-screen">
+      <div className="container mx-auto px-4 py-8">
+        <Breadcrumb items={[{ label: 'Home', path: '/' }, { label: 'Wishlist' }]} />
+        <h1 className="text-3xl md:text-4xl font-bold mb-8 text-center text-gray-800">My Wishlist</h1>
 
-      {/* Page Title */}
-      <h1 className="text-3xl font-bold mb-8 text-center">My Wishlist</h1>
-
-      {wishlist.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-xl text-gray-500 mb-6">Your wishlist is empty.</p>
-          <Link to="/shop" className="bg-pink-500 text-white py-3 px-8 rounded-md hover:bg-pink-600 transition">
-            Continue Shopping
-          </Link>
-        </div>
-      ) : (
-        <>
-          {/* Wishlist Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="text-left bg-gray-50">
-                  <th className="py-4 px-6 font-medium text-gray-500 uppercase text-sm">PRODUCT</th>
-                  <th className="py-4 px-6 font-medium text-gray-500 uppercase text-sm">PRICE</th>
-                  <th className="py-4 px-6 font-medium text-gray-500 uppercase text-sm">STOCK STATUS</th>
-                  <th className="py-4 px-6 font-medium text-gray-500 uppercase text-sm"></th>
-                  <th className="py-4 px-6 font-medium text-gray-500 uppercase text-sm"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {wishlist.map((product) => {
-                  const isInStock = product.stockStatus !== 'Out of Stock';
-                  
-                  return (
-                    <tr key={product.id} className="border-t">
-                      <td className="py-4 px-6">
-                        <div className="flex items-center">
-                          <img src={product.image} alt={product.name} className="w-16 h-16 object-cover mr-4" />
-                          <span className="font-medium">{product.name}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        {product.oldPrice && (
-                          <span className="line-through text-gray-400 mr-2">{formatPrice(product.oldPrice)}</span>
-                        )}
-                        <span className="font-bold">{formatPrice(product.price)}</span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className={`py-1 px-3 rounded-md text-sm ${isInStock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {isInStock ? 'In Stock' : 'Out of Stock'}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <button
-                          onClick={() => handleAddToCart(product)}
-                          disabled={!isInStock}
-                          className={`py-2 px-6 rounded-md text-sm font-medium ${
-                            isInStock
-                              ? 'bg-pink-500 text-white hover:bg-pink-600'
-                              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                          }`}
-                        >
-                          Add to Cart
-                        </button>
-                      </td>
-                      <td className="py-4 px-6">
-                        <button
-                          onClick={() => handleRemove(product.id)}
-                          className="text-gray-400 hover:text-gray-600"
-                          aria-label="Remove from wishlist"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        {wishlist.length === 0 ? (
+          <div className="text-center py-16 px-6 bg-white rounded-lg shadow-md">
+            <p className="text-xl text-gray-600 mb-6">Your wishlist is currently empty.</p>
+            <p className="text-gray-500 mb-8">Add items you love to your wishlist to save them for later!</p>
+            <Link to="/shop" className="bg-pink-500 text-white py-3 px-8 rounded-md hover:bg-pink-600 transition-colors font-semibold">
+              Discover Products
+            </Link>
           </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto shadow-md rounded-lg mb-8">
+              <table className="w-full border-collapse bg-white">
+                <thead className="bg-gray-100">
+                  <tr className="text-left">
+                    <th className="py-4 px-6 font-semibold text-gray-600 uppercase text-sm" colSpan="2">PRODUCT</th>
+                    <th className="py-4 px-6 font-semibold text-gray-600 uppercase text-sm hidden md:table-cell">PRICE</th>
+                    <th className="py-4 px-6 font-semibold text-gray-600 uppercase text-sm hidden md:table-cell">STOCK</th>
+                    <th className="py-4 px-6 font-semibold text-gray-600 uppercase text-sm text-right">ACTION</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {wishlist.map((product) => {
+                    const isInStock = product.available_qty > 0;
+                    return (
+                      <tr key={product.product_id} className="border-t hover:bg-gray-50 transition-colors">
+                        <td className="py-4 px-6 w-24">
+                          <Link to={`/product/${product.product_id}`}>
+                            <img 
+                              src={product.images?.[0] || 'https://placehold.co/100x100/f7f7f7/ccc?text=Image'} 
+                              alt={product.name} 
+                              className="w-16 h-16 object-cover rounded-md" 
+                            />
+                          </Link>
+                        </td>
+                        <td className="py-4 px-2 md:px-6">
+                          <Link to={`/product/${product.product_id}`} className="font-medium text-gray-800 hover:text-pink-500">{product.name}</Link>
+                          <div className="md:hidden text-sm font-bold mt-1">{formatter.formatCurrency(product.price)}</div>
+                        </td>
+                        <td className="py-4 px-6 hidden md:table-cell">
+                          <span className="font-bold text-lg text-gray-800">{formatter.formatCurrency(product.price)}</span>
+                        </td>
+                        <td className="py-4 px-6 hidden md:table-cell">
+                          <span className={`py-1 px-3 rounded-full text-xs font-semibold ${isInStock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {isInStock ? 'In Stock' : 'Out of Stock'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          <div className="flex flex-col sm:flex-row justify-end items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                            <button
+                              onClick={() => addToCart(product)}
+                              disabled={!isInStock}
+                              className="bg-pink-500 text-white py-2 px-4 rounded-md text-sm font-medium hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                              Add to Cart
+                            </button>
+                            <button
+                              onClick={() => removeFromWishlist(product.product_id)}
+                              className="text-gray-400 hover:text-red-500 p-2"
+                              aria-label="Remove from wishlist"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-          {/* Social Share Section */}
-          <div className="mt-8 border-t pt-6">
-            <div className="flex items-center">
-              <span className="mr-4 font-medium">Share:</span>
-              <div className="flex space-x-2">
-                <a href="#" className="bg-pink-500 text-white p-2 rounded-full">
-                  <FaFacebookF className="h-4 w-4" />
-                </a>
-                <a href="#" className="bg-gray-200 text-gray-600 p-2 rounded-full hover:bg-gray-300">
-                  <FaTwitter className="h-4 w-4" />
-                </a>
-                <a href="#" className="bg-gray-200 text-gray-600 p-2 rounded-full hover:bg-gray-300">
-                  <FaPinterestP className="h-4 w-4" />
-                </a>
-                <a href="#" className="bg-gray-200 text-gray-600 p-2 rounded-full hover:bg-gray-300">
-                  <FaInstagram className="h-4 w-4" />
-                </a>
+            <div className="mt-8 border-t pt-6 flex justify-end">
+              <div className="flex items-center">
+                <span className="mr-4 font-medium text-gray-600">Share your wishlist:</span>
+                <div className="flex space-x-4">
+                  <button onClick={() => handleShare('facebook')} aria-label="Share on Facebook" className="text-gray-500 hover:text-blue-600 transition-colors"><FaFacebookF size={20} /></button>
+                  <button onClick={() => handleShare('twitter')} aria-label="Share on Twitter" className="text-gray-500 hover:text-sky-500 transition-colors"><FaTwitter size={20} /></button>
+                  <button onClick={() => handleShare('whatsapp')} aria-label="Share on WhatsApp" className="text-gray-500 hover:text-green-500 transition-colors"><FaWhatsapp size={20} /></button>
+                </div>
               </div>
             </div>
+          </>
+        )}
+
+        <div className="mt-24">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">You Might Also Like</h2>
+            <Link to="/shop" className="text-pink-500 hover:underline font-medium flex items-center">
+              See all
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
           </div>
-        </>
-      )}
-
-      {/* Related Products Section */}
-      <div className="mt-16">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Related Products</h2>
-          <Link to="/shop" className="text-gray-500 hover:text-pink-500 flex items-center">
-            See all
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
+          
+          {isLoading ? (
+             <p className="text-center text-gray-500 py-8">Loading recommendations...</p>
+          ) : relatedProducts.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {relatedProducts.map((product) => (
+                <ProductCard key={product.product_id || product.id} product={product} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-gray-500 py-8">Could not load recommendations at this time.</p>
+          )}
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Example related products - these would come from your actual product data */}
-          {Array.from({ length: 4 }).map((_, index) => (
-            <RelatedProductCard key={index} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Sample Related Product Card component
-const RelatedProductCard = () => {
-  const [isWishlisted, setIsWishlisted] = React.useState(false);
-  
-  const toggleWishlist = (e) => {
-    e.preventDefault();
-    setIsWishlisted(!isWishlisted);
-  };
-
-  return (
-    <div className="group relative bg-white border rounded-lg overflow-hidden">
-      <div className="relative pt-[100%]">
-        <img 
-          src="https://via.placeholder.com/300x300?text=Skincare+Product" 
-          alt="Timeless Skincare TIMELESS 20% Vitamin C Serum + Vitamin E + Ferulic Acid" 
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <button 
-          onClick={toggleWishlist}
-          className="absolute top-2 right-2 z-10 bg-white p-1.5 rounded-full shadow-sm"
-        >
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            className={`h-5 w-5 ${isWishlisted ? 'text-pink-500 fill-pink-500' : 'text-gray-400'}`} 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
-            fill="none"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        </button>
-      </div>
-      <div className="p-4">
-        <h3 className="text-sm text-gray-500">Timeless Skincare TIMELESS</h3>
-        <p className="font-medium">20% Vitamin C Serum + Vitamin E + Ferulic Acid</p>
-        <p className="font-bold mt-2">₦15,000</p>
       </div>
     </div>
   );
