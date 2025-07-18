@@ -31,28 +31,30 @@ const ProductDetailPage = () => {
                 
                 if (!apiResponse || !apiResponse.product) {
                     setError("Product not found");
-                    setLoading(false); // Stop loading if product not found
+                    setLoading(false);
                     return;
                 }
 
                 const productData = apiResponse.product;
                 setProduct(productData);
                 
-                // Fetch related products based on category
+                // Fetch related products based on the product's category
                 try {
                     const category = productData.category || productData.category_name;
                     if (category && category !== 'Uncategorized') {
                         const relatedData = await productService.fetchProducts({
                             categories: [category],
-                            limit: 5
+                            limit: 5 // Fetch one extra to filter out the current product
                         });
                         
                         if (relatedData.products) {
                             const related = relatedData.products
+                                // Ensure the current product is not in the related list
                                 .filter(p => {
                                     const pId = p.id || p._id || p.product_id;
                                     return pId && pId !== productId;
                                 })
+                                // Limit to 4 related products
                                 .slice(0, 4);
                                 
                             setRelatedProducts(related);
@@ -60,7 +62,7 @@ const ProductDetailPage = () => {
                     }
                 } catch (relatedErr) {
                     console.error("Error fetching related products:", relatedErr);
-                    setRelatedProducts([]);
+                    setRelatedProducts([]); // Reset on error
                 }
             } catch (err) {
                 console.error("Error fetching product details:", err);
@@ -71,7 +73,7 @@ const ProductDetailPage = () => {
         };
 
         fetchProductDetails();
-        window.scrollTo(0, 0);
+        window.scrollTo(0, 0); // Scroll to top on new product load
     }, [productId]);
 
     if (loading) {
@@ -110,16 +112,18 @@ const ProductDetailPage = () => {
 
     return (
         <div className="min-h-screen bg-white">
-            <Breadcrumb items={breadcrumbItems} />
-            <div className="container mx-auto px-4 py-8">
-                {product && <ProductDetail product={product} />}
-                
-                {relatedProducts.length > 0 && (
-                    <div className="mt-12">
-                        <RelatedProducts products={relatedProducts} />
-                    </div>
-                )}
+            <div className="container mx-auto px-4 py-4 sm:py-6">
+                <Breadcrumb items={breadcrumbItems} />
             </div>
+            
+            <div className="container mx-auto px-4 pb-8">
+                {product && <ProductDetail product={product} />}
+            </div>
+            
+            {/* The RelatedProducts component is now linked and will display here */}
+            {relatedProducts.length > 0 && (
+                <RelatedProducts products={relatedProducts} />
+            )}
         </div>
     );
 };
