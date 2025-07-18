@@ -45,8 +45,12 @@ curl --location --request POST '{base_url}/api/admin/logout' \
 ## Add Product
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/add-product?name={name}&price={price|numeric}&slashed_price={slashed_price|numeric}&description={description}&quantity={quantity|integer}&concern_options={concern_options_1,concern_options_2,concern_options_n}&category={category}&images={files|max:2mb_each|image/*}' \
+curl --location --request POST '{base_url}/api/admin/add-product?name={name}&price={price|numeric}&slashed_price={slashed_price|numeric}&deal_end_date={valid_datetime_format|optional}&deal_price={deal_price|numeric|optional}&description={description}&quantity={quantity|integer}&concern_options={concern_options_1,concern_options_2,concern_options_n}&category={category}&images={files|max:2mb_each|image/*}' \
 --header 'Authorization: Bearer {token}'
+```
+
+```
+[POST] valid_datetime_format = {YYYY-MM-DD H:i:s} (e.g; "2025-11-25 22:10:55")
 ```
 
 ```JSON
@@ -62,7 +66,7 @@ curl --location --request POST '{base_url}/api/admin/add-product?name={name}&pri
 ## Update Product
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/update-product?product_id={product_id}name={name|optional}&price={price|numeric|optional}&slashed_price={slashed_price|numeric|optional}&description={description|optional}&available_qty={available_qty|integer|optional}&category={category|optional}&concern_options={concern_options_1,concern_options_2,concern_options_n}&images={files|max:2mb_each|image/*|optional}' \
+curl --location --request POST '{base_url}/api/admin/update-product?product_id={product_id}name={name|optional}&price={price|numeric|optional}&slashed_price={slashed_price|numeric|optional}&deal_end_date={YYYY-MM-DD H:i:s|optional}&deal_price={deal_price|numeric|optional}&description={description|optional}&available_qty={available_qty|integer|optional}&category={category|optional}&concern_options={concern_options_1,concern_options_2,concern_options_n}&images={files|max:2mb_each|image/*|optional}' \
 --header 'Authorization: Bearer {token}'
 ```
 
@@ -110,6 +114,7 @@ curl --location --request GET '{base_url}/api/fetch-product?product_id={product_
 		"name": "Product Name",
 		"price": 2999,
 		"slashed_price": 3999,
+		"deal_end_date": "2025-11-25 22:10:55",
 		"description": "Something something",
 		"available_qty": 12,
 		"images": ["image_1", "image_2", "image_3"],
@@ -133,7 +138,7 @@ Can take (optionally):
 
 - [GET] filter = {serums|moisturizers|bathe and body|sunscreens|toners|face cleansers} // for filtering out the categories of products you are interested in. E.g; ?filter=serum will return every products under serum. (To apply multiple filters, just use comma. E.g; ?filter=serums,bathe and body,sunscreens)
 
-- [GET] sort = {name|price|category} // can sort by column names, i.e; sort='price', to sort by price (always ASC)
+- [GET] sort = {name|price|category} // can sort by column names, i.e; sort='price', to sort by price (Always ASC)
 ```
 
 ```JSON
@@ -146,6 +151,7 @@ Can take (optionally):
 			"name": "Product Name",
 			"price": 2999,
 			"slashed_price": 3999,
+			"deal_end_date": "2025-11-25 22:10:55",
 			"description": "Something something",
 			"available_qty": 12,
 			"images": ["image_1", "image_2", "image_3"],
@@ -157,6 +163,7 @@ Can take (optionally):
 			"name": "Product Name",
 			"price": 12000,
 			"slashed_price": 15000,
+			"deal_end_date": "2025-11-25 22:10:55",
 			"description": "Something something",
 			"available_qty": 5,
 			"images": ["image_1", "image_2", "image_3"],
