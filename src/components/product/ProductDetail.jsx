@@ -113,6 +113,20 @@ const ProductDetail = ({ product }) => {
         toggleWishlistItem(normalizedProduct);
         // The WishlistContext now handles showing the notification
     };
+
+    const handleShare = () => {
+        if (navigator.share) {
+            navigator.share({
+                title: normalizedProduct.name,
+                text: `Check out this product: ${normalizedProduct.name}`,
+                url: window.location.href
+            });
+        } else {
+            // Fallback: copy to clipboard
+            navigator.clipboard.writeText(window.location.href);
+            // You can add a toast notification here if needed
+        }
+    };
     
     if (!normalizedProduct) {
         return <div className="p-8 text-center">Product data not available.</div>;
@@ -121,28 +135,51 @@ const ProductDetail = ({ product }) => {
     return (
         <div className="bg-white">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-6">
                     {/* Product Images */}
                     <div className="space-y-4">
-                        <div className="relative bg-gray-50 rounded-xl overflow-hidden shadow-lg border border-gray-100" style={{ aspectRatio: '4/3', maxHeight: '400px' }}>
-                            <img 
-                                src={normalizedProduct.images[selectedImage]}
-                                alt={normalizedProduct.name} 
-                                className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                            />
-                            {normalizedProduct.discount > 0 && (
-                                <div className="absolute top-4 left-4 bg-red-500 text-white text-sm font-bold px-3 py-1.5 rounded-lg shadow-md">
-                                    -{normalizedProduct.discount}%
-                                </div>
-                            )}
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1 relative bg-gray-50 rounded-xl overflow-hidden shadow-lg border border-gray-100" style={{ aspectRatio: '4/3', maxHeight: '400px' }}>
+                                <img 
+                                    src={normalizedProduct.images[selectedImage]}
+                                    alt={normalizedProduct.name} 
+                                    className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                                />
+                                {normalizedProduct.discount > 0 && (
+                                    <div className="absolute top-4 left-4 bg-red-500 text-white text-sm font-bold px-3 py-1.5 rounded-lg shadow-md">
+                                        -{normalizedProduct.discount}%
+                                    </div>
+                                )}
+                            </div>
+                            {/* Share Icon positioned beside the image */}
+                            <button 
+                                className="ml-3 flex items-center justify-center w-10 h-10 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow-md"
+                                onClick={handleShare}
+                                aria-label="Share product"
+                            >
+                                <svg 
+                                    xmlns="http://www.w3.org/2000/svg" 
+                                    className="h-5 w-5" 
+                                    fill="none" 
+                                    viewBox="0 0 24 24" 
+                                    stroke="currentColor"
+                                >
+                                    <path 
+                                        strokeLinecap="round" 
+                                        strokeLinejoin="round" 
+                                        strokeWidth={2} 
+                                        d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" 
+                                    />
+                                </svg>
+                            </button>
                         </div>
                         
                         {normalizedProduct.images.length > 1 && (
-                            <div className="grid grid-cols-4 gap-3">
-                                {normalizedProduct.images.map((image, index) => (
+                            <div className="grid grid-cols-6 gap-1.5">
+                                {normalizedProduct.images.slice(0, 5).map((image, index) => (
                                     <div 
                                         key={index} 
-                                        className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 aspect-square ${
+                                        className={`relative border-2 rounded-md overflow-hidden cursor-pointer transition-all duration-200 aspect-square ${
                                             selectedImage === index 
                                                 ? 'border-pink-500 shadow-md ring-2 ring-pink-200' 
                                                 : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
