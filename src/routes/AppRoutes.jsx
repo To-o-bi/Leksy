@@ -4,6 +4,19 @@ import PublicRoutes from './PublicRoutes';
 import ProtectedRoute from './ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
 
+// --- ADDED: ScrollToTop component ---
+// This component will automatically scroll the window to the top on every route change.
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+};
+
+
 // Loading fallback for lazy-loaded components
 const LoadingFallback = () => (
     <div className="flex items-center justify-center h-screen bg-gray-100">
@@ -28,7 +41,6 @@ const ConsultationSuccessPage = lazy(() => import('../components/consultation/Co
 const CheckoutSuccessPage = lazy(() => import('../pages/public/CheckoutSuccessPage'));
 const PrivacyPolicyPage = lazy(() => import('../pages/public/PolicyPages/PrivacyPolicyPage'));
 const TermsAndConditionsPage = lazy(() => import('../pages/public/PolicyPages/TermsAndConditionsPage'));
-// --- ADDED: Import for the new Shipping Policy page ---
 const ShippingPolicyPage = lazy(() => import('../pages/public/PolicyPages/ShippingPolicyPage'));
 
 
@@ -60,6 +72,8 @@ const LoginWrapper = () => {
 const AppRoutes = () => {
     return (
         <Suspense fallback={<LoadingFallback />}>
+            {/* --- ADDED: ScrollToTop component is placed here to monitor route changes --- */}
+            <ScrollToTop />
             <Routes>
                 <Route path="admin/login" element={<LoginWrapper />} />
                 
@@ -76,8 +90,6 @@ const AppRoutes = () => {
                     <Route path="/consultation/success" element={<ConsultationSuccessPage />} />
                     <Route path="/policies/privacy" element={<PrivacyPolicyPage />} />
                     <Route path="/policies/terms-and-conditions" element={<TermsAndConditionsPage />} />
-
-                    {/* --- ADDED: Route for the Shipping Policy page --- */}
                     <Route path="/policies/shipping" element={<ShippingPolicyPage />} />
                 </Route>
                 

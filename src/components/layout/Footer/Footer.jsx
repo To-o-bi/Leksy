@@ -32,7 +32,7 @@ const FooterLinkGroup = ({ title, links }) => (
     <h3 className="text-white font-semibold mb-4 sm:mb-6 text-base sm:text-lg">{title}</h3>
     <ul className="space-y-2 sm:space-y-3">
       {links.map((link) => (
-        <li key={link.path}>
+        <li key={link.path + link.label}>
           <Link 
             to={link.path} 
             className="text-gray-100 hover:text-white transition-colors duration-300 text-xs sm:text-sm flex items-center group"
@@ -49,8 +49,8 @@ const FooterLinkGroup = ({ title, links }) => (
 
 const Footer = () => {
   const accountLinks = [
-    { label: 'Order History', path: '/account' },
-    { label: 'Login', path: '/login' },
+    { label: 'Order History', path: '/admin/orders' },
+    { label: 'Login', path: '/admin/login' },
     { label: 'Wishlist', path: '/wishlist' },
     { label: 'Checkout', path: '/checkout' },
     { label: 'Cart', path: '/cart' }
@@ -58,18 +58,17 @@ const Footer = () => {
 
   const shopLinks = [
     { label: 'All Products', path: '/shop' },
-    { label: 'New Arrivals', path: '/shop/new-arrivals' },
-    { label: 'Best Sellers', path: '/shop/best-sellers' },
-    { label: 'Blog', path: '/blog' },
-    { label: 'Skin Type Finder', path: '/finder' }
+    { label: 'New Arrivals', path: '/shop' },
+    { label: 'Best Sellers', path: '/shop' },
+    { label: 'Blog', path: '/' },
+    { label: 'Skin Type Finder', path: '/consultation' }
   ];
 
   const infoLinks = [
-    { label: 'About Us', path: '/about' },
+    { label: 'About Us', path: '/' },
     { label: 'Contact Us', path: '/contact' },
     { label: 'Shipping Policy', path: '/policies/shipping' },
     { label: 'Privacy Policy', path: '/policies/privacy' },
-    // --- ADDED: Link to the new Terms & Conditions page ---
     { label: 'Terms & Conditions', path: '/policies/terms-and-conditions' },
   ];
 
