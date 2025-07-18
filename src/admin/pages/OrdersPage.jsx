@@ -21,6 +21,7 @@ const AllOrders = () => {
   const [notification, setNotification] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [highlightedOrderId, setHighlightedOrderId] = useState(null);
+  const [isModalLoading, setIsModalLoading] = useState(false);
   
   const ORDERS_PER_PAGE = 9;
 
@@ -110,7 +111,7 @@ const AllOrders = () => {
   const getDeliveryMethodDisplay = useCallback((method) => {
     switch (method) {
       case 'pickup':
-        return 'Store Pickup';
+        return 'Pickup';
       case 'address':
         return 'Home Delivery';
       case 'bus-park':
@@ -138,24 +139,7 @@ const AllOrders = () => {
   // Format order data, ensuring cart data is properly parsed
   const formatOrderData = useCallback((ordersData) => {
     return ordersData.map(order => {
-      let cartItems = [];
-      const cartData = order.cart_obj;
-
-      if (cartData) {
-        if (typeof cartData === 'string') {
-          try {
-            const parsedCart = JSON.parse(cartData);
-            if (Array.isArray(parsedCart)) {
-              cartItems = parsedCart;
-            }
-          } catch (e) {
-            console.error(`Failed to parse cart JSON for order ${order.order_id}:`, e);
-          }
-        } else if (Array.isArray(cartData)) {
-          cartItems = cartData;
-        }
-      }
-
+      // Cart data will be fetched on demand, so initialize as empty
       return {
         id: order.order_id,
         name: order.name,
@@ -172,7 +156,7 @@ const AllOrders = () => {
         state: order.state,
         city: order.city,
         streetAddress: order.street_address,
-        cart: cartItems,
+        cart: [], // Initialize cart as empty
         rawData: order
       };
     });
@@ -278,10 +262,50 @@ const AllOrders = () => {
     setCurrentPage(1);
   }, []);
 
-  const viewOrderDetails = useCallback((order) => {
-    setSelectedOrder(order);
+  const viewOrderDetails = useCallback(async (order) => {
     setShowModal(true);
-  }, []);
+    setSelectedOrder(order);
+    setIsModalLoading(true);
+
+    try {
+      const result = await orderService.fetchOrder(order.id);
+
+      if (result?.code === 200 && result.order) {
+        const detailedOrder = result.order;
+        let cartItems = [];
+        const cartData = detailedOrder.cart_obj;
+
+        if (cartData) {
+          if (typeof cartData === 'string') {
+            try {
+              const parsedCart = JSON.parse(cartData);
+              if (Array.isArray(parsedCart)) {
+                cartItems = parsedCart;
+              }
+            } catch (e) {
+              console.error(`Failed to parse cart JSON for order ${detailedOrder.order_id}:`, e);
+            }
+          } else if (Array.isArray(cartData)) {
+            cartItems = cartData;
+          }
+        }
+        
+        setSelectedOrder(prevOrder => ({
+          ...prevOrder,
+          ...detailedOrder,
+          cart: cartItems,
+        }));
+
+      } else {
+        showNotification('error', 'Could not fetch full order details.');
+      }
+    } catch (err) {
+      console.error('Failed to fetch order details:', err);
+      showNotification('error', 'Could not fetch full order details.');
+    } finally {
+      setIsModalLoading(false);
+    }
+  }, [showNotification]);
 
   useEffect(() => {
     if (notification) {
@@ -436,7 +460,7 @@ const AllOrders = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-gray-200">
-                {['ORDER ID', 'CUSTOMER', 'PRODUCTS', 'AMOUNT', 'DATE', 'METHOD', 'PAYMENT', 'DELIVERY', 'ACTION'].map(header => (
+                {['ORDER ID', 'CUSTOMER', 'AMOUNT', 'DATE', 'METHOD', 'PAYMENT', 'DELIVERY', 'ACTION'].map(header => (
                   <th key={header} className="pb-3 text-sm font-medium text-gray-500 uppercase">
                     {header}
                   </th>
@@ -459,25 +483,6 @@ const AllOrders = () => {
                       <div className="text-xs text-gray-500">{order.email}</div>
                       <div className="text-xs text-gray-500">{order.phone}</div>
                     </div>
-                  </td>
-                  <td className="py-4 text-sm">
-                    {order.cart && order.cart.length > 0 ? (
-                      <div className="flex flex-col">
-                        <span 
-                          className="font-medium truncate max-w-[150px]" 
-                          title={order.cart.map(item => `${item.product_name || 'N/A'} (Qty: ${item.ordered_quantity || 'N/A'})`).join('\n')}
-                        >
-                          {order.cart[0].product_name || 'Unknown Product'}
-                        </span>
-                        {order.cart.length > 1 && (
-                          <span className="text-xs text-gray-500">
-                            + {order.cart.length - 1} more item(s)
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 italic">No items</span>
-                    )}
                   </td>
                   <td className="py-4 text-sm font-semibold">{formatCurrency(order.amount)}</td>
                   <td className="py-4 text-sm">{order.date}</td>
@@ -522,7 +527,7 @@ const AllOrders = () => {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan="9" className="py-12 text-center text-gray-500">
+                  <td colSpan="8" className="py-12 text-center text-gray-500">
                     <div className="text-6xl mb-4">📦</div>
                     <p className="text-lg font-medium">No orders found</p>
                     {searchQuery && (
@@ -597,9 +602,13 @@ const AllOrders = () => {
               </div>
             </div>
 
-            {selectedOrder.cart?.length > 0 && (
-              <div className="mt-6">
-                <h4 className="font-semibold mb-3">Order Items ({selectedOrder.cart.length})</h4>
+            <div className="mt-6">
+              <h4 className="font-semibold mb-3">Order Items</h4>
+              {isModalLoading ? (
+                <div className="text-center p-4 text-gray-500">
+                  <p>Loading items...</p>
+                </div>
+              ) : selectedOrder.cart?.length > 0 ? (
                 <div className="space-y-2">
                   {selectedOrder.cart.map((item, index) => (
                     <div key={item.product_id || index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
@@ -618,8 +627,12 @@ const AllOrders = () => {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="text-center p-4 bg-gray-50 rounded-md">
+                  <p className="text-gray-500">No items found for this order.</p>
+                </div>
+              )}
+            </div>
 
             <div className="mt-6 flex justify-end">
               <button 
