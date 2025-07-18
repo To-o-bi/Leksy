@@ -107,6 +107,19 @@ const AllOrders = () => {
     return statusMap[status?.toLowerCase()] || 'bg-gray-100 text-gray-600';
   }, []);
 
+  const getDeliveryMethodDisplay = useCallback((method) => {
+    switch (method) {
+      case 'pickup':
+        return 'Store Pickup';
+      case 'address':
+        return 'Home Delivery';
+      case 'bus-park':
+        return 'Bus Park Delivery';
+      default:
+        return method || 'Not specified';
+    }
+  }, []);
+
   // Check authentication
   const checkAuth = useCallback(() => {
     if (!isAuthenticated || !user) {
@@ -126,18 +139,21 @@ const AllOrders = () => {
   const formatOrderData = useCallback((ordersData) => {
     return ordersData.map(order => {
       let cartItems = [];
-      if (typeof order.cart_obj === 'string') {
-        try {
-          const parsedCart = JSON.parse(order.cart_obj);
-          if (Array.isArray(parsedCart)) {
-            cartItems = parsedCart;
+      const cartData = order.cart_obj;
+
+      if (cartData) {
+        if (typeof cartData === 'string') {
+          try {
+            const parsedCart = JSON.parse(cartData);
+            if (Array.isArray(parsedCart)) {
+              cartItems = parsedCart;
+            }
+          } catch (e) {
+            console.error(`Failed to parse cart JSON for order ${order.order_id}:`, e);
           }
-        } catch (e) {
-          console.error(`Failed to parse cart for order ${order.order_id}:`, e);
-          cartItems = [];
+        } else if (Array.isArray(cartData)) {
+          cartItems = cartData;
         }
-      } else if (Array.isArray(order.cart_obj)) {
-        cartItems = order.cart_obj;
       }
 
       return {
@@ -468,7 +484,7 @@ const AllOrders = () => {
                   <td className="py-4 text-sm">
                     <div className="flex flex-col">
                       <span className="font-medium">
-                        {order.deliveryMethod === 'pickup' ? 'Pickup' : 'Delivery'}
+                        {getDeliveryMethodDisplay(order.deliveryMethod)}
                       </span>
                       {order.deliveryMethod === 'address' && (
                         <span className="text-xs text-gray-500 truncate max-w-[120px]" title={`${order.city}, ${order.state}`}>
@@ -575,7 +591,7 @@ const AllOrders = () => {
                   <div><span className="font-medium">Name:</span> {selectedOrder.name}</div>
                   <div><span className="font-medium">Email:</span> {selectedOrder.email}</div>
                   <div><span className="font-medium">Phone:</span> {selectedOrder.phone}</div>
-                  <div><span className="font-medium">Method:</span> {selectedOrder.deliveryMethod}</div>
+                  <div><span className="font-medium">Method:</span> {getDeliveryMethodDisplay(selectedOrder.deliveryMethod)}</div>
                   <div><span className="font-medium">Address:</span> {selectedOrder.address}</div>
                 </div>
               </div>
