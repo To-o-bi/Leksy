@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Filter, Eye, RefreshCw, AlertCircle } from 'lucide-react';
 import { orderService } from '../../api/services';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSearchParams } from 'react-router-dom';
+
 
 const AllOrders = () => {
   const { isAuthenticated, user, isAdmin } = useAuth();
@@ -540,9 +542,18 @@ const AllOrders = () => {
         )}
       </div>
 
-      {showModal && selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      {/* Use a portal to render the modal at the top level of the DOM */}
+      {showModal && selectedOrder && createPortal(
+        <div 
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setShowModal(false)} // Close modal on overlay click
+        >
+          <div 
+            className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()} // Prevent modal content click from closing modal
+          >
             <div className="flex justify-between items-start mb-6">
               <h3 className="text-xl font-semibold">Order Details</h3>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
@@ -617,7 +628,8 @@ const AllOrders = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
