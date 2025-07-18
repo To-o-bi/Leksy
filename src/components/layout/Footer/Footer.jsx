@@ -158,7 +158,7 @@ const Footer = () => {
                   <p className="text-gray-100 text-xs sm:text-sm flex flex-col sm:flex-row items-center font-light text-center sm:text-left">
                     <span className="mb-1 sm:mb-0">Designed and Developed by</span>
                     <a 
-                      href="https://trinitystudio.com" 
+                      href="https://trinitystudioltd.com" 
                       target="_blank" 
                       rel="noopener noreferrer" 
                       className="flex items-center sm:ml-2 hover:opacity-80 transition-all duration-300 group"
