@@ -1,9 +1,9 @@
-import React, { useState, useContext, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useCart } from '../../hooks/useCart';
 import { useNavigate } from 'react-router-dom';
 import { useWishlist } from '../../contexts/WishlistContext';
-import { formatter } from '../../utils/formatter'; // <-- Use the central formatter
-import Notification from '../common/Notification'; // Assuming this component exists
+import { useMessage } from '../../contexts/MessageContext'; // Import the global message hook
+import { formatter } from '../../utils/formatter';
 
 // Helper function to decode HTML entities that might come from the API
 const decodeHtmlEntities = (text) => {
@@ -17,10 +17,10 @@ const ProductDetail = ({ product }) => {
     const { addToCart } = useCart();
     const navigate = useNavigate();
     const [quantity, setQuantity] = useState(1);
-    const [notification, setNotification] = useState(null);
     const [selectedImage, setSelectedImage] = useState(0);
 
-    const { wishlist, toggleWishlistItem, isInWishlist } = useWishlist();
+    const { toggleWishlistItem, isInWishlist } = useWishlist();
+    const { warning } = useMessage(); // Use the global message hook
 
     // Memoize the normalized product data for performance and consistency
     const normalizedProduct = useMemo(() => {
@@ -49,58 +49,69 @@ const ProductDetail = ({ product }) => {
     const isProductInWishlist = useMemo(() => {
         if (!normalizedProduct?.product_id) return false;
         return isInWishlist(normalizedProduct.product_id);
-    }, [wishlist, normalizedProduct, isInWishlist]);
+    }, [isInWishlist, normalizedProduct]);
 
-    const showNotification = (type, message) => {
-        setNotification({ type, message });
-        setTimeout(() => setNotification(null), 4000);
-    };
-
-    // --- Quantity Control Logic ---
+    // --- Refined Quantity Control Logic ---
     const incrementQuantity = () => {
         const stock = normalizedProduct.stock;
-        if (quantity < stock) {
-            setQuantity(q => q + 1);
+        // Coerce quantity to a number before incrementing
+        const currentQuantity = Number(quantity) || 0;
+        if (currentQuantity < stock) {
+            setQuantity(currentQuantity + 1);
         } else {
-            showNotification('warning', `Oops! Only ${stock} pieces are left.`);
+            warning(`Oops! Only ${stock} pieces are left.`);
         }
     };
 
     const decrementQuantity = () => {
-        if (quantity > 1) {
-            setQuantity(q => q - 1);
+        // Coerce quantity to a number before decrementing
+        const currentQuantity = Number(quantity) || 1;
+        if (currentQuantity > 1) {
+            setQuantity(currentQuantity - 1);
         }
     };
 
     const handleQuantityInputChange = (e) => {
-        const value = parseInt(e.target.value, 10);
-        const stock = normalizedProduct.stock;
-        if (isNaN(value) || value < 1) {
-            setQuantity(1);
-        } else if (value > stock) {
-            setQuantity(stock);
-            showNotification('warning', `Oops! Only ${stock} pieces are left.`);
-        } else {
-            setQuantity(value);
+        const value = e.target.value;
+        // Allow only digits or an empty string to be typed
+        if (value === '' || /^\d+$/.test(value)) {
+            const num = value === '' ? '' : parseInt(value, 10);
+            const stock = normalizedProduct.stock;
+
+            if (num > stock) {
+                setQuantity(stock);
+                warning(`Oops! Only ${stock} pieces are left.`);
+            } else {
+                setQuantity(num);
+            }
         }
     };
-    // --- End of Quantity Logic ---
+    
+    const handleQuantityInputBlur = () => {
+        // On blur, if the input is empty or invalid, reset it to 1.
+        if (quantity === '' || Number(quantity) < 1) {
+            setQuantity(1);
+        }
+    };
+    // --- End of Refined Quantity Logic ---
 
     const handleAddToCart = () => {
         if (normalizedProduct.stock < 1) return;
-        addToCart(normalizedProduct, quantity);
-        showNotification('success', `${quantity} x ${normalizedProduct.name} added to cart!`);
+        // Ensure we add a valid number to the cart, defaulting to 1 if input is invalid.
+        const quantityToAdd = Number(quantity) || 1;
+        addToCart(normalizedProduct, quantityToAdd);
     };
 
     const handleCheckoutNow = () => {
         if (normalizedProduct.stock < 1) return;
-        addToCart(normalizedProduct, quantity);
+        const quantityToAdd = Number(quantity) || 1;
+        addToCart(normalizedProduct, quantityToAdd);
         navigate('/checkout');
     };
 
     const handleToggleWishlist = () => {
         toggleWishlistItem(normalizedProduct);
-        // Notification message is handled by the context now
+        // The WishlistContext now handles showing the notification
     };
     
     if (!normalizedProduct) {
@@ -109,16 +120,6 @@ const ProductDetail = ({ product }) => {
 
     return (
         <div className="bg-white">
-            {notification && (
-                <div className="fixed top-5 right-5 z-50">
-                    <Notification 
-                        type={notification.type} 
-                        message={notification.message} 
-                        onClose={() => setNotification(null)} 
-                    />
-                </div>
-            )}
-            
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
                     {/* Product Images */}
@@ -177,16 +178,17 @@ const ProductDetail = ({ product }) => {
                             <div className="flex items-center mb-6">
                                 <span className="mr-4 text-sm font-medium text-gray-700">Quantity:</span>
                                 <div className="flex border border-gray-300 rounded-md">
-                                    <button onClick={decrementQuantity} className="px-3 py-1.5 border-r text-lg hover:bg-gray-100 disabled:opacity-50" disabled={quantity <= 1}>-</button>
+                                    <button onClick={decrementQuantity} className="px-3 py-1.5 border-r text-lg hover:bg-gray-100 disabled:opacity-50" disabled={Number(quantity) <= 1}>-</button>
                                     <input
-                                        type="number"
+                                        type="text" // Use text to allow empty string, validation is handled
                                         value={quantity}
                                         onChange={handleQuantityInputChange}
+                                        onBlur={handleQuantityInputBlur} // Add blur handler for validation
                                         className="w-12 text-center focus:outline-none"
                                         min="1"
                                         max={normalizedProduct.stock}
                                     />
-                                    <button onClick={incrementQuantity} className="px-3 py-1.5 border-l text-lg hover:bg-gray-100 disabled:opacity-50" disabled={quantity >= normalizedProduct.stock}>+</button>
+                                    <button onClick={incrementQuantity} className="px-3 py-1.5 border-l text-lg hover:bg-gray-100 disabled:opacity-50" disabled={Number(quantity) >= normalizedProduct.stock}>+</button>
                                 </div>
                             </div>
                         )}

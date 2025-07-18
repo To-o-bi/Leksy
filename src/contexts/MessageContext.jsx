@@ -1,4 +1,3 @@
-// src/contexts/MessageContext.jsx
 import React, { createContext, useState, useCallback, useContext, useRef } from 'react';
 import Message from '../components/common/Message';
 
@@ -13,51 +12,59 @@ export const useMessage = () => {
 };
 
 export const MessageProvider = ({ children }) => {
-  const [messages, setMessages] = useState([]);
-  // Use useRef to maintain counter across re-renders without causing re-renders
-  const counterRef = useRef(0);
+  const [message, setMessage] = useState(null);
+  const timeoutRef = useRef(null);
 
-  const showMessage = useCallback((message, type = 'success', duration = 3000) => {
-    // Increment counter and get unique ID
-    const id = counterRef.current++;
-    
-    setMessages(prev => [...prev, { id, message, type, duration, show: true }]);
-    
-    // Auto remove from the messages array after duration + animation time
-    if (duration > 0) {
-      setTimeout(() => {
-        setMessages(prev => prev.filter(msg => msg.id !== id));
-      }, duration + 500);
+  /**
+   * Hides the current message.
+   */
+  const hideMessage = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
-    
-    return id;
-  }, []); // Remove counter dependency since we're using ref
-
-  const hideMessage = useCallback((id) => {
-    setMessages(prev => prev.map(msg => 
-      msg.id === id ? { ...msg, show: false } : msg
-    ));
-    
-    // Remove from array after animation completes
-    setTimeout(() => {
-      setMessages(prev => prev.filter(msg => msg.id !== id));
-    }, 500);
+    setMessage(null);
   }, []);
 
-  const clearMessages = useCallback(() => {
-    setMessages([]);
-  }, []);
+  /**
+   * Shows a message. If the same message is shown in quick succession,
+   * it increments a counter instead of creating a new message.
+   * @param {string} text - The message content.
+   * @param {string} [type='success'] - The message type (e.g., 'success', 'error').
+   * @param {number} [duration=3000] - Duration in ms before auto-hiding.
+   */
+  const showMessage = useCallback((text, type = 'success', duration = 3000) => {
+    // Always clear the previous timeout to reset the timer
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    setMessage(prevMessage => {
+      // If the new message is identical to the current one, just increment the count
+      if (prevMessage && prevMessage.text === text && prevMessage.type === type) {
+        return { ...prevMessage, count: prevMessage.count + 1 };
+      }
+      // Otherwise, show a new message
+      return { id: Date.now(), text, type, count: 1 };
+    });
+
+    // Set a new timeout to automatically hide the message
+    if (duration > 0) {
+      timeoutRef.current = setTimeout(() => {
+        hideMessage();
+      }, duration);
+    }
+  }, [hideMessage]);
 
   // Convenience methods for different message types
-  const success = useCallback((message, duration) => showMessage(message, 'success', duration), [showMessage]);
-  const error = useCallback((message, duration) => showMessage(message, 'error', duration), [showMessage]);
-  const warning = useCallback((message, duration) => showMessage(message, 'warning', duration), [showMessage]);
-  const info = useCallback((message, duration) => showMessage(message, 'info', duration), [showMessage]);
+  const success = useCallback((msg, dur) => showMessage(msg, 'success', dur), [showMessage]);
+  const error = useCallback((msg, dur) => showMessage(msg, 'error', dur), [showMessage]);
+  const warning = useCallback((msg, dur) => showMessage(msg, 'warning', dur), [showMessage]);
+  const info = useCallback((msg, dur) => showMessage(msg, 'info', dur), [showMessage]);
 
   const value = {
     showMessage,
     hideMessage,
-    clearMessages,
+    clearMessages: hideMessage, // clearMessages is now an alias for hideMessage
     success,
     error,
     warning,
@@ -68,28 +75,20 @@ export const MessageProvider = ({ children }) => {
     <MessageContext.Provider value={value}>
       {children}
       
-      {/* Render all active messages */}
-      <div className="message-container">
-        {messages.map((msg, index) => (
-          <div 
-            key={msg.id} 
-            style={{ 
-              position: 'fixed',
-              top: `${4 + index * (80 + 8)}px`, // 80px height + 8px gap
-              right: '1rem',
-              zIndex: 9999 - index,
-              transition: 'all 0.3s ease-in-out'
-            }}
-          >
+      {/* Container for the message, positioned at the top-right */}
+      <div className="fixed top-5 right-5 z-[9999] w-full max-w-sm pointer-events-none">
+        {message && (
+          // Wrapper to re-enable pointer events for the message itself
+          <div className="pointer-events-auto">
             <Message
-              show={msg.show}
-              message={msg.message}
-              type={msg.type}
-              duration={msg.duration}
-              onClose={() => hideMessage(msg.id)}
+              key={message.id}
+              message={message.text}
+              type={message.type}
+              count={message.count}
+              onClose={hideMessage}
             />
           </div>
-        ))}
+        )}
       </div>
     </MessageContext.Provider>
   );
