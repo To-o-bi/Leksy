@@ -5,7 +5,6 @@ import { orderService } from '../../api/services';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 
-
 const AllOrders = () => {
   const { isAuthenticated, user, isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -137,27 +136,73 @@ const AllOrders = () => {
     setNotification({ type, message });
   }, []);
 
-  // Format order data from the main list fetch, including cart items
-  const formatOrderListData = useCallback((ordersData) => {
-    const ordersArray = ordersData.products || ordersData.orders || [];
-    return ordersArray.map(order => {
-      let cartItems = [];
-      const cartData = order.cart_obj;
+  // Enhanced cart parsing function
+  const parseCartData = useCallback((cartData) => {
+    if (!cartData) {
+      console.log('No cart data provided');
+      return [];
+    }
 
-      if (cartData) {
-        if (typeof cartData === 'string') {
-          try {
-            const parsedCart = JSON.parse(cartData);
-            if (Array.isArray(parsedCart)) {
-              cartItems = parsedCart;
-            }
-          } catch (e) {
-            console.error(`Failed to parse cart JSON for order ${order.order_id}:`, e);
-          }
-        } else if (Array.isArray(cartData)) {
-          cartItems = cartData;
+    try {
+      let parsedCart = [];
+
+      if (typeof cartData === 'string') {
+        console.log('Cart data is string, attempting to parse:', cartData);
+        
+        // First, decode HTML entities if present
+        let decodedData = cartData;
+        if (cartData.includes('&quot;')) {
+          decodedData = cartData
+            .replace(/&quot;/g, '"')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&#039;/g, "'");
+          console.log('Decoded HTML entities:', decodedData);
+        }
+        
+        parsedCart = JSON.parse(decodedData);
+      } else if (Array.isArray(cartData)) {
+        console.log('Cart data is already an array:', cartData);
+        parsedCart = cartData;
+      } else if (typeof cartData === 'object') {
+        console.log('Cart data is object:', cartData);
+        // If it's an object, try to extract array or convert to array
+        if (cartData.items && Array.isArray(cartData.items)) {
+          parsedCart = cartData.items;
+        } else {
+          parsedCart = [cartData];
         }
       }
+
+      if (!Array.isArray(parsedCart)) {
+        console.error('Parsed cart is not an array:', parsedCart);
+        return [];
+      }
+
+      console.log('Successfully parsed cart:', parsedCart);
+      return parsedCart;
+    } catch (error) {
+      console.error('Failed to parse cart data:', error, 'Original data:', cartData);
+      return [];
+    }
+  }, []);
+
+  // Format order data from the main list fetch, including cart items
+  const formatOrderListData = useCallback((ordersData) => {
+    console.log('Raw orders data received:', ordersData);
+    
+    const ordersArray = ordersData.products || ordersData.orders || [];
+    console.log('Orders array:', ordersArray);
+    
+    return ordersArray.map(order => {
+      console.log('Processing order:', order.order_id, 'Cart data:', order.cart_obj_str || order.cart_obj);
+      
+      // Try both cart_obj_str and cart_obj fields
+      const cartData = order.cart_obj_str || order.cart_obj;
+      const cartItems = parseCartData(cartData);
+      
+      console.log('Parsed cart items for order', order.order_id, ':', cartItems);
 
       return {
         id: order.order_id,
@@ -167,19 +212,21 @@ const AllOrders = () => {
         amount: order.amount_paid || order.amount_calculated || 0,
         date: formatDate(order.created_at),
         rawDate: order.created_at,
-        orderStatus: order.order_status,
+        orderStatus: order.order_status?.toLowerCase() || 'unknown',
         deliveryStatus: order.delivery_status,
         deliveryMethod: order.delivery_method,
         address: order.street_address ? 
           `${order.street_address}, ${order.city}, ${order.state}` : 'Pickup',
         state: order.state,
+        lga: order.lga,
         city: order.city,
         streetAddress: order.street_address,
-        cart: cartItems, // Populate cart directly from the list
+        deliveryFee: order.delivery_fee,
+        cart: cartItems, // Use the parsed cart items
         rawData: order
       };
     });
-  }, [formatDate]);
+  }, [formatDate, parseCartData]);
 
   // Fetch orders with enhanced error handling
   const fetchOrders = useCallback(async () => {
@@ -192,15 +239,19 @@ const AllOrders = () => {
       if (orderStatus !== 'all') filters.order_status = orderStatus;
       if (deliveryStatus !== 'all') filters.delivery_status = deliveryStatus;
       
+      console.log('Fetching orders with filters:', filters);
       const result = await orderService.fetchOrders(filters);
+      console.log('API response:', result);
       
       if (result?.code === 200) {
         const formattedOrders = formatOrderListData(result);
+        console.log('Formatted orders:', formattedOrders);
         setOrders(formattedOrders);
       } else {
         throw new Error(result?.message || 'Failed to fetch orders');
       }
     } catch (err) {
+      console.error('Error fetching orders:', err);
       let errorMessage = 'Failed to load orders. Please try again.';
       if (err.message.includes('CORS')) {
         errorMessage = 'CORS error: Please contact your backend administrator.';
@@ -216,6 +267,57 @@ const AllOrders = () => {
       setLoading(false);
     }
   }, [orderStatus, deliveryStatus, checkAuth, formatOrderListData]);
+
+  // Enhanced function to fetch detailed order data when viewing
+  const viewOrderDetails = useCallback(async (order) => {
+    try {
+      console.log('Viewing order details for:', order.id);
+      
+      // First, try using the cart data we already have
+      if (order.cart && order.cart.length > 0) {
+        console.log('Using existing cart data:', order.cart);
+        setSelectedOrder(order);
+        setShowModal(true);
+        return;
+      }
+
+      // If no cart data, fetch detailed order info
+      console.log('No cart data found, fetching detailed order info...');
+      const detailedOrder = await orderService.fetchOrder(order.id);
+      console.log('Detailed order response:', detailedOrder);
+      
+      if (detailedOrder?.code === 200 && detailedOrder.product) {
+        const orderData = detailedOrder.product;
+        // Try both cart_obj_str and cart_obj fields for detailed order
+        const cartData = orderData.cart_obj_str || orderData.cart_obj;
+        const cartItems = parseCartData(cartData);
+        
+        console.log('Detailed cart items:', cartItems);
+        
+        const enhancedOrder = {
+          ...order,
+          cart: cartItems,
+          // Update any other fields that might be more detailed
+          amount: orderData.amount_paid || orderData.amount_calculated || order.amount,
+          address: orderData.street_address ? 
+            `${orderData.street_address}, ${orderData.city}, ${orderData.state}` : order.address
+        };
+        
+        setSelectedOrder(enhancedOrder);
+      } else {
+        // Fallback to original order data even if fetch fails
+        setSelectedOrder(order);
+      }
+      
+      setShowModal(true);
+    } catch (err) {
+      console.error('Error fetching order details:', err);
+      // Still show the modal with available data
+      setSelectedOrder(order);
+      setShowModal(true);
+      showNotification('warning', 'Could not load detailed order information, showing available data');
+    }
+  }, [parseCartData, showNotification]);
 
   // Handle delivery status change
   const handleDeliveryStatusChange = useCallback(async (orderId, newStatus) => {
@@ -279,12 +381,6 @@ const AllOrders = () => {
     setDeliveryStatus('all');
     setSearchQuery('');
     setCurrentPage(1);
-  }, []);
-
-  // Simplified function to show the modal with already-loaded data
-  const viewOrderDetails = useCallback((order) => {
-    setSelectedOrder(order);
-    setShowModal(true);
   }, []);
 
   useEffect(() => {
@@ -361,6 +457,8 @@ const AllOrders = () => {
         <div className={`fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 ${
           notification.type === 'success' 
             ? 'bg-green-50 text-green-800 border border-green-200' 
+            : notification.type === 'warning'
+            ? 'bg-yellow-50 text-yellow-800 border border-yellow-200'
             : 'bg-red-50 text-red-800 border border-red-200'
         }`}>
           <div className="flex items-center justify-between">
@@ -542,17 +640,17 @@ const AllOrders = () => {
         )}
       </div>
 
-      {/* Use a portal to render the modal at the top level of the DOM */}
+      {/* Enhanced Modal with better cart display */}
       {showModal && selectedOrder && createPortal(
         <div 
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
             role="dialog"
             aria-modal="true"
-            onClick={() => setShowModal(false)} // Close modal on overlay click
+            onClick={() => setShowModal(false)}
         >
           <div 
             className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-            onClick={e => e.stopPropagation()} // Prevent modal content click from closing modal
+            onClick={e => e.stopPropagation()}
           >
             <div className="flex justify-between items-start mb-6">
               <h3 className="text-xl font-semibold">Order Details</h3>
@@ -586,46 +684,109 @@ const AllOrders = () => {
                   <div><span className="font-medium">Email:</span> {selectedOrder.email}</div>
                   <div><span className="font-medium">Phone:</span> {selectedOrder.phone}</div>
                   <div><span className="font-medium">Method:</span> {getDeliveryMethodDisplay(selectedOrder.deliveryMethod)}</div>
-                  <div><span className="font-medium">Address:</span> {selectedOrder.address}</div>
+                  <div>
+                    <span className="font-medium">Address:</span> 
+                    <div className="mt-1 text-gray-600">
+                      {selectedOrder.deliveryMethod === 'address' ? (
+                        <>
+                          {selectedOrder.streetAddress && <div>{selectedOrder.streetAddress}</div>}
+                          <div>{selectedOrder.city}, {selectedOrder.state}</div>
+                          {selectedOrder.lga && <div>LGA: {selectedOrder.lga}</div>}
+                        </>
+                      ) : selectedOrder.deliveryMethod === 'bus-park' ? (
+                        <div>Bus Park Delivery</div>
+                      ) : (
+                        <div>Pickup at Store</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
             <div className="mt-6">
               <h4 className="font-semibold mb-3">Order Items</h4>
-              {selectedOrder.cart?.length > 0 ? (
+              {selectedOrder.cart && selectedOrder.cart.length > 0 ? (
                 <div className="space-y-2">
-                  {selectedOrder.cart.map((item, index) => (
-                    <div key={item.product_id || index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <div>
-                        <p className="font-medium">{item.product_name || 'Unnamed Product'}</p>
-                        <p className="text-sm text-gray-500">Qty: {item.ordered_quantity || 'N/A'}</p>
+                  {selectedOrder.cart.map((item, index) => {
+                    console.log('Rendering cart item:', item);
+                    const itemPrice = Number(item.product_price) || 0;
+                    const itemQuantity = Number(item.ordered_quantity) || 1;
+                    const itemTotal = itemPrice * itemQuantity;
+                    
+                    return (
+                      <div key={item.product_id || index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">
+                            {item.product_name || item.name || 'Unnamed Product'}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Quantity: {itemQuantity}
+                            {item.product_id && (
+                              <span className="ml-2 text-xs text-gray-400">ID: {item.product_id}</span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-gray-900">
+                            {formatCurrency(itemTotal)}
+                          </p>
+                          {itemPrice > 0 && (
+                            <p className="text-xs text-gray-500">
+                              {formatCurrency(itemPrice)} each
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{formatCurrency((item.product_price || 0) * (item.ordered_quantity || 1))}</p>
-                        {typeof item.product_price === 'number' && (
-                           <p className="text-xs text-gray-500">
-                             {formatCurrency(item.product_price)} each
-                           </p>
-                        )}
-                      </div>
+                    );
+                  })}
+                  
+                  {/* Order Total */}
+                  <div className="mt-4 pt-3 border-t border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-semibold text-gray-900">Total</span>
+                      <span className="text-lg font-bold text-pink-600">
+                        {formatCurrency(selectedOrder.amount)}
+                      </span>
                     </div>
-                  ))}
+                  </div>
                 </div>
               ) : (
-                <div className="text-center p-4 bg-gray-50 rounded-md">
-                  <p className="text-gray-500">No items found for this order.</p>
+                <div className="text-center p-6 bg-gray-50 rounded-md">
+                  <div className="text-4xl mb-2">📦</div>
+                  <p className="text-gray-500 font-medium">No items found for this order</p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Cart data may not be available or failed to load
+                  </p>
+                  {selectedOrder.rawData && (
+                    <details className="mt-3 text-left">
+                      <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-600">
+                        Debug: Show raw order data
+                      </summary>
+                      <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-auto max-h-32">
+                        {JSON.stringify(selectedOrder.rawData, null, 2)}
+                      </pre>
+                    </details>
+                  )}
                 </div>
               )}
             </div>
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex justify-end space-x-3">
               <button 
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
               >
                 Close
               </button>
+              {selectedOrder.cart && selectedOrder.cart.length === 0 && (
+                <button 
+                  onClick={() => viewOrderDetails(selectedOrder)}
+                  className="px-4 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600 transition-colors"
+                >
+                  Retry Loading Items
+                </button>
+              )}
             </div>
           </div>
         </div>,
