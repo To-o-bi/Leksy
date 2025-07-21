@@ -607,6 +607,20 @@ curl --location --request GET '{base_url}/api/admin/fetch-contact-submissions?li
 ```
 
 
+## Mark As Read
+
+```
+See #[NOTIFICATIONS] section
+```
+
+
+## Mark All As Read
+
+```
+See #[NOTIFICATIONS] section
+```
+
+
 
 # CONSULTATION
 
@@ -1003,17 +1017,40 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 }
 ```
 
+
 ## Mark As Read
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/mark-as-read?id={id_of_notification|integer}' \
+curl --location --request POST '{base_url}/api/admin/mark-as-read?target={a_valid_target}&id={id|integer}' \
 --header 'Authorization: Bearer {token}'
 ```
 
+```
+[POST] a_valid_target = {notifications|contact_submissions}
+```
 
 ```JSON
 {
 	"code": 200,
-	"message": "Successful!",
+	"message": "Successfully marked the {notification / contact submission} as read!",
+}
+```
+
+
+## Mark All As Read
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/mark-all-as-read?target={a_valid_target}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```
+[POST] a_valid_target = {notifications|contact_submissions}
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Successfully marked 29 {a_valid_target} as read!",
 }
 ```
