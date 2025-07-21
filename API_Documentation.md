@@ -961,7 +961,6 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 --header 'Authorization: Bearer {token}'
 ```
 
-
 ```JSON
 {
 	"code": 200,
@@ -1004,3 +1003,17 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 }
 ```
 
+## Mark As Read
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/mark-as-read?id={id_of_notification|integer}' \
+--header 'Authorization: Bearer {token}'
+```
+
+
+```JSON
+{
+	"code": 200,
+	"message": "Successful!",
+}
+```
