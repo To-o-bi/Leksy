@@ -363,7 +363,7 @@ There are two key steps:
 ### 1. Initiate Checkout (This will alert and prepare the payment gateway for the next step)
 
 ```CURL
-curl --location --request POST '{base_url}/api/checkout/initiate?name={name}&email={email}&phone={phone}&delivery_method={pickup/address/bus-park}&state={state|optional}&lga={lga|optional|required:if(state=lagos)}&city={city|optional}&street_address={street_address|optional}&cart={a_valid_json_encoded_cart_object|see_sample_below}&success_redirect={https://leksycosmetics.com/path/to/your-successful-order-page}'
+curl --location --request POST '{base_url}/api/checkout/initiate?name={name}&email={email}&phone={phone|numeric}&additional_phone={additional_phone|numeric|optional}&delivery_method={pickup/address/bus-park}&state={state|optional}&lga={lga|optional|required:if(state=lagos)}&city={city|optional}&street_address={street_address|optional}&cart={a_valid_json_encoded_cart_object|see_sample_below}&success_redirect={https://leksycosmetics.com/path/to/your-successful-order-page}'
 ```
 
 ```
@@ -604,6 +604,20 @@ curl --location --request GET '{base_url}/api/admin/fetch-contact-submissions?li
 		...
 	]
 }
+```
+
+
+## Mark As Read
+
+```
+See #[NOTIFICATIONS] section
+```
+
+
+## Mark All As Read
+
+```
+See #[NOTIFICATIONS] section
 ```
 
 
@@ -961,7 +975,6 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 --header 'Authorization: Bearer {token}'
 ```
 
-
 ```JSON
 {
 	"code": 200,
@@ -1004,3 +1017,40 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 }
 ```
 
+
+## Mark As Read
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/mark-as-read?target={a_valid_target}&id={id|integer}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```
+[POST] a_valid_target = {notifications|contact_submissions}
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Successfully marked the {notification / contact submission} as read!",
+}
+```
+
+
+## Mark All As Read
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/mark-all-as-read?target={a_valid_target}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```
+[POST] a_valid_target = {notifications|contact_submissions}
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Successfully marked 29 {a_valid_target} as read!",
+}
+```
