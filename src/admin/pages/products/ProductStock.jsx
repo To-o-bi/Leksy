@@ -224,113 +224,251 @@ const ProductStockPage = () => {
     currentProducts.every(p => selectedProducts.has(p.product_id));
 
   return (
-    <div>
+    <div className="p-2 sm:p-4 lg:p-6">
       {notification && (
-        <div className={`fixed top-4 right-4 p-4 rounded-md shadow-md z-50 ${notification.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+        <div className={`fixed top-2 sm:top-4 left-2 right-2 sm:left-auto sm:right-4 sm:w-auto max-w-md mx-auto sm:mx-0 p-3 sm:p-4 rounded-md shadow-md z-50 ${notification.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
           <div className="flex items-center justify-between">
-            <span>{notification.message}</span>
-            <button onClick={() => setNotification(null)} className="ml-4 text-gray-400">×</button>
+            <span className="text-sm sm:text-base">{notification.message}</span>
+            <button onClick={() => setNotification(null)} className="ml-2 sm:ml-4 text-gray-400 text-lg">×</button>
           </div>
         </div>
       )}
 
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-medium text-gray-800">Product Stock</h1>
-        <div className="flex items-center space-x-3">
+      <div className="flex justify-between items-center mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-medium text-gray-800">Product Stock</h1>
+        <div className="flex items-center gap-2 sm:gap-3">
           {!isSelectionMode ? (
             <>
-              <button onClick={handleSelectModeToggle} className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md flex items-center">
-                Select Products
+              <button onClick={handleSelectModeToggle} className="bg-gray-500 hover:bg-gray-600 text-white px-3 sm:px-4 py-2 rounded-md text-sm sm:text-base">
+                Select
               </button>
-              <button onClick={() => navigate('/admin/products/add')} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center">
-                <Plus size={16} className="mr-2" /> Add New
+              <button onClick={() => navigate('/admin/products/add')} className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-md flex items-center justify-center">
+                <Plus size={16} />
               </button>
             </>
           ) : (
             <>
               <span className="text-sm text-gray-600">{selectedProducts.size} selected</span>
               {selectedProducts.size > 0 && (
-                <button onClick={() => setShowBulkDeleteModal(true)} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md flex items-center">
-                  <Trash2 size={16} className="mr-2" /> Delete Selected
+                <button onClick={() => setShowBulkDeleteModal(true)} className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-md flex items-center justify-center">
+                  <Trash2 size={16} />
                 </button>
               )}
-              <button onClick={handleSelectModeToggle} className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md flex items-center">
-                <X size={16} className="mr-2" /> Cancel
+              <button onClick={handleSelectModeToggle} className="bg-gray-500 hover:bg-gray-600 text-white p-2 rounded-md flex items-center justify-center">
+                <X size={16} />
               </button>
             </>
           )}
         </div>
       </div>
 
-      <div className="bg-white rounded-md shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              {isSelectionMode && (
-                <th className="px-4 py-3 text-left">
-                  <input type="checkbox" checked={allCurrentPageSelected} onChange={handleSelectAll} className="rounded" />
-                </th>
-              )}
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Image</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Product</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Category</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Price</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Stock</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr><td colSpan={isSelectionMode ? 7 : 6} className="text-center p-8"><Loader /></td></tr>
-            ) : products.length === 0 ? (
-              <tr><td colSpan={isSelectionMode ? 7 : 6} className="text-center p-8"><ShoppingBag size={48} className="mx-auto text-gray-300" /><p>No products found</p></td></tr>
-            ) : (
-              currentProducts.map((product) => (
-                <tr key={product.product_id} id={`product-row-${product.product_id}`} className={`border-b hover:bg-gray-50 ${targetedProductId === product.product_id ? 'bg-blue-50 ring-2 ring-blue-200' : ''}`}>
-                  {isSelectionMode && (
-                    <td className="px-4 py-3"><input type="checkbox" checked={selectedProducts.has(product.product_id)} onChange={() => handleProductSelect(product.product_id)} className="rounded" /></td>
-                  )}
-                  <td className="px-4 py-3"><img src={product.images?.[0] || '/placeholder.jpg'} alt={product.name} className="w-12 h-12 object-cover rounded-md" /></td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{product.name}</td>
-                  <td className="px-4 py-3 text-gray-600 capitalize">{product.category}</td>
-                  <td className="px-4 py-3 font-medium">{formatPrice(product.price)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStockColor(product.available_qty)}`}>
-                      {Math.max(0, parseInt(product.available_qty, 10) || 0)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex space-x-3">
-                      <button onClick={() => navigate(`/admin/products/edit/${product.product_id}`)} disabled={isSelectionMode} className="text-gray-500 hover:text-gray-700"><Edit size={16} /></button>
-                      <button onClick={() => { setActiveProduct(product); setShowDeleteModal(true); }} disabled={isSelectionMode} className="text-gray-500 hover:text-red-500"><Trash2 size={16} /></button>
+      {/* Mobile Card View */}
+      <div className="block sm:hidden">
+        {isLoading ? (
+          <div className="text-center p-8"><Loader /></div>
+        ) : products.length === 0 ? (
+          <div className="text-center p-8">
+            <ShoppingBag size={48} className="mx-auto text-gray-300 mb-4" />
+            <p className="text-gray-500">No products found</p>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-4">
+              {currentProducts.map((product) => (
+                <div key={product.product_id} id={`product-row-${product.product_id}`} className={`bg-white rounded-lg border p-4 ${targetedProductId === product.product_id ? 'bg-blue-50 ring-2 ring-blue-200' : ''}`}>
+                  <div className="flex items-start space-x-3">
+                    {isSelectionMode && (
+                      <input 
+                        type="checkbox" 
+                        checked={selectedProducts.has(product.product_id)} 
+                        onChange={() => handleProductSelect(product.product_id)} 
+                        className="rounded mt-1" 
+                      />
+                    )}
+                    <img 
+                      src={product.images?.[0] || '/placeholder.jpg'} 
+                      alt={product.name} 
+                      className="w-16 h-16 object-cover rounded-md flex-shrink-0" 
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-gray-900 truncate">{product.name}</h3>
+                      <p className="text-sm text-gray-600 capitalize mb-1">{product.category}</p>
+                      <p className="font-medium text-lg">{formatPrice(product.price)}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStockColor(product.available_qty)}`}>
+                          Stock: {Math.max(0, parseInt(product.available_qty, 10) || 0)}
+                        </span>
+                        {!isSelectionMode && (
+                          <div className="flex space-x-2">
+                            <button 
+                              onClick={() => navigate(`/admin/products/edit/${product.product_id}`)} 
+                              className="text-gray-500 hover:text-gray-700 p-2"
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button 
+                              onClick={() => { setActiveProduct(product); setShowDeleteModal(true); }} 
+                              className="text-gray-500 hover:text-red-500 p-2"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Mobile Pagination */}
+            {!isLoading && products.length > 0 && totalPages > 1 && (
+              <div className="mt-6 px-4 py-4 bg-white rounded-lg border">
+                <div className="flex flex-col space-y-3">
+                  <p className="text-sm text-gray-500 text-center">
+                    Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, products.length)} of {products.length}
+                  </p>
+                  <div className="flex items-center justify-center space-x-4">
+                    <button 
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
+                      disabled={currentPage === 1} 
+                      className="flex items-center px-3 py-2 text-sm bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft size={16} className="mr-1" /> Previous
+                    </button>
+                    <span className="text-sm font-medium">Page {currentPage} of {totalPages}</span>
+                    <button 
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} 
+                      disabled={currentPage === totalPages} 
+                      className="flex items-center px-3 py-2 text-sm bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next <ChevronRight size={16} className="ml-1" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden sm:block bg-white rounded-md shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                {isSelectionMode && (
+                  <th className="px-3 lg:px-4 py-3 text-left w-12">
+                    <input type="checkbox" checked={allCurrentPageSelected} onChange={handleSelectAll} className="rounded" />
+                  </th>
+                )}
+                <th className="px-3 lg:px-4 py-3 text-left text-sm font-medium text-gray-500 w-20">Image</th>
+                <th className="px-3 lg:px-4 py-3 text-left text-sm font-medium text-gray-500 min-w-[150px]">Product</th>
+                <th className="px-3 lg:px-4 py-3 text-left text-sm font-medium text-gray-500 min-w-[100px]">Category</th>
+                <th className="px-3 lg:px-4 py-3 text-left text-sm font-medium text-gray-500 min-w-[100px]">Price</th>
+                <th className="px-3 lg:px-4 py-3 text-left text-sm font-medium text-gray-500 min-w-[80px]">Stock</th>
+                <th className="px-3 lg:px-4 py-3 text-left text-sm font-medium text-gray-500 w-24">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan={isSelectionMode ? 7 : 6} className="text-center p-8"><Loader /></td></tr>
+              ) : products.length === 0 ? (
+                <tr>
+                  <td colSpan={isSelectionMode ? 7 : 6} className="text-center p-8">
+                    <ShoppingBag size={48} className="mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-500">No products found</p>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                currentProducts.map((product) => (
+                  <tr key={product.product_id} id={`product-row-${product.product_id}`} className={`border-b hover:bg-gray-50 ${targetedProductId === product.product_id ? 'bg-blue-50 ring-2 ring-blue-200' : ''}`}>
+                    {isSelectionMode && (
+                      <td className="px-3 lg:px-4 py-3">
+                        <input type="checkbox" checked={selectedProducts.has(product.product_id)} onChange={() => handleProductSelect(product.product_id)} className="rounded" />
+                      </td>
+                    )}
+                    <td className="px-3 lg:px-4 py-3">
+                      <img src={product.images?.[0] || '/placeholder.jpg'} alt={product.name} className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded-md" />
+                    </td>
+                    <td className="px-3 lg:px-4 py-3 font-medium text-gray-900">
+                      <div className="truncate max-w-[150px] sm:max-w-[200px] lg:max-w-none">{product.name}</div>
+                    </td>
+                    <td className="px-3 lg:px-4 py-3 text-gray-600">
+                      <div className="capitalize truncate">{product.category}</div>
+                    </td>
+                    <td className="px-3 lg:px-4 py-3 font-medium">{formatPrice(product.price)}</td>
+                    <td className="px-3 lg:px-4 py-3">
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStockColor(product.available_qty)}`}>
+                        {Math.max(0, parseInt(product.available_qty, 10) || 0)}
+                      </span>
+                    </td>
+                    <td className="px-3 lg:px-4 py-3">
+                      <div className="flex space-x-2 sm:space-x-3">
+                        <button onClick={() => navigate(`/admin/products/edit/${product.product_id}`)} disabled={isSelectionMode} className="text-gray-500 hover:text-gray-700 p-1">
+                          <Edit size={14} className="sm:w-4 sm:h-4" />
+                        </button>
+                        <button onClick={() => { setActiveProduct(product); setShowDeleteModal(true); }} disabled={isSelectionMode} className="text-gray-500 hover:text-red-500 p-1">
+                          <Trash2 size={14} className="sm:w-4 sm:h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
+        {/* Desktop Pagination */}
         {!isLoading && products.length > 0 && totalPages > 1 && (
-          <div className="px-4 py-4 flex justify-between items-center border-t">
-            <p className="text-sm text-gray-500">Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, products.length)} of {products.length}</p>
+          <div className="px-3 lg:px-4 py-4 flex flex-col sm:flex-row justify-between items-center border-t gap-3 sm:gap-0">
+            <p className="text-sm text-gray-500">
+              Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, products.length)} of {products.length}
+            </p>
             <div className="flex items-center space-x-2">
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-md hover:bg-gray-100 disabled:opacity-50"><ChevronLeft size={20} /></button>
-              <span>Page {currentPage} of {totalPages}</span>
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-md hover:bg-gray-100 disabled:opacity-50"><ChevronRight size={20} /></button>
+              <button 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
+                disabled={currentPage === 1} 
+                className="p-2 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft size={18} className="sm:w-5 sm:h-5" />
+              </button>
+              <span className="text-sm sm:text-base">Page {currentPage} of {totalPages}</span>
+              <button 
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} 
+                disabled={currentPage === totalPages} 
+                className="p-2 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight size={18} className="sm:w-5 sm:h-5" />
+              </button>
             </div>
           </div>
         )}
       </div>
 
+      {/* Delete Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-md">
             <h3 className="text-lg font-medium mb-4">Confirm Delete</h3>
-            <p className="text-gray-600 mb-6">Are you sure you want to delete "{activeProduct?.name}"? This cannot be undone.</p>
-            <div className="flex justify-end space-x-3">
-              <button onClick={() => setShowDeleteModal(false)} className="px-4 py-2 border rounded-md" disabled={isSubmitting}>Cancel</button>
-              <button onClick={handleDelete} className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:opacity-50" disabled={isSubmitting}>
+            <p className="text-gray-600 mb-6 text-sm sm:text-base">
+              Are you sure you want to delete "{activeProduct?.name}"? This cannot be undone.
+            </p>
+            <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-3 sm:space-y-0">
+              <button 
+                onClick={() => setShowDeleteModal(false)} 
+                className="px-4 py-2 border rounded-md text-sm sm:text-base" 
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDelete} 
+                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:opacity-50 text-sm sm:text-base" 
+                disabled={isSubmitting}
+              >
                 {isSubmitting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
@@ -338,14 +476,27 @@ const ProductStockPage = () => {
         </div>
       )}
 
+      {/* Bulk Delete Modal */}
       {showBulkDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-md">
             <h3 className="text-lg font-medium mb-4">Confirm Bulk Delete</h3>
-            <p className="text-gray-600 mb-6">Are you sure you want to delete {selectedProducts.size} product(s)? This cannot be undone.</p>
-            <div className="flex justify-end space-x-3">
-              <button onClick={() => setShowBulkDeleteModal(false)} className="px-4 py-2 border rounded-md" disabled={isBulkDeleting}>Cancel</button>
-              <button onClick={handleBulkDelete} className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:opacity-50" disabled={isBulkDeleting}>
+            <p className="text-gray-600 mb-6 text-sm sm:text-base">
+              Are you sure you want to delete {selectedProducts.size} product(s)? This cannot be undone.
+            </p>
+            <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-3 sm:space-y-0">
+              <button 
+                onClick={() => setShowBulkDeleteModal(false)} 
+                className="px-4 py-2 border rounded-md text-sm sm:text-base" 
+                disabled={isBulkDeleting}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleBulkDelete} 
+                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:opacity-50 text-sm sm:text-base" 
+                disabled={isBulkDeleting}
+              >
                 {isBulkDeleting ? 'Deleting...' : `Delete ${selectedProducts.size} Product(s)`}
               </button>
             </div>
