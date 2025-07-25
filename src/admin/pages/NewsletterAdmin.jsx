@@ -10,7 +10,7 @@ import {
   RefreshCw,
   AlertTriangle
 } from 'lucide-react';
-import api from '../../api/axios'; 
+import api from '../../api/axios'; // Reverted to the original API import
 
 // Toast hook implementation
 const useToast = () => {
@@ -70,16 +70,16 @@ const DeleteModal = ({ isOpen, onClose, onConfirm, subscriberEmail, isMultiple =
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
       onClick={handleBackdropClick}
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-auto transform transition-all">
         <div className="p-6">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-start justify-between mb-4">
             <div className="flex items-center space-x-3">
-              <div className="flex-shrink-0">
-                <AlertTriangle className="w-6 h-6 text-red-500" />
+              <div className="flex-shrink-0 bg-red-100 rounded-full p-2">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900">
                 Confirm Deletion
@@ -102,7 +102,7 @@ const DeleteModal = ({ isOpen, onClose, onConfirm, subscriberEmail, isMultiple =
                 </>
               ) : (
                 <>
-                  Are you sure you want to remove <span className="font-semibold text-red-600">{subscriberEmail}</span> from the newsletter?
+                  Are you sure you want to remove <span className="font-semibold text-red-600 break-all">{subscriberEmail}</span> from the newsletter?
                 </>
               )}
             </p>
@@ -112,16 +112,16 @@ const DeleteModal = ({ isOpen, onClose, onConfirm, subscriberEmail, isMultiple =
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end space-x-3">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-3 gap-2 sm:gap-0">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              className="w-full sm:w-auto px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-300"
             >
               Cancel
             </button>
             <button
               onClick={onConfirm}
-              className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors"
+              className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors"
             >
               {isMultiple ? `Remove ${count} Subscribers` : 'Remove Subscriber'}
             </button>
@@ -209,7 +209,7 @@ const NewsletterAdmin = () => {
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown';
     const date = new Date(dateString);
-    return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString();
+    return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
   const calculateStats = (subscriberData) => {
@@ -225,8 +225,9 @@ const NewsletterAdmin = () => {
   };
 
   const updateSubscribersList = (newData) => {
-    setSubscribers(newData);
-    calculateStats(newData);
+    const sortedData = newData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    setSubscribers(sortedData);
+    calculateStats(sortedData);
   };
 
   const showToast = (type, title, description) => {
@@ -235,12 +236,7 @@ const NewsletterAdmin = () => {
 
   // Modal handlers
   const openDeleteModal = (email) => {
-    setDeleteModal({
-      isOpen: true,
-      email,
-      isMultiple: false,
-      count: 0
-    });
+    setDeleteModal({ isOpen: true, email, isMultiple: false, count: 0 });
   };
 
   const openBulkDeleteModal = () => {
@@ -248,22 +244,11 @@ const NewsletterAdmin = () => {
       showToast('warning', 'Warning', 'Please select subscribers to remove');
       return;
     }
-
-    setDeleteModal({
-      isOpen: true,
-      email: '',
-      isMultiple: true,
-      count: selectedSubscribers.length
-    });
+    setDeleteModal({ isOpen: true, email: '', isMultiple: true, count: selectedSubscribers.length });
   };
 
   const closeDeleteModal = () => {
-    setDeleteModal({
-      isOpen: false,
-      email: '',
-      isMultiple: false,
-      count: 0
-    });
+    setDeleteModal({ isOpen: false, email: '', isMultiple: false, count: 0 });
   };
 
   // API handlers
@@ -306,15 +291,18 @@ const NewsletterAdmin = () => {
         selectedSubscribers.map(email => newsletterService.removeSubscriber(email))
       );
       
-      const allSuccess = results.every(result => result.success);
-      if (allSuccess) {
+      const successfulRemovals = results.filter(r => r.success).length;
+      if (successfulRemovals > 0) {
         const newData = subscribers.filter(sub => !selectedSubscribers.includes(sub.email));
         updateSubscribersList(newData);
         setSelectedSubscribers([]);
-        showToast('success', 'Success', `${selectedSubscribers.length} subscribers removed successfully!`);
-      } else {
-        const errorMessages = results.filter(r => !r.success).map(r => r.message);
-        showToast('destructive', 'Partial Error', `Some subscribers could not be removed: ${errorMessages.join(', ')}`);
+        showToast('success', 'Success', `${successfulRemovals} subscribers removed successfully!`);
+      }
+
+      const failedRemovals = results.filter(r => !r.success);
+      if (failedRemovals.length > 0) {
+        const errorMessages = failedRemovals.map(r => r.message).join(', ');
+        showToast('destructive', 'Partial Error', `Could not remove ${failedRemovals.length} subscribers. Errors: ${errorMessages}`);
       }
     } catch (error) {
       showToast('destructive', 'Error', error.message || 'Failed to remove subscribers');
@@ -330,7 +318,7 @@ const NewsletterAdmin = () => {
         ...subscribers.map(sub => [sub.email, formatDate(sub.created_at)])
       ].map(row => row.join(',')).join('\n');
 
-      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -372,16 +360,18 @@ const NewsletterAdmin = () => {
     const token = api.getToken();
     if (!token) {
       showToast('destructive', 'Authentication Required', 'Please login to access this page');
+      setLoading(false); // Stop loading if not authenticated
     } else {
       fetchSubscribers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-500"></div>
-        <span className="ml-3 text-gray-600">Loading subscribers...</span>
+        <span className="mt-4 text-gray-600">Loading subscribers...</span>
       </div>
     );
   }
@@ -394,9 +384,9 @@ const NewsletterAdmin = () => {
   ];
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-sm min-h-screen bg-gray-50">
+    <div className="bg-gray-50 min-h-screen">
       {/* Toast Container */}
-      <div className="fixed top-4 right-4 z-50">
+      <div className="fixed top-4 right-4 z-50 w-full max-w-xs px-4 sm:px-0">
         {toasts.map(toastItem => (
           <Toast key={toastItem.id} toast={toastItem} onDismiss={() => removeToast(toastItem.id)} />
         ))}
@@ -412,24 +402,24 @@ const NewsletterAdmin = () => {
         count={deleteModal.count}
       />
 
-      <div className="max-w-7xl mx-auto">
+      <main className="p-4 sm:p-6 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
           <div className="flex items-center space-x-3">
-            <Mail className="w-6 h-6 text-pink-500" />
+            <Mail className="w-7 h-7 text-pink-500" />
             <h1 className="text-2xl font-bold text-gray-900">Newsletter Subscribers</h1>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center flex-wrap gap-2">
             <button
               onClick={exportSubscribers}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+              className="flex items-center justify-center w-1/2 sm:w-auto space-x-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
             >
               <Download className="w-4 h-4" />
               <span>Export CSV</span>
             </button>
             <button
               onClick={fetchSubscribers}
-              className="flex items-center space-x-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              className="flex items-center justify-center w-[calc(50%-0.5rem)] sm:w-auto space-x-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
             >
               <RefreshCw className="w-4 h-4" />
               <span>Refresh</span>
@@ -440,101 +430,110 @@ const NewsletterAdmin = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {statsData.map(({ label, value, color, icon: Icon }) => (
-            <div key={label} className={`bg-${color}-50 p-4 rounded-lg border border-${color}-200`}>
+            <div key={label} className={`bg-white p-4 rounded-lg border border-gray-200 shadow-sm`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-sm text-${color}-600`}>{label}</p>
-                  <p className={`text-2xl font-bold text-${color}-900`}>{value}</p>
+                  <p className={`text-sm text-gray-500`}>{label}</p>
+                  <p className={`text-3xl font-bold text-gray-900`}>{value}</p>
                 </div>
-                <Icon className={`w-8 h-8 text-${color}-500`} />
+                <div className={`p-3 rounded-full bg-${color}-100`}>
+                    <Icon className={`w-6 h-6 text-${color}-600`} />
+                </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Search and Bulk Actions */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search subscribers..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          {selectedSubscribers.length > 0 && (
-            <button
-              onClick={openBulkDeleteModal}
-              className="flex items-center space-x-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>Remove Selected ({selectedSubscribers.length})</span>
-            </button>
-          )}
-        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            {/* Search and Bulk Actions */}
+            <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200">
+              <div className="relative flex-1 w-full">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search subscribers by email..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent transition"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              {selectedSubscribers.length > 0 && (
+                <button
+                  onClick={openBulkDeleteModal}
+                  className="flex items-center justify-center w-full md:w-auto space-x-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Remove Selected ({selectedSubscribers.length})</span>
+                </button>
+              )}
+            </div>
 
-        {/* Subscribers Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <input
-                      type="checkbox"
-                      checked={selectedSubscribers.length === filteredSubscribers.length && filteredSubscribers.length > 0}
-                      onChange={toggleSelectAll}
-                      className="rounded border-gray-300 text-pink-600 focus:ring-pink-500"
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Subscribed</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredSubscribers.length === 0 ? (
+            {/* Subscribers Table */}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
                   <tr>
-                    <td colSpan="4" className="px-6 py-8 text-center text-gray-500">
-                      {searchTerm ? 'No subscribers found matching your search.' : 'No subscribers yet.'}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredSubscribers.map((subscriber, index) => (
-                    <tr key={subscriber.email || index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <input
+                    <th scope="col" className="p-4">
+                       <input
                           type="checkbox"
-                          checked={selectedSubscribers.includes(subscriber.email)}
-                          onChange={(e) => toggleSubscriberSelection(subscriber.email, e.target.checked)}
+                          checked={filteredSubscribers.length > 0 && selectedSubscribers.length === filteredSubscribers.length}
+                          onChange={toggleSelectAll}
+                          disabled={filteredSubscribers.length === 0}
                           className="rounded border-gray-300 text-pink-600 focus:ring-pink-500"
                         />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {subscriber.email}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(subscriber.created_at)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <button
-                          onClick={() => openDeleteModal(subscriber.email)}
-                          className="text-red-600 hover:text-red-800 transition-colors p-1"
-                          title="Remove subscriber"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
+                    </th>
+                    <th scope="col" className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th scope="col" className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Subscribed</th>
+                    <th scope="col" className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredSubscribers.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="px-6 py-16 text-center text-gray-500">
+                        <div className="flex flex-col items-center">
+                            <Users className="w-12 h-12 text-gray-300 mb-2"/>
+                            <p className="font-semibold">{searchTerm ? 'No subscribers found' : 'No subscribers yet'}</p>
+                            <p className="text-sm">{searchTerm ? 'Try adjusting your search.' : 'New subscribers will appear here.'}</p>
+                        </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    filteredSubscribers.map((subscriber, index) => (
+                      <tr key={subscriber.email || index} className="hover:bg-gray-50 transition-colors">
+                        <td className="p-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedSubscribers.includes(subscriber.email)}
+                            onChange={(e) => toggleSubscriberSelection(subscriber.email, e.target.checked)}
+                            className="rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+                          />
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900 truncate" title={subscriber.email}>
+                                {subscriber.email}
+                            </div>
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(subscriber.created_at)}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <button
+                            onClick={() => openDeleteModal(subscriber.email)}
+                            className="text-red-600 hover:text-red-800 transition-colors p-1 rounded-full hover:bg-red-100"
+                            title="Remove subscriber"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
