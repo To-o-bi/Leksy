@@ -30,8 +30,8 @@ const FormField = React.memo(({ label, name, type = 'text', required = false, pl
   const baseClasses = `w-full px-3 py-2 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${error ? 'border-red-300' : 'border-gray-300'}`;
   return (
     <div className={className}><label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-2">{label} {required && <span className="text-red-500">*</span>}</label>
-      {type === 'select' ? (<select id={name} name={name} value={value} onChange={onChange} disabled={disabled} className={baseClasses} {...props}><option value="">{placeholder}</option>{options?.map((option) => (<option key={option} value={option}>{formatCategoryName(option)}</option>))}</select>) 
-      : type === 'textarea' ? (<textarea id={name} name={name} value={value} onChange={onChange} disabled={disabled} rows={rows || 4} className={baseClasses} placeholder={placeholder} {...props} />) 
+      {type === 'select' ? (<select id={name} name={name} value={value} onChange={onChange} disabled={disabled} className={baseClasses} {...props}><option value="">{placeholder}</option>{options?.map((option) => (<option key={option} value={option}>{formatCategoryName(option)}</option>))}</select>)
+      : type === 'textarea' ? (<textarea id={name} name={name} value={value} onChange={onChange} disabled={disabled} rows={rows || 4} className={baseClasses} placeholder={placeholder} {...props} />)
       : (<div className={currency ? 'relative' : ''}>{currency && (<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-500">₦</span></div>)}<input type={type} id={name} name={name} value={value} onChange={onChange} disabled={disabled} className={`${baseClasses} ${currency ? 'pl-8' : ''}`} placeholder={placeholder} {...props} /></div>)}
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>
@@ -46,7 +46,7 @@ const EditProductPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
-  
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -55,7 +55,7 @@ const EditProductPage = () => {
   const [originalData, setOriginalData] = useState(null);
   const [errors, setErrors] = useState({});
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
-  
+
   const [formData, setFormData] = useState({ name: '', price: '', slashed_price: '', description: '', quantity: '', category: '', concern_options: [], deal_price: '', deal_end_date: '' });
   const [newImages, setNewImages] = useState([]);
   const [newImagePreviews, setNewImagePreviews] = useState([]);
@@ -65,21 +65,21 @@ const EditProductPage = () => {
   const hasChanges = useCallback(() => {
     if (!originalData) return false;
     const areArraysEqual = (a, b) => { const arrA = a || [], arrB = b || []; if (arrA.length !== arrB.length) return false; return [...arrA].sort().join() === [...arrB].sort().join(); };
-    
+
     const originalDate = originalData.deal_end_date ? originalData.deal_end_date.slice(0, 16).replace(' ', 'T') : '';
     const formDate = formData.deal_end_date || '';
 
     return (
-      formData.name !== originalData.name || 
-      parseFloat(formData.price) !== originalData.price || 
-      parseFloat(formData.slashed_price || 0) !== (originalData.slashed_price || 0) || 
-      formData.description !== originalData.description || 
-      parseInt(formData.quantity, 10) !== originalData.available_qty || 
-      formData.category !== originalData.category || 
+      formData.name !== originalData.name ||
+      parseFloat(formData.price) !== originalData.price ||
+      parseFloat(formData.slashed_price || 0) !== (originalData.slashed_price || 0) ||
+      formData.description !== originalData.description ||
+      parseInt(formData.quantity, 10) !== originalData.available_qty ||
+      formData.category !== originalData.category ||
       !areArraysEqual(formData.concern_options, originalData.concern_options) ||
       parseFloat(formData.deal_price || 0) !== (originalData.deal_price || 0) ||
       formDate !== originalDate ||
-      newImages.length > 0 || 
+      newImages.length > 0 ||
       removedImages.length > 0
     );
   }, [formData, originalData, newImages, removedImages]);
@@ -93,38 +93,37 @@ const EditProductPage = () => {
         const response = await productService.fetchProduct(id);
         if (!response || response.code !== 200 || !response.product) { setProductNotFound(true); setLoading(false); return; }
         const productData = response.product;
-        
+
         let fetchedConcerns = [];
         if (typeof productData.concern_options === 'string') { try { const parsed = JSON.parse(productData.concern_options); fetchedConcerns = Array.isArray(parsed) ? parsed : []; } catch { fetchedConcerns = productData.concern_options.split(',').map(c => c.trim()).filter(Boolean); } }
         else if (Array.isArray(productData.concern_options)) { fetchedConcerns = productData.concern_options; }
-        
-        // **FIXED**: Correctly format the date for the datetime-local input
-        const formattedDealEndDate = productData.deal_end_date 
-            ? productData.deal_end_date.slice(0, 16).replace(' ', 'T') 
+
+        const formattedDealEndDate = productData.deal_end_date
+            ? productData.deal_end_date.slice(0, 16).replace(' ', 'T')
             : '';
-        
+
         const fullOriginalData = { ...productData, concern_options: fetchedConcerns, deal_end_date: productData.deal_end_date || '' };
         setOriginalData(fullOriginalData);
 
-        setFormData({ 
-          name: productData.name || '', 
-          price: productData.price?.toString() || '', 
-          slashed_price: productData.slashed_price?.toString() || '', 
-          category: productData.category || '', 
-          quantity: productData.available_qty?.toString() || '', 
-          description: productData.description || '', 
+        setFormData({
+          name: productData.name || '',
+          price: productData.price?.toString() || '',
+          slashed_price: productData.slashed_price?.toString() || '',
+          category: productData.category || '',
+          quantity: productData.available_qty?.toString() || '',
+          description: productData.description || '',
           concern_options: fetchedConcerns,
           deal_price: productData.deal_price?.toString() || '',
           deal_end_date: formattedDealEndDate
         });
-        
+
         setExistingImages(Array.isArray(productData.images) ? productData.images : []);
       } catch (error) { handleError(error, 'Failed to load product data.'); }
       finally { setLoading(false); }
     };
     fetchProductData();
   }, [id, handleError]);
-  
+
   const handleChange = useCallback((e) => { const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: value })); if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' })); if (submitError) setSubmitError(''); }, [errors, submitError]);
   const handleConcernToggle = useCallback((concernValue) => { setFormData(prev => { const currentConcerns = prev.concern_options || []; const updatedConcerns = currentConcerns.includes(concernValue) ? currentConcerns.filter(c => c !== concernValue) : [...currentConcerns, concernValue]; return { ...prev, concern_options: updatedConcerns }; }); if (errors.concern_options) setErrors(prev => ({ ...prev, concern_options: '' })); if (submitError) setSubmitError(''); }, [errors.concern_options, submitError]);
 
@@ -140,7 +139,7 @@ const EditProductPage = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [existingImages.length, newImages.length, errors, submitError]);
 
-  const handleRemoveImage = useCallback((index, type) => { if (type === 'new') { setNewImages(prev => prev.filter((_, i) => i !== index)); setNewImagePreviews(prev => prev.filter((_, i) => i !== index)); } else { setRemovedImages(prev => [...prev, existingImages[index]]); setExistingImages(prev => prev.filter((_, i) => i !== index)); } }, [existingImages]); 
+  const handleRemoveImage = useCallback((index, type) => { if (type === 'new') { setNewImages(prev => prev.filter((_, i) => i !== index)); setNewImagePreviews(prev => prev.filter((_, i) => i !== index)); } else { setRemovedImages(prev => [...prev, existingImages[index]]); setExistingImages(prev => prev.filter((_, i) => i !== index)); } }, [existingImages]);
 
   const validateForm = useCallback(() => {
     const newErrors = {};
@@ -153,7 +152,7 @@ const EditProductPage = () => {
     if (!concern_options || concern_options.length === 0) newErrors.concern_options = 'At least one skin concern must be selected';
     if (slashed_price && (isNaN(slashed_price) || parseFloat(slashed_price) <= 0 || parseFloat(slashed_price) <= parseFloat(price))) newErrors.slashed_price = 'Original price must be greater than current price';
     if (existingImages.length === 0 && newImages.length === 0) newErrors.images = 'At least one product image is required';
-    
+
     if ((deal_price && !deal_end_date) || (!deal_price && deal_end_date)) {
         newErrors.deal_price = "Both Deal Price and End Date are required to set a deal.";
         newErrors.deal_end_date = "Both fields are required for a deal.";
@@ -164,7 +163,7 @@ const EditProductPage = () => {
             newErrors.deal_price = "Deal price must be less than the current price.";
         }
     }
-    
+
     if (deal_end_date && new Date(deal_end_date) <= new Date()) {
         newErrors.deal_end_date = "Deal end date must be in the future.";
     }
@@ -178,26 +177,25 @@ const EditProductPage = () => {
     if (!validateForm()) { setSubmitError('Please correct the errors and try again.'); return; }
     if (!hasChanges()) { setSubmitError('No changes detected.'); return; }
     setSubmitting(true); setSubmitError(''); setSubmitSuccess(false);
-    
+
     try {
       const productData = {}; const areArraysEqual = (a, b) => (a || []).sort().join() === (b || []).sort().join();
-      
+
       if (formData.name !== originalData.name) productData.name = formData.name.trim();
       if (parseFloat(formData.price) !== originalData.price) productData.price = parseFloat(formData.price);
       if (formData.description !== originalData.description) productData.description = formData.description.trim();
       if (parseInt(formData.quantity, 10) !== originalData.available_qty) productData.available_qty = parseInt(formData.quantity, 10);
       if (formData.category !== originalData.category) productData.category = formData.category;
       if (!areArraysEqual(formData.concern_options, originalData.concern_options)) productData.concern_options = formData.concern_options;
-      
+
       const newSlashed = formData.slashed_price ? parseFloat(formData.slashed_price) : null;
       if (newSlashed !== (originalData.slashed_price || null)) productData.slashed_price = newSlashed;
-      
+
       const newDealPrice = formData.deal_price ? parseFloat(formData.deal_price) : null;
       if (newDealPrice !== (originalData.deal_price || null)) {
         productData.deal_price = newDealPrice;
       }
-      
-      // **FIXED**: Correctly format date for API submission
+
       const formDate = formData.deal_end_date ? formData.deal_end_date.replace('T', ' ') + ':00' : null;
       if (formDate !== (originalData.deal_end_date || null)) {
         productData.deal_end_date = formDate;
@@ -205,7 +203,7 @@ const EditProductPage = () => {
 
       if (newImages.length > 0) productData.images = newImages;
       if (removedImages.length > 0) productData.removed_images = removedImages;
-      
+
       const response = await productService.updateProduct(id, productData); const parsed = parseApiResponse(response);
       if (parsed && (parsed.code === 200 || parsed.code === '200')) { setSubmitSuccess(true); setTimeout(() => navigate('/admin/products/stock', { state: { notification: { type: 'success', message: `Product "${formData.name}" updated.` } } }), 2000); }
       else { throw new Error(parsed?.message || 'Failed to update product'); }
@@ -217,15 +215,23 @@ const EditProductPage = () => {
   const handleConfirmLeave = () => { setIsLeaveModalOpen(false); navigate('/admin/products/stock'); };
   const handleCloseModal = () => setIsLeaveModalOpen(false);
 
-  if (loading) return <div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
-  if (productNotFound) return <div className="max-w-4xl mx-auto py-8 text-center"><AlertCircle size={48} className="mx-auto text-red-400 mb-4" /><h1 className="text-2xl font-semibold mb-2">Product Not Found</h1><p className="text-red-800 bg-red-50 p-3 rounded-md">The product you are looking for does not exist.</p><button onClick={() => navigate('/admin/products/stock')} className="mt-6 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md">Return to Products</button></div>;
-  
+  if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
+  if (productNotFound) return <div className="max-w-4xl mx-auto p-4 sm:p-8 text-center"><AlertCircle size={48} className="mx-auto text-red-400 mb-4" /><h1 className="text-xl sm:text-2xl font-semibold mb-2">Product Not Found</h1><p className="text-red-800 bg-red-50 p-3 rounded-md">The product you are looking for does not exist.</p><button onClick={() => navigate('/admin/products/stock')} className="mt-6 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md">Return to Products</button></div>;
+
   return (
     <>
-      <div className="max-w-4xl mx-auto py-8">
+      <div className="max-w-4xl mx-auto py-6 sm:py-8 px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="bg-white px-6 py-4 border-b border-gray-200"><div className="flex items-center"><button onClick={handleGoBack} className="flex items-center text-gray-600 hover:text-gray-800 mr-4" disabled={submitting}><ChevronLeft size={20} /><span className="ml-1">Back</span></button><h1 className="text-2xl font-semibold text-gray-900">Edit Product</h1></div></div>
-          <div className="px-6 py-6">
+          <div className="bg-white px-4 sm:px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center">
+              <button onClick={handleGoBack} className="flex items-center text-gray-600 hover:text-gray-800 mr-4" disabled={submitting}>
+                <ChevronLeft size={20} />
+                <span className="ml-1 hidden sm:inline">Back</span>
+              </button>
+              <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 truncate">Edit Product</h1>
+            </div>
+          </div>
+          <div className="p-4 sm:p-6">
             {submitSuccess && <StatusMessage type="success" message="Product updated successfully!" submessage="Redirecting..." />}
             {submitError && <StatusMessage type="error" message={submitError} />}
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -246,15 +252,33 @@ const EditProductPage = () => {
               </div>
 
               <div className="space-y-6">
-                <div className="md:col-span-2"><label className="block text-sm font-medium text-gray-700 mb-2">Skin Concerns <span className="text-red-500">*</span></label><div className={`grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 border rounded-md ${errors.concern_options ? 'border-red-300' : 'border-gray-300'}`}>{CONCERN_OPTIONS.map(c => { const isSelected = formData.concern_options.includes(c.value); return (<label key={c.value} className={`flex items-center p-2 rounded-md border cursor-pointer ${isSelected ? 'bg-blue-50 border-blue-400' : 'bg-white border-gray-200 hover:bg-gray-50'}`}><input type="checkbox" checked={isSelected} onChange={() => handleConcernToggle(c.value)} disabled={submitting} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span className={`ml-3 text-sm font-medium ${isSelected ? 'text-blue-800' : 'text-gray-700'}`}>{c.label}</span></label>); })}</div>{errors.concern_options && <p className="mt-1 text-sm text-red-600">{errors.concern_options}</p>}</div>
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Skin Concerns <span className="text-red-500">*</span></label>
+                    <div className={`grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 border rounded-md ${errors.concern_options ? 'border-red-300' : 'border-gray-300'}`}>
+                        {CONCERN_OPTIONS.map(c => { const isSelected = formData.concern_options.includes(c.value); return (<label key={c.value} className={`flex items-center p-2 rounded-md border cursor-pointer ${isSelected ? 'bg-blue-50 border-blue-400' : 'bg-white border-gray-200 hover:bg-gray-50'}`}><input type="checkbox" checked={isSelected} onChange={() => handleConcernToggle(c.value)} disabled={submitting} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span className={`ml-3 text-sm font-medium ${isSelected ? 'text-blue-800' : 'text-gray-700'}`}>{c.label}</span></label>); })}
+                    </div>
+                    {errors.concern_options && <p className="mt-1 text-sm text-red-600">{errors.concern_options}</p>}
+                </div>
                 <FormField key="description" label="Description" name="description" type="textarea" required className="md:col-span-2" value={formData.description} error={errors.description} onChange={handleChange} disabled={submitting} />
                 {existingImages.length > 0 && (<div className="md:col-span-2"><label className="block text-sm font-medium text-gray-700 mb-3">Current Images ({existingImages.length})</label><ImageGrid images={existingImages} type="existing" onRemove={handleRemoveImage} submitting={submitting} /></div>)}
-                <div className="md:col-span-2"><label className="block text-sm font-medium text-gray-700 mb-2">{existingImages.length > 0 ? 'Add More Images' : 'Product Images'} {existingImages.length === 0 && <span className="text-red-500">*</span>}</label><div className={`border-2 border-dashed rounded-lg p-6 text-center ${errors.images ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-gray-400'}`}><Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" /><div className="space-y-2"><label htmlFor="images" className="cursor-pointer text-blue-600 hover:text-blue-500 font-medium">Choose files<input id="images" name="images" type="file" ref={fileInputRef} className="hidden" multiple accept="image/*" onChange={handleImageChange} disabled={submitting} /></label><p className="text-gray-500">or drag and drop</p><p className="text-sm text-gray-400">PNG, JPG, WebP up to 2MB (max {IMAGE_CONFIG.maxCount})</p></div></div>{errors.images && <p className="mt-2 text-sm text-red-600">{errors.images}</p>}{newImagePreviews.length > 0 && (<div className="mt-4"><p className="text-sm font-medium text-gray-700 mb-3">New Images ({newImages.length}):</p><ImageGrid images={newImagePreviews} type="new" onRemove={handleRemoveImage} submitting={submitting} /></div>)}</div>
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{existingImages.length > 0 ? 'Add More Images' : 'Product Images'} {existingImages.length === 0 && <span className="text-red-500">*</span>}</label>
+                    <div className={`border-2 border-dashed rounded-lg p-6 text-center ${errors.images ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-gray-400'}`}>
+                        <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                        <div className="space-y-2">
+                            <label htmlFor="images" className="cursor-pointer text-blue-600 hover:text-blue-500 font-medium">Choose files<input id="images" name="images" type="file" ref={fileInputRef} className="hidden" multiple accept="image/*" onChange={handleImageChange} disabled={submitting} /></label>
+                            <p className="text-gray-500">or drag and drop</p>
+                            <p className="text-sm text-gray-400">PNG, JPG, WebP up to 2MB (max {IMAGE_CONFIG.maxCount})</p>
+                        </div>
+                    </div>
+                    {errors.images && <p className="mt-2 text-sm text-red-600">{errors.images}</p>}
+                    {newImagePreviews.length > 0 && (<div className="mt-4"><p className="text-sm font-medium text-gray-700 mb-3">New Images ({newImages.length}):</p><ImageGrid images={newImagePreviews} type="new" onRemove={handleRemoveImage} submitting={submitting} /></div>)}
+                </div>
               </div>
 
-              <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-                <button type="button" onClick={handleGoBack} className="px-6 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50" disabled={submitting}>Cancel</button>
-                <button type="submit" disabled={submitting || !hasChanges()} className={`px-6 py-2 border border-transparent rounded-md text-sm font-medium text-white flex items-center justify-center ${submitting || !hasChanges() ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}>{submitting ? (<><svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>Updating...</>) : (<><Save size={18} className="mr-2" />Save Changes</>)}</button>
+              <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 pt-6 border-t border-gray-200">
+                <button type="button" onClick={handleGoBack} className="w-full sm:w-auto px-6 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50" disabled={submitting}>Cancel</button>
+                <button type="submit" disabled={submitting || !hasChanges()} className={`w-full sm:w-auto px-6 py-2 border border-transparent rounded-md text-sm font-medium text-white flex items-center justify-center ${submitting || !hasChanges() ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}>{submitting ? (<><svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>Updating...</>) : (<><Save size={18} className="mr-2" />Save Changes</>)}</button>
               </div>
             </form>
           </div>
