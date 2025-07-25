@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../contexts/NotificationsContext';
-import Message from '../../components/common/Message'; 
+import Message from '../../components/common/Message';
 
 const NotificationsPage = () => {
   const {
@@ -17,45 +18,69 @@ const NotificationsPage = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [limit, setLimit] = useState(20);
   const [refreshing, setRefreshing] = useState(false);
-
-  // --- Start of Added Code for Toasts ---
   const [toasts, setToasts] = useState([]);
   const prevNotificationsRef = useRef();
-  const isInitialMount = useRef(true);
+  const navigate = useNavigate();
+  const isInitialLoad = useRef(true);
+
+  // --- Start of Corrected Code for HTML Entity Decoding ---
+  // A robust function to handle multiple layers of HTML entity encoding.
+  const decodeHtmlEntities = (text) => {
+    if (typeof text !== 'string' || !text.includes('&')) {
+      return text;
+    }
+    // Use a temporary element to let the browser do the decoding.
+    // This loop handles cases like &amp;amp;#8358; -> &#8358; -> ₦
+    let currentText = text;
+    let previousText = '';
+    let i = 0; // Safety break to prevent infinite loops
+    
+    // Keep decoding until the string stops changing.
+    while (currentText !== previousText && i < 5) {
+      previousText = currentText;
+      try {
+        if (typeof window !== 'undefined') {
+          const textarea = document.createElement('textarea');
+          textarea.innerHTML = previousText;
+          currentText = textarea.value;
+        } else {
+          // Break if not in a browser environment
+          break;
+        }
+      } catch (e) {
+        console.error("Failed to decode HTML entities", e);
+        return text; // Return original text on error
+      }
+      i++;
+    }
+    return currentText;
+  };
+  // --- End of Corrected Code ---
 
   useEffect(() => {
-    // On initial mount, store current notifications and exit to prevent toasting on first load.
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
+    if (isInitialLoad.current && notifications.length > 0) {
       prevNotificationsRef.current = notifications;
+      isInitialLoad.current = false;
       return;
     }
-
-    // If we have previous notifications, find the ones that are new.
-    if (prevNotificationsRef.current && notifications.length > prevNotificationsRef.current.length) {
+    if (!isInitialLoad.current && prevNotificationsRef.current) {
       const prevIds = new Set(prevNotificationsRef.current.map(n => n.id));
       const newNotifications = notifications.filter(n => !prevIds.has(n.id));
-
-      // Create a toast for each new notification.
-      const newToasts = newNotifications.map(n => ({
-        id: n.id, // Use notification ID as a unique key
-        message: n.title,
-        type: 'info'
-      }));
-
-      setToasts(currentToasts => [...currentToasts, ...newToasts]);
+      if (newNotifications.length > 0) {
+        const newToasts = newNotifications.map(n => ({
+          id: n.id,
+          message: decodeHtmlEntities(n.title),
+          type: 'info'
+        }));
+        setToasts(currentToasts => [...currentToasts, ...newToasts]);
+      }
     }
-
-    // Update the ref to the current notifications for the next comparison.
     prevNotificationsRef.current = notifications;
   }, [notifications]);
 
   const handleToastClose = (toastId) => {
     setToasts(currentToasts => currentToasts.filter(toast => toast.id !== toastId));
   };
-  // --- End of Added Code for Toasts ---
-
-  const navigate = useNavigate();
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -103,13 +128,11 @@ const NotificationsPage = () => {
 
   const getNotificationAction = (notification) => {
     const { type, type_id, id: notificationId } = notification;
-
     const handleClick = (e) => {
       e.stopPropagation();
       if (!notification.read) {
         markAsRead(notificationId);
       }
-
       let route = '/admin/dashboard';
       switch (type) {
         case 'consultations': route = `/admin/bookings?bookingId=${type_id}&highlight=true`; break;
@@ -120,7 +143,6 @@ const NotificationsPage = () => {
       }
       navigate(route);
     };
-
     const getActionText = () => {
       switch (type) {
         case 'consultations': return '📅 View Booking';
@@ -130,7 +152,6 @@ const NotificationsPage = () => {
         default: return '👁️ View Details';
       }
     };
-
     const getColorClass = () => {
       switch (type) {
         case 'consultations': return 'text-pink-600 hover:text-pink-800 bg-pink-50 hover:bg-pink-100 border-pink-200';
@@ -140,7 +161,6 @@ const NotificationsPage = () => {
         default: return 'text-gray-600 hover:text-gray-800 bg-gray-50 hover:bg-gray-100 border-gray-200';
       }
     };
-
     return (
       <button
         onClick={handleClick}
@@ -172,9 +192,7 @@ const NotificationsPage = () => {
 
   const groupedNotifications = filteredNotifications.reduce((acc, notification) => {
     const dateKey = notification.created_at ? formatDate(notification.created_at) : 'Unknown Date';
-    if (!acc[dateKey]) {
-      acc[dateKey] = [];
-    }
+    if (!acc[dateKey]) acc[dateKey] = [];
     acc[dateKey].push(notification);
     return acc;
   }, {});
@@ -190,25 +208,13 @@ const NotificationsPage = () => {
     return new Date(dateB) - new Date(dateA);
   });
 
-  if (loading && isInitialMount.current) {
+  if (loading && isInitialLoad.current) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
         <div className="animate-pulse">
           <div className="h-6 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="flex space-x-4 mb-6">
-            {[...Array(4)].map((_, i) => <div key={i} className="h-8 bg-gray-200 rounded w-16"></div>)}
-          </div>
-          <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-start space-x-4 p-4 border rounded-lg">
-                <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
-                <div className="flex-1">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <div className="flex space-x-4 mb-6">{[...Array(4)].map((_, i) => <div key={i} className="h-8 bg-gray-200 rounded w-16"></div>)}</div>
+          <div className="space-y-4">{[...Array(5)].map((_, i) => (<div key={i} className="flex items-start space-x-4 p-4 border rounded-lg"><div className="w-10 h-10 bg-gray-200 rounded-full"></div><div className="flex-1"><div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div><div className="h-3 bg-gray-200 rounded w-1/2"></div></div></div>))}</div>
         </div>
       </div>
     );
@@ -216,17 +222,12 @@ const NotificationsPage = () => {
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
         <div className="text-center py-8">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
           <h3 className="text-lg font-semibold text-gray-800 mb-2">Error Loading Notifications</h3>
           <p className="text-gray-600 mb-4 max-w-md mx-auto">{error}</p>
-          <button
-            onClick={() => fetchNotifications()}
-            className="bg-pink-500 text-white px-6 py-2 rounded-md hover:bg-pink-600"
-          >
-            🔄 Try Again
-          </button>
+          <button onClick={() => fetchNotifications()} className="bg-pink-500 text-white px-6 py-2 rounded-md hover:bg-pink-600">🔄 Try Again</button>
         </div>
       </div>
     );
@@ -234,109 +235,53 @@ const NotificationsPage = () => {
 
   return (
     <>
-      {/* --- Start of Added JSX for Toasts --- */}
       <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-50">
         <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
-          {toasts.map((toast) => (
-            <Message
-              key={toast.id}
-              show={true}
-              message={toast.message}
-              type={toast.type}
-              duration={5000} // Disappears after 5 seconds
-              onClose={() => handleToastClose(toast.id)}
-            />
-          ))}
+          {toasts.map((toast) => (<Message key={toast.id} show={true} message={toast.message} type={toast.type} duration={5000} onClose={() => handleToastClose(toast.id)} />))}
         </div>
       </div>
-      {/* --- End of Added JSX for Toasts --- */}
-      
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-          <div className="flex items-center justify-between">
+        <div className="p-4 sm:px-6 sm:py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center space-x-3">
               <h2 className="text-xl font-semibold text-gray-800">Notifications</h2>
-              {unreadCount > 0 && (
-                <div className="relative">
-                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
-                    {unreadCount}
-                  </span>
-                </div>
-              )}
+              {unreadCount > 0 && (<div className="relative"><span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">{unreadCount}</span></div>)}
             </div>
-            <div className="flex items-center space-x-4">
-              <button onClick={handleRefresh} disabled={refreshing} className={`text-sm font-medium transition-all px-3 py-1.5 rounded-md border ${refreshing ? 'cursor-not-allowed' : 'hover:bg-gray-50'}`}>
-                {refreshing ? 'Refreshing...' : 'Refresh'}
-              </button>
-              {unreadCount > 0 && (
-                <button onClick={markAllAsRead} className="text-sm text-pink-500 hover:text-pink-700 font-medium">
-                  ✓ Mark all as read
-                </button>
-              )}
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <button onClick={handleRefresh} disabled={refreshing} className={`text-sm font-medium transition-all px-3 py-1.5 rounded-md border ${refreshing ? 'cursor-not-allowed' : 'hover:bg-gray-50'}`}>{refreshing ? 'Refreshing...' : 'Refresh'}</button>
+              {unreadCount > 0 && (<button onClick={markAllAsRead} className="text-sm text-pink-500 hover:text-pink-700 font-medium">✓ Mark all as read</button>)}
             </div>
           </div>
         </div>
-
-        <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50">
-          <button
-            className={`px-6 py-3 text-sm font-medium ${activeTab === 'all' ? 'text-pink-600 border-b-2 border-pink-500 bg-white' : 'text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setActiveTab('all')}
-          >
-            All ({notifications.length})
-          </button>
-          <button
-            className={`px-6 py-3 text-sm font-medium ${activeTab === 'unread' ? 'text-pink-600 border-b-2 border-pink-500 bg-white' : 'text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setActiveTab('unread')}
-          >
-            Unread ({unreadCount})
-          </button>
-          {uniqueTypes.map(type => (
-            <button
-              key={type}
-              className={`px-6 py-3 text-sm font-medium ${activeTab === type ? 'text-pink-600 border-b-2 border-pink-500 bg-white' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => setActiveTab(type)}
-            >
-              {getTabDisplayName(type)} ({notifications.filter(n => n.type === type).length})
-            </button>
-          ))}
+        <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50 whitespace-nowrap">
+          <button className={`px-4 sm:px-6 py-3 text-sm font-medium ${activeTab === 'all' ? 'text-pink-600 border-b-2 border-pink-500 bg-white' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => setActiveTab('all')}>All ({notifications.length})</button>
+          <button className={`px-4 sm:px-6 py-3 text-sm font-medium ${activeTab === 'unread' ? 'text-pink-600 border-b-2 border-pink-500 bg-white' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => setActiveTab('unread')}>Unread ({unreadCount})</button>
+          {uniqueTypes.map(type => (<button key={type} className={`px-4 sm:px-6 py-3 text-sm font-medium ${activeTab === type ? 'text-pink-600 border-b-2 border-pink-500 bg-white' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => setActiveTab(type)}>{getTabDisplayName(type)} ({notifications.filter(n => n.type === type).length})</button>))}
         </div>
-
         <div className="divide-y divide-gray-200 max-h-[600px] overflow-y-auto">
           {filteredNotifications.length === 0 ? (
-            <div className="px-6 py-12 text-center text-gray-500">
-              <p>No notifications found.</p>
-            </div>
+            <div className="px-6 py-12 text-center text-gray-500"><p>No notifications found.</p></div>
           ) : (
             sortedDates.map(date => (
               <div key={date}>
-                <div className="px-6 py-3 bg-gray-50 sticky top-0 z-10 border-b">
-                  <h3 className="text-sm font-medium text-gray-700">{date}</h3>
-                </div>
+                <div className="px-4 sm:px-6 py-3 bg-gray-50 sticky top-0 z-10 border-b"><h3 className="text-sm font-medium text-gray-700">{date}</h3></div>
                 {groupedNotifications[date].map(notification => (
-                  <div
-                    key={notification.id}
-                    className={`px-6 py-4 hover:bg-gray-50 cursor-pointer ${!notification.read ? 'bg-pink-50 border-l-4 border-pink-500' : ''}`}
-                    onClick={() => !notification.read && markAsRead(notification.id)}
-                  >
+                  <div key={notification.id} className={`p-4 sm:px-6 sm:py-4 hover:bg-gray-50 cursor-pointer ${!notification.read ? 'bg-pink-50 border-l-4 border-pink-500' : ''}`} onClick={() => !notification.read && markAsRead(notification.id)}>
                     <div className="flex items-start space-x-4">
-                      <div className="flex-shrink-0 pt-1">
-                        {getNotificationIcon(notification.type)}
-                      </div>
+                      <div className="flex-shrink-0 pt-1">{getNotificationIcon(notification.type)}</div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className={`text-sm font-medium truncate ${!notification.read ? 'text-gray-900' : 'text-gray-600'}`}>
-                            {notification.title}
-                          </p>
-                          <span className="text-xs text-gray-500 ml-4">
-                            {notification.created_at ? formatTimeAgo(notification.created_at) : ''}
-                          </span>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
+                          <p
+                            className={`text-sm font-medium truncate ${!notification.read ? 'text-gray-900' : 'text-gray-600'}`}
+                            dangerouslySetInnerHTML={{ __html: decodeHtmlEntities(notification.title) }}
+                          />
+                          <span className="text-xs text-gray-500 flex-shrink-0">{notification.created_at ? formatTimeAgo(notification.created_at) : ''}</span>
                         </div>
-                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                          {notification.message?.replace(/<[^>]*>/g, '')}
-                        </p>
-                        <div className="flex items-center justify-between">
-                          {getNotificationAction(notification)}
-                        </div>
+                        <p
+                          className="text-sm text-gray-600 mb-3 line-clamp-2"
+                          dangerouslySetInnerHTML={{ __html: decodeHtmlEntities(notification.message?.replace(/<[^>]*>/g, '')) }}
+                        />
+                        <div className="flex items-center justify-start">{getNotificationAction(notification)}</div>
                       </div>
                     </div>
                   </div>

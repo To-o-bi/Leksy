@@ -27,6 +27,34 @@ const ProductStockPage = () => {
   
   const itemsPerPage = 10;
 
+  // --- Start of Added Code for HTML Entity Decoding ---
+  const decodeHtmlEntities = (text) => {
+    if (typeof text !== 'string' || !text.includes('&')) {
+      return text;
+    }
+    let currentText = text;
+    let previousText = '';
+    let i = 0; // Safety break
+    while (currentText !== previousText && i < 5) {
+      previousText = currentText;
+      try {
+        if (typeof window !== 'undefined') {
+          const textarea = document.createElement('textarea');
+          textarea.innerHTML = previousText;
+          currentText = textarea.value;
+        } else {
+          break;
+        }
+      } catch (e) {
+        console.error("Failed to decode HTML entities", e);
+        return text;
+      }
+      i++;
+    }
+    return currentText;
+  };
+  // --- End of Added Code ---
+
   const fetchProducts = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -52,7 +80,6 @@ const ProductStockPage = () => {
     fetchProducts();
   }, [fetchProducts]);
 
-  // Check for URL parameters to target specific product
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const productId = urlParams.get('productId') || urlParams.get('highlight');
@@ -106,7 +133,7 @@ const ProductStockPage = () => {
         setProducts(prev => prev.filter(p => p.product_id !== activeProduct.product_id));
         setNotification({
           type: 'success',
-          message: `Product "${activeProduct.name}" deleted successfully`
+          message: `Product "${decodeHtmlEntities(activeProduct.name)}" deleted successfully`
         });
         setShowDeleteModal(false);
         setActiveProduct(null);
@@ -123,7 +150,6 @@ const ProductStockPage = () => {
     }
   };
 
-  // Bulk selection handlers
   const handleSelectModeToggle = () => {
     setIsSelectionMode(!isSelectionMode);
     setSelectedProducts(new Set());
@@ -216,7 +242,6 @@ const ProductStockPage = () => {
     return 'bg-green-100 text-green-800';
   };
 
-  // Pagination
   const totalPages = Math.ceil(products.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentProducts = products.slice(startIndex, startIndex + itemsPerPage);
@@ -287,11 +312,11 @@ const ProductStockPage = () => {
                     )}
                     <img 
                       src={product.images?.[0] || '/placeholder.jpg'} 
-                      alt={product.name} 
+                      alt={decodeHtmlEntities(product.name)} 
                       className="w-16 h-16 object-cover rounded-md flex-shrink-0" 
                     />
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-gray-900 truncate">{product.name}</h3>
+                      <h3 className="font-medium text-gray-900 truncate">{decodeHtmlEntities(product.name)}</h3>
                       <p className="text-sm text-gray-600 capitalize mb-1">{product.category}</p>
                       <p className="font-medium text-lg">{formatPrice(product.price)}</p>
                       <div className="flex items-center justify-between mt-2">
@@ -321,7 +346,6 @@ const ProductStockPage = () => {
               ))}
             </div>
             
-            {/* Mobile Pagination */}
             {!isLoading && products.length > 0 && totalPages > 1 && (
               <div className="mt-6 px-4 py-4 bg-white rounded-lg border">
                 <div className="flex flex-col space-y-3">
@@ -390,10 +414,10 @@ const ProductStockPage = () => {
                       </td>
                     )}
                     <td className="px-3 lg:px-4 py-3">
-                      <img src={product.images?.[0] || '/placeholder.jpg'} alt={product.name} className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded-md" />
+                      <img src={product.images?.[0] || '/placeholder.jpg'} alt={decodeHtmlEntities(product.name)} className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded-md" />
                     </td>
                     <td className="px-3 lg:px-4 py-3 font-medium text-gray-900">
-                      <div className="truncate max-w-[150px] sm:max-w-[200px] lg:max-w-none">{product.name}</div>
+                      <div className="truncate max-w-[150px] sm:max-w-[200px] lg:max-w-none">{decodeHtmlEntities(product.name)}</div>
                     </td>
                     <td className="px-3 lg:px-4 py-3 text-gray-600">
                       <div className="capitalize truncate">{product.category}</div>
@@ -421,7 +445,6 @@ const ProductStockPage = () => {
           </table>
         </div>
 
-        {/* Desktop Pagination */}
         {!isLoading && products.length > 0 && totalPages > 1 && (
           <div className="px-3 lg:px-4 py-4 flex flex-col sm:flex-row justify-between items-center border-t gap-3 sm:gap-0">
             <p className="text-sm text-gray-500">
@@ -454,7 +477,7 @@ const ProductStockPage = () => {
           <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-md">
             <h3 className="text-lg font-medium mb-4">Confirm Delete</h3>
             <p className="text-gray-600 mb-6 text-sm sm:text-base">
-              Are you sure you want to delete "{activeProduct?.name}"? This cannot be undone.
+              Are you sure you want to delete "{decodeHtmlEntities(activeProduct?.name)}"? This cannot be undone.
             </p>
             <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-3 sm:space-y-0">
               <button 

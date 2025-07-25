@@ -62,6 +62,34 @@ const EditProductPage = () => {
   const [existingImages, setExistingImages] = useState([]);
   const [removedImages, setRemovedImages] = useState([]);
 
+  // --- Start of Added Code for HTML Entity Decoding ---
+  const decodeHtmlEntities = (text) => {
+    if (typeof text !== 'string' || !text.includes('&')) {
+      return text;
+    }
+    let currentText = text;
+    let previousText = '';
+    let i = 0; // Safety break
+    while (currentText !== previousText && i < 5) {
+      previousText = currentText;
+      try {
+        if (typeof window !== 'undefined') {
+          const textarea = document.createElement('textarea');
+          textarea.innerHTML = previousText;
+          currentText = textarea.value;
+        } else {
+          break;
+        }
+      } catch (e) {
+        console.error("Failed to decode HTML entities", e);
+        return text;
+      }
+      i++;
+    }
+    return currentText;
+  };
+  // --- End of Added Code ---
+
   const hasChanges = useCallback(() => {
     if (!originalData) return false;
     const areArraysEqual = (a, b) => { const arrA = a || [], arrB = b || []; if (arrA.length !== arrB.length) return false; return [...arrA].sort().join() === [...arrB].sort().join(); };
@@ -94,6 +122,10 @@ const EditProductPage = () => {
         if (!response || response.code !== 200 || !response.product) { setProductNotFound(true); setLoading(false); return; }
         const productData = response.product;
 
+        // Decode name and description
+        const decodedName = decodeHtmlEntities(productData.name || '');
+        const decodedDescription = decodeHtmlEntities(productData.description || '');
+
         let fetchedConcerns = [];
         if (typeof productData.concern_options === 'string') { try { const parsed = JSON.parse(productData.concern_options); fetchedConcerns = Array.isArray(parsed) ? parsed : []; } catch { fetchedConcerns = productData.concern_options.split(',').map(c => c.trim()).filter(Boolean); } }
         else if (Array.isArray(productData.concern_options)) { fetchedConcerns = productData.concern_options; }
@@ -102,16 +134,22 @@ const EditProductPage = () => {
             ? productData.deal_end_date.slice(0, 16).replace(' ', 'T')
             : '';
 
-        const fullOriginalData = { ...productData, concern_options: fetchedConcerns, deal_end_date: productData.deal_end_date || '' };
+        const fullOriginalData = { 
+          ...productData, 
+          name: decodedName,
+          description: decodedDescription,
+          concern_options: fetchedConcerns, 
+          deal_end_date: productData.deal_end_date || '' 
+        };
         setOriginalData(fullOriginalData);
 
         setFormData({
-          name: productData.name || '',
+          name: decodedName,
           price: productData.price?.toString() || '',
           slashed_price: productData.slashed_price?.toString() || '',
           category: productData.category || '',
           quantity: productData.available_qty?.toString() || '',
-          description: productData.description || '',
+          description: decodedDescription,
           concern_options: fetchedConcerns,
           deal_price: productData.deal_price?.toString() || '',
           deal_end_date: formattedDealEndDate
