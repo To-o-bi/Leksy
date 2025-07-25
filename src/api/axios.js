@@ -73,12 +73,6 @@ class ApiClient {
       const match = document.cookie.match(/auth_token=([^;]+)/);
       const token = match ? atob(match[1]) : null;
       
-      console.log('🔑 Token check:', { 
-        hasMemoryToken: !!this.tokenStore, 
-        hasCookieToken: !!token,
-        cookieFound: !!match
-      });
-      
       // Store in memory for future requests
       if (token) {
         this.tokenStore = token;
@@ -86,7 +80,6 @@ class ApiClient {
       
       return token;
     } catch (error) {
-      console.error('❌ Error reading token:', error);
       return null;
     }
   }
@@ -96,7 +89,6 @@ class ApiClient {
     
     // Store in memory immediately
     this.tokenStore = token;
-    console.log('💾 Setting token in memory');
     
     // Store in secure cookie for persistence
     if (typeof document !== 'undefined') {
@@ -107,13 +99,11 @@ class ApiClient {
         const secureFlag = isHttps ? '; Secure' : '';
         const cookieString = `auth_token=${encoded}; path=/; max-age=31536000; SameSite=Strict${secureFlag}`;
         document.cookie = cookieString;
-        console.log('🍪 Token cookie set:', { isHttps, cookieString });
         
         // Verify the cookie was set
         const verification = document.cookie.match(/auth_token=([^;]+)/);
-        console.log('🔍 Token cookie verification:', { cookieSet: !!verification });
       } catch (error) {
-        console.error('❌ Error setting token cookie:', error);
+        // Silent error handling for production
       }
     }
     
@@ -136,13 +126,10 @@ class ApiClient {
       if (match) {
         const user = JSON.parse(atob(match[1]));
         this.userStore = user; // Cache in memory
-        console.log('👤 User retrieved from cookie:', { hasUser: !!user, role: user?.role });
         return user;
-      } else {
-        console.log('👤 No user cookie found');
       }
     } catch (error) {
-      console.error('❌ Error reading user data:', error);
+      // Silent error handling for production
     }
     return null;
   }
@@ -152,7 +139,6 @@ class ApiClient {
     
     // Store in memory immediately
     this.userStore = userData;
-    console.log('💾 Setting user in memory:', { role: userData.role });
     
     // Store in secure cookie for persistence
     if (typeof document !== 'undefined') {
@@ -163,13 +149,11 @@ class ApiClient {
         const secureFlag = isHttps ? '; Secure' : '';
         const cookieString = `user_data=${encoded}; path=/; max-age=31536000; SameSite=Strict${secureFlag}`;
         document.cookie = cookieString;
-        console.log('🍪 User cookie set:', { isHttps, cookieString: cookieString.substring(0, 50) + '...' });
         
         // Verify the cookie was set
         const verification = document.cookie.match(/user_data=([^;]+)/);
-        console.log('🔍 User cookie verification:', { cookieSet: !!verification });
       } catch (error) {
-        console.error('❌ Error setting user cookie:', error);
+        // Silent error handling for production
       }
     }
   }
@@ -178,7 +162,6 @@ class ApiClient {
     // Clear in-memory storage
     this.tokenStore = null;
     this.userStore = null;
-    console.log('🧹 Clearing auth from memory');
     
     // Clear cookies
     if (typeof document !== 'undefined') {
@@ -197,7 +180,6 @@ class ApiClient {
   isAuthenticated() {
     const token = this.getToken();
     const user = this.getUser();
-    console.log('🔍 API Client Auth Check:', { token: !!token, user: !!user, hasAuth: !!(token && user) });
     return !!(token && user);
   }
 

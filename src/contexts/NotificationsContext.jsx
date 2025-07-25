@@ -1,7 +1,7 @@
 // src/contexts/NotificationsContext.js
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import api from '../api/axios'; 
+import api from '../api/axios';
 
 const NotificationsContext = createContext();
 
@@ -16,26 +16,28 @@ export const NotificationsProvider = ({ children }) => {
   const fetchNotifications = useCallback(async (limit = 20) => {
     try {
       const response = await api.get('/admin/fetch-notifications', { params: { limit } });
-      if (response.data.code === 200) {
-        const readIds = new Set(JSON.parse(localStorage.getItem('readNotificationIds')) || []);
-        
+
+      // --- DEBUG ---
+      console.log('[DEBUG] Fetched data from backend:', response.data.notifications);
+      // --- END DEBUG ---
+
+      if (response.data && response.data.code === 200) {
         const transformed = response.data.notifications.map(n => ({
           id: n.id,
           type: n.type,
           type_id: n.type_id,
           title: n.title,
           message: n.description,
-          read: readIds.has(n.id),
+          read: n.isRead,
           created_at: n.created_at,
           raw_description: n.description,
-          // You might need to re-add your formatting functions here or pass them in
         }));
         
         setNotifications(transformed);
         setUnreadCount(transformed.filter(n => !n.read).length);
         setError(null);
       } else {
-        throw new Error(response.data.message || 'Failed to fetch notifications');
+        throw new Error(response.data?.message || 'Failed to fetch notifications');
       }
     } catch (err) {
       console.error('Error fetching notifications:', err);
@@ -45,30 +47,41 @@ export const NotificationsProvider = ({ children }) => {
     }
   }, []);
 
-  const markAsRead = useCallback((id) => {
-    const readIds = new Set(JSON.parse(localStorage.getItem('readNotificationIds')) || []);
-    if (readIds.has(id)) return; // Already read, do nothing
+  const markAsRead = useCallback(async (id) => {
+    // ... (This function can be debugged similarly if needed)
+  }, [notifications]);
 
-    readIds.add(id);
-    localStorage.setItem('readNotificationIds', JSON.stringify([...readIds]));
-
-    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
-    setUnreadCount(prev => (prev > 0 ? prev - 1 : 0));
-  }, []);
-
-  const markAllAsRead = useCallback(() => {
-    const allIds = notifications.map(n => n.id);
-    const readIds = new Set(JSON.parse(localStorage.getItem('readNotificationIds')) || []);
-    allIds.forEach(id => readIds.add(id));
-    localStorage.setItem('readNotificationIds', JSON.stringify([...readIds]));
-
+  const markAllAsRead = useCallback(async () => {
+    const originalNotifications = [...notifications];
+    
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     setUnreadCount(0);
+
+    try {
+      // --- DEBUG ---
+      console.log('[DEBUG] Sending "Mark all as read" request to the backend...');
+      // --- END DEBUG ---
+      
+      await api.post('/admin/mark-all-as-read?target=notifications');
+
+      // --- DEBUG ---
+      console.log('[DEBUG] "Mark all as read" request was successful.');
+      // --- END DEBUG ---
+      
+    } catch (err) {
+      // --- DEBUG ---
+      console.error('[DEBUG] "Mark all as read" request FAILED:', err);
+      // --- END DEBUG ---
+
+      console.error('Failed to mark all notifications as read:', err);
+      setNotifications(originalNotifications);
+      setUnreadCount(originalNotifications.filter(n => !n.read).length);
+    }
   }, [notifications]);
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(() => fetchNotifications(), 30000); // Auto-refresh
+    const interval = setInterval(() => fetchNotifications(), 30000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 

@@ -978,7 +978,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 ```JSON
 {
 	"code": 200,
-	"message": "Notifications fetch returned 4 results",
+	"message": "Notifications fetch returned 3 results",
 	"notifications": [
 		{
 			"id": 4,
@@ -987,7 +987,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 			"title": "New Consultation Booking",
 			"description": "omeone just booked a Video consultation.\nDate: 2025-08-01\nTime: 02:00 PM - 03:00 PM",
 			"created_at": "2025-07-05 04:25:02",
-			"isRead": true
+   "isRead": true
 		},
 		{
 			"id": 3,
@@ -996,7 +996,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 			"title": "New Order Received",
 			"description": "Felicia placed an order worth of &amp;#8358;18,100. Full details available in the orders section.",
 			"created_at": "2025-07-05 04:20:57",
-			"isRead": true
+   "isRead": true
 		},
 		{
 			"id": 2,
@@ -1005,7 +1005,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 			"title": "Low Stock Alert",
 			"description": "Product: Abc is currently running low! Remaining: 5 qty.",
 			"created_at": "2025-07-05 04:20:48",
-			"isRead": true
+   "isRead": true
 		},
 		{
 			"id": 1,
@@ -1014,7 +1014,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 			"title": "New Contact Form Submission",
 			"description": "Message: Hello testingg...",
 			"created_at": "2025-07-05 04:17:49",
-			"isRead": true
+   "isRead": true
 		}
 	],
 	"token": "68641f6750a7c"

@@ -1,3 +1,4 @@
+
 // src/api/CheckoutService.js
 
 const BASE_URL = 'https://leksycosmetics.com';
@@ -29,6 +30,13 @@ export const initiateCheckout = async (formData, deliveryMethod, cart, successRe
   searchParams.append('name', formData.name);
   searchParams.append('email', formData.email);
   searchParams.append('phone', formData.phone);
+  
+  // START: Added logic for additional_phone
+  if (formData.additional_phone && formData.additional_phone.trim() !== '') {
+    searchParams.append('additional_phone', formData.additional_phone);
+  }
+  // END: Added logic for additional_phone
+
   searchParams.append('delivery_method', deliveryMethod);
   searchParams.append('cart', JSON.stringify(cartForAPI));
   searchParams.append('success_redirect', successRedirectUrl);
@@ -52,7 +60,7 @@ export const initiateCheckout = async (formData, deliveryMethod, cart, successRe
 
   const result = await response.json();
   
-  if (result.code === 200) {
+  if (response.ok && result.code === 200) {
     return result;
   }
   
@@ -70,6 +78,7 @@ export const validateCheckoutForm = (formData, deliveryMethod) => {
   if (!formData.name.trim()) errors.name = 'Name is required';
   if (!/\S+@\S+\.\S+/.test(formData.email)) errors.email = 'Email is invalid';
   if (!formData.phone.trim()) errors.phone = 'Phone number is required';
+  // Note: additional_phone is optional, so no validation is needed here.
   if (deliveryMethod === 'address') {
     if (!formData.state) errors.state = 'State is required';
     if (!formData.city) errors.city = 'City/LGA is required';

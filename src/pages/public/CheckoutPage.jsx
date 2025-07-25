@@ -28,10 +28,12 @@ const CheckoutPage = () => {
   const [busParkFee, setBusParkFee] = useState(null);
   const [isFetchingBusParkFee, setIsFetchingBusParkFee] = useState(true);
 
+  // Added 'additional_phone' to the formData state
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
+    additional_phone: '',
     state: '',
     city: '',
     street_address: '',
@@ -148,12 +150,8 @@ const CheckoutPage = () => {
     }
 
     try {
-      const cartForAPI = cart.map(item => ({
-        product_id: item.product_id,
-        quantity: item.quantity
-      }));
-
-      const result = await initiateCheckout(formData, deliveryMethod, cartForAPI, SUCCESS_REDIRECT_URL);
+      // The cart mapping is now handled inside initiateCheckout
+      const result = await initiateCheckout(formData, deliveryMethod, cart, SUCCESS_REDIRECT_URL);
 
       if (result.code === 200 && result.authorization_url) {
         const detailsForSuccessPage = {
@@ -379,6 +377,25 @@ const CheckoutPage = () => {
                     />
                     {formErrors.phone && <p className="text-red-500 text-sm mt-1">{formErrors.phone}</p>}
                   </div>
+
+                  {/* START: Added Additional Phone Field */}
+                  <div className="md:col-span-2">
+                    <label htmlFor="additional_phone" className="block text-sm font-medium text-gray-700 mb-2">
+                      Additional Phone (Optional)
+                    </label>
+                    <input 
+                      type="tel" 
+                      id="additional_phone" 
+                      name="additional_phone" 
+                      value={formData.additional_phone} 
+                      onChange={handleInputChange} 
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                      placeholder="Enter another phone number"
+                      disabled={isProcessingOrder} 
+                    />
+                  </div>
+                  {/* END: Added Additional Phone Field */}
+
                 </div>
               </div>
             </div>

@@ -79,35 +79,22 @@ function useProvideAuth() {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        console.log('🚀 Initializing auth...');
-        
         const token = authService.getToken();
         const userData = authService.getAuthUser();
         const isAuthenticated = authService.isAuthenticated();
         
-        console.log('🔍 Auth initialization:', { 
-          hasToken: !!token, 
-          hasUser: !!userData, 
-          isAuthenticated,
-          pathname: location.pathname
-        });
-        
         if (isAuthenticated && userData) {
-          console.log('✅ User authenticated, setting user state');
           setUser(userData);
           setAuthChangeCounter(prev => prev + 1);
         } else {
-          console.log('❌ User not authenticated, clearing auth');
           authService.clearAuth();
           setUser(null);
           
           if (isProtectedRoute() && !isLoginPage()) {
-            console.log('🔒 Protected route without auth, redirecting to login');
             navigateToLogin('Authentication required');
           }
         }
       } catch (error) {
-        console.error('❌ Auth initialization error:', error);
         authService.clearAuth();
         setUser(null);
         
@@ -175,7 +162,7 @@ function useProvideAuth() {
     try {
       await authService.logout();
     } catch (error) {
-      console.warn('Logout API failed:', error.message);
+      // Silent error handling for production
     }
     
     setUser(null);
@@ -214,15 +201,6 @@ function useProvideAuth() {
     const hasToken = !!authService.getToken();
     const currentUser = user || authService.getAuthUser();
     const isUserAuthenticated = hasToken && !!currentUser;
-    
-    console.log('🔍 Auth Context Check:', { 
-      hasToken, 
-      hasUser: !!currentUser, 
-      userFromState: !!user,
-      userFromService: !!authService.getAuthUser(),
-      isAuthenticated: isUserAuthenticated,
-      pathname: location.pathname
-    });
     
     return {
       // State

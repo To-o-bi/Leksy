@@ -7,7 +7,7 @@ import ProductFilters from '../../components/product/ProductFilters';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import Pagination from '../../components/common/Pagination';
 import Loader from '../../components/common/Loader';
-import Hero from '../../components/shop/Hero';
+import HeroBanner from '../../components/shop/HeroBanner'; 
 import { fetchProducts, handleApiError, getCategoryDisplayName } from '../../utils/api';
 
 const ShopPage = () => {
@@ -27,10 +27,22 @@ const ShopPage = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [showMobileFilters, setShowMobileFilters] = useState(false);
     const [totalProductsCount, setTotalProductsCount] = useState(0);
+    // State to hold the best deal product
+    const [bestDeal, setBestDeal] = useState(null);
 
     const productsPerPage = 20;
 
-    // This is now the single source of truth for getting and filtering data
+    const findBestDeal = (products) => {
+        const now = new Date();
+        const validDeals = products.filter(p => p.deal_end_date && new Date(p.deal_end_date) > now);
+
+        if (validDeals.length > 0) {
+            validDeals.sort((a, b) => new Date(a.deal_end_date) - new Date(b.deal_end_date));
+            return validDeals[0];
+        }
+        return null;
+    };
+
     const fetchAndFilterProducts = useCallback(async (filters, search) => {
         setLoading(true);
         setError(null);
@@ -45,6 +57,8 @@ const ShopPage = () => {
             if (result.success) {
                 setAllProducts(result.products);
                 setTotalProductsCount(result.totalCount);
+                // Find and set the best deal from the fetched products
+                setBestDeal(findBestDeal(result.products));
                 setCurrentPage(1);
             } else {
                 throw new Error(result.error || 'Failed to fetch or filter products');
@@ -53,26 +67,23 @@ const ShopPage = () => {
             setError(handleApiError(err, 'Failed to process products. Please try again.'));
             setAllProducts([]);
             setTotalProductsCount(0);
+            setBestDeal(null);
         } finally {
             setLoading(false);
         }
     }, []);
 
-    // Main effect to fetch data when filters change
     useEffect(() => {
         fetchAndFilterProducts(selectedFilters, searchQuery);
     }, [selectedFilters, searchQuery, fetchAndFilterProducts]);
 
-    // Effect to handle incoming navigation from homepage
     useEffect(() => {
         if (location.state?.concerns) {
             setSelectedFilters(prev => ({ ...prev, concerns: location.state.concerns }));
-            // Clear the state so it's not "sticky"
             navigate(location.pathname, { replace: true, state: {} });
         }
     }, [location.state, location.pathname, navigate]);
     
-    // Pagination effect
     useEffect(() => {
         const total = Math.ceil(totalProductsCount / productsPerPage);
         setTotalPages(total > 0 ? total : 1);
@@ -81,7 +92,6 @@ const ShopPage = () => {
         setProducts(allProducts.slice(startIndex, endIndex));
     }, [allProducts, currentPage, totalProductsCount, productsPerPage]);
 
-    // Handlers
     const handleSearchChange = useCallback((e) => {
         setSearchQuery(e.target.value);
     }, []);
@@ -99,8 +109,6 @@ const ShopPage = () => {
         setSelectedFilters({ category: '', concerns: [] });
         setSearchQuery('');
     }, []);
-    
-    // --- Render logic (no changes needed below) ---
     
     if (loading && products.length === 0) {
         return (
@@ -124,8 +132,10 @@ const ShopPage = () => {
                     }] : [])
                 ]}
             />
-            <Hero />
+            {/* Pass the bestDeal product as a prop */}
+            <HeroBanner bestDealProduct={bestDeal} />
             <div className="w-[87%] mx-auto py-8">
+                {/* ... rest of the component remains the same ... */}
                 <div className="mb-8">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                         <div className="relative w-full md:w-auto">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../contexts/NotificationsContext';
-import Message from '../../components/common/Message'; // Note: Adjust this import path to match your project structure
+import Message from '../../components/common/Message'; 
 
 const NotificationsPage = () => {
   const {
