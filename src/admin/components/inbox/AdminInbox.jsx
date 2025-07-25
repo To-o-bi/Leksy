@@ -31,8 +31,6 @@ const AdminInbox = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notification, setNotification] = useState(null);
-  // REMOVED: Unnecessary state for the mobile sidebar toggle
-  // const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // HTML Entity Decoder Function
   const decodeHtml = (html) => {
@@ -171,8 +169,6 @@ const AdminInbox = () => {
       saveMessageStatus(message.id, { read: true });
     }
     setSelectedMessage(prev => ({ ...message, read: true }));
-    // REMOVED: No longer need to manage the sidebar state here
-    // setIsSidebarOpen(false);
   };
 
   const handleOpenGmail = () => {
@@ -195,8 +191,6 @@ const AdminInbox = () => {
 
   const handleBackToList = () => {
     setSelectedMessage(null);
-    // REMOVED: No longer need to manage the sidebar state here
-    // setIsSidebarOpen(true);
   };
 
   useEffect(() => {
@@ -309,10 +303,7 @@ const AdminInbox = () => {
           selectedMessage ? 'hidden lg:flex' : 'flex'
         } w-full lg:w-96 bg-white/70 backdrop-blur-xl border-r border-white/20 flex-col shadow-xl relative`}>
           
-          {/* REMOVED: The unnecessary mobile toggle button is gone. */}
-
           <div className="p-4 sm:p-6 border-b border-gray-100/60 bg-gradient-to-r from-white/50 to-pink-50/30">
-            {/* FIXED: Added margin-top to account for lack of mobile button. Use mt-4 lg:mt-0 */}
             <div className="flex items-center justify-between mb-4 sm:mb-6 mt-4 lg:mt-0">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
@@ -438,13 +429,14 @@ const AdminInbox = () => {
         </div>
 
         {/* Message Detail View */}
+        {/* FIXED: Added overflow-y-auto to this container */}
         <div className={`${
           selectedMessage ? 'flex' : 'hidden lg:flex'
-        } flex-1 flex-col bg-white/40 backdrop-blur-sm`}>
+        } flex-1 flex-col bg-white/40 backdrop-blur-sm pt-20 lg:pt-0 overflow-y-auto`}>
           {selectedMessage ? (
             <>
               {/* Message Header */}
-              <div className="p-4 sm:p-6 border-b border-gray-100/60 bg-gradient-to-r from-white/70 to-pink-50/30 backdrop-blur-sm mt-16 lg:mt-0">
+              <div className="p-4 sm:p-6 border-b border-gray-100/60 bg-gradient-to-r from-white/70 to-pink-50/30 backdrop-blur-sm">
                 <div className="flex items-start gap-3 sm:gap-4">
                   <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shadow-xl bg-gradient-to-br ${getAvatarColor(selectedMessage.name, selectedMessage.read)}`}>
                     <span className="text-base sm:text-xl font-bold text-white">
@@ -483,9 +475,9 @@ const AdminInbox = () => {
               </div>
               
               {/* Message Content */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-white/30">
+              {/* FIXED: Removed overflow-y-auto from this inner container */}
+              <div className="p-4 sm:p-6 bg-white/30">
                 <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100/60">
-                  {/* FIXED: Added 'break-words' to prevent horizontal overflow */}
                   <p className="text-gray-700 leading-relaxed whitespace-pre-line text-sm sm:text-base break-words">
                     {selectedMessage.message}
                   </p>
@@ -493,6 +485,7 @@ const AdminInbox = () => {
               </div>
 
               {/* Reply Button */}
+              {/* FIXED: Removed mt-auto to eliminate the large gap */}
               <div className="p-4 sm:p-6 border-t border-gray-100/60 bg-gradient-to-r from-white/70 to-pink-50/30 backdrop-blur-sm">
                 <div className="flex items-center justify-center">
                   <button 
