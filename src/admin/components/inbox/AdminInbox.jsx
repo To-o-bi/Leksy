@@ -31,7 +31,8 @@ const AdminInbox = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notification, setNotification] = useState(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // REMOVED: Unnecessary state for the mobile sidebar toggle
+  // const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // HTML Entity Decoder Function
   const decodeHtml = (html) => {
@@ -78,12 +79,10 @@ const AdminInbox = () => {
         const submissionsData = responseData.submissions || [];
         
         if (submissionsData && submissionsData.length > 0) {
-          // FIX: Get all saved statuses from localStorage before mapping
           const savedStatuses = getSavedStatuses();
 
           const formattedMessages = submissionsData.map((submission, index) => {
             const id = submission.id || submission.submission_id || `msg_${index}`;
-            // FIX: Get the saved status for this specific message ID
             const status = savedStatuses[id] || { read: false, replied: false };
 
             return {
@@ -94,7 +93,6 @@ const AdminInbox = () => {
               subject: decodeHtml(submission.subject || 'No subject'),
               message: decodeHtml(submission.message || ''),
               created_at: submission.created_at || new Date().toISOString(),
-              // FIX: Use the saved status, otherwise default to false
               read: status.read,
               replied: status.replied,
               date: formatDate(submission.created_at),
@@ -165,19 +163,16 @@ const AdminInbox = () => {
   };
 
   const handleSelectMessage = (message) => {
-    // FIX: Only update state and localStorage if the message is currently unread
     if (!message.read) {
       const updatedMessages = messages.map(msg => 
         msg.id === message.id ? { ...msg, read: true } : msg
       );
       setMessages(updatedMessages);
-      // FIX: Save the new 'read' status to localStorage
       saveMessageStatus(message.id, { read: true });
     }
-    // Update the selected message in either case
     setSelectedMessage(prev => ({ ...message, read: true }));
-    // Close mobile sidebar when message is selected
-    setIsSidebarOpen(false);
+    // REMOVED: No longer need to manage the sidebar state here
+    // setIsSidebarOpen(false);
   };
 
   const handleOpenGmail = () => {
@@ -188,21 +183,20 @@ const AdminInbox = () => {
     
     setNotification({ type: 'success', message: 'Opening Gmail to reply...' });
     
-    // FIX: Only update state and localStorage if the message hasn't been marked as replied yet
     if (!selectedMessage.replied) {
       const updatedMessages = messages.map(msg => 
         msg.id === selectedMessage.id ? { ...msg, replied: true } : msg
       );
       setMessages(updatedMessages);
       setSelectedMessage(prev => ({ ...prev, replied: true }));
-      // FIX: Save the new 'replied' status to localStorage
       saveMessageStatus(selectedMessage.id, { replied: true });
     }
   };
 
   const handleBackToList = () => {
     setSelectedMessage(null);
-    setIsSidebarOpen(true);
+    // REMOVED: No longer need to manage the sidebar state here
+    // setIsSidebarOpen(true);
   };
 
   useEffect(() => {
@@ -315,16 +309,11 @@ const AdminInbox = () => {
           selectedMessage ? 'hidden lg:flex' : 'flex'
         } w-full lg:w-96 bg-white/70 backdrop-blur-xl border-r border-white/20 flex-col shadow-xl relative`}>
           
-          {/* Mobile Toggle Button */}
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="lg:hidden fixed top-4 left-4 z-50 bg-white/80 backdrop-blur-sm p-2 rounded-lg shadow-lg border border-gray-200/60"
-          >
-            {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          {/* REMOVED: The unnecessary mobile toggle button is gone. */}
 
           <div className="p-4 sm:p-6 border-b border-gray-100/60 bg-gradient-to-r from-white/50 to-pink-50/30">
-            <div className="flex items-center justify-between mb-4 sm:mb-6 mt-12 lg:mt-0">
+            {/* FIXED: Added margin-top to account for lack of mobile button. Use mt-4 lg:mt-0 */}
+            <div className="flex items-center justify-between mb-4 sm:mb-6 mt-4 lg:mt-0">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
                   <Mail className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
@@ -496,7 +485,8 @@ const AdminInbox = () => {
               {/* Message Content */}
               <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-white/30">
                 <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100/60">
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-line text-sm sm:text-base">
+                  {/* FIXED: Added 'break-words' to prevent horizontal overflow */}
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-line text-sm sm:text-base break-words">
                     {selectedMessage.message}
                   </p>
                 </div>
