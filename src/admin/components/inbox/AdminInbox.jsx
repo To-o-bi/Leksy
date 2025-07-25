@@ -486,7 +486,7 @@ const AdminInbox = () => {
 
               {/* Reply Button */}
               {/* FIXED: Removed mt-auto to eliminate the large gap */}
-              <div className="p-4 sm:p-6 border-t border-gray-100/60 bg-gradient-to-r from-white/70 to-pink-50/30 backdrop-blur-sm">
+              <div className="p-4 sm:p-6">
                 <div className="flex items-center justify-center">
                   <button 
                     onClick={handleOpenGmail}
