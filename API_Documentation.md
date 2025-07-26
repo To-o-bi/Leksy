@@ -363,7 +363,7 @@ There are two key steps:
 ### 1. Initiate Checkout (This will alert and prepare the payment gateway for the next step)
 
 ```CURL
-curl --location --request POST '{base_url}/api/checkout/initiate?name={name}&email={email}&phone={phone|numeric}&additional_phone={additional_phone|numeric|optional}&delivery_method={pickup/address/bus-park}&state={state|optional}&lga={lga|optional|required:if(state=lagos)}&city={city|optional}&street_address={street_address|optional}&cart={a_valid_json_encoded_cart_object|see_sample_below}&success_redirect={https://leksycosmetics.com/path/to/your-successful-order-page}'
+curl --location --request POST '{base_url}/api/checkout/initiate?name={name}&email={email}&phone={phone|numeric}&additional_phone={additional_phone|numeric|optional}&delivery_method={pickup/address/bus-park}&state={state|optional}&lga={lga|optional|required:if(state=lagos)}&city={city|optional}&street_address={street_address|optional}&additional_details={additional_details|optional}&cart={a_valid_json_encoded_cart_object|see_sample_below}&success_redirect={https://leksycosmetics.com/path/to/your-successful-order-page}'
 ```
 
 ```
@@ -436,11 +436,13 @@ curl --location --request GET '{base_url}/api/fetch-order?order_id={order_id}'
 		"email": "john@doe.com",
 		"name": "John Doe",
 		"phone": "07012312131",
+		"additional_phone": "09012345677",
 		"delivery_method": "address|pickup",
 		"state": "Kogi",
 		"lga": null,
 		"city": "Lokoja",
 		"street address": "1, My Street",
+		"additional_details": "Hello.",
 		"amount_calculated": 25000, // Must be exactly equal to amount_paid, else a fraud has happened. 
 		"amount_paid": 25000,
 		"cart_obj": [
@@ -489,11 +491,13 @@ curl --location --request GET '{base_url}/api/fetch-orders?&order_status={order_
 			"email": "john@doe.com",
 			"name": "John Doe",
 			"phone": "07012312131",
+			"additional_phone": "09012345677",
 			"delivery_method": "address|pickup",
 			"state": "Kogi",
 			"lga": null,
 			"city": "Lokoja",
 			"street address": "1, My Street",
+			"additional_details": "Hello.",
 			"amount_calculated": 25000, // Must be exactly equal to amount_paid, else a fraud has happened. 
 			"amount_paid": 25000,
 			"cart_obj": [
@@ -631,7 +635,7 @@ There are two key steps:
 ### 1. Initiate Consultation (This will alert and prepare the payment gateway for the next step)
 
 ```CURL
-curl --location --request POST '{base_url}/api/consultation/initiate?name={name}&email={email}&phone={phone}&age_range={age_range}&gender={gender}&skin_type={skin_type}&skin_concerns={skin_concern_1,skin_concern_2,skin_concern_n}&current_skincare_products={current_skincare_products|optional}&additional_details={additional_details|optional}&channel={a_valid_channel}&date={yyyy-mm-dd}&time_range={a_valid_time_range}&success_redirect={https://leksycosmetics.com/path/to/your-successful-consultation-page}'
+curl --location --request POST '{base_url}/api/consultation/initiate?name={name}&email={email}&phone={phone}&additional_phone={additional_phone|optional}&age_range={age_range}&gender={gender}&skin_type={skin_type}&skin_concerns={skin_concern_1,skin_concern_2,skin_concern_n}&current_skincare_products={current_skincare_products|optional}&additional_details={additional_details|optional}&channel={a_valid_channel}&date={yyyy-mm-dd}&time_range={a_valid_time_range}&success_redirect={https://leksycosmetics.com/path/to/your-successful-consultation-page}'
 ```
 
 ```
@@ -723,6 +727,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-consultation?consultat
 		"name": "Felicia H.",
 		"email": "hendersonf52@gmail.com",
 		"phone": "08011229391",
+		"additional_phone": "09012345643",
 		"age_range": "20 - 25",
 		"gender": "female",
 		"skin_type": "normal",
@@ -768,6 +773,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-consultations?&payment
 			"name": "Felicia H.",
 			"email": "hendersonf52@gmail.com",
 			"phone": "08011229391",
+			"additional_phone": "09012345643",
 			"age_range": "20 - 25",
 			"gender": "female",
 			"skin_type": "normal",
