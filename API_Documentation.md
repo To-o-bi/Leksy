@@ -800,6 +800,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-consultations?&payment
 			"name": "Felicia H.",
 			"email": "hendersonf52@gmail.com",
 			"phone": "08011229391",
+			"additional_phone": "09012345643",
 			"age_range": "20 - 25",
 			"gender": "female",
 			"skin_type": "normal",
@@ -824,7 +825,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-consultations?&payment
 ## Update Consultation
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/update-consultation?consultation_id={consultation_id}&session_held_status={session_held_status|optional}&name={name|optional}&email={email|optional}&phone={phone|optional}&age_range={age_range|optional}&gender={gender|optional}&skin_type={skin_type|optional}&skin_concerns={skin_concern_1,skin_concern_2,skin_concern_n|optional}&current_skincare_products={current_skincare_products|optional}&additional_details={additional_details|optional}&channel={a_valid_channel|optional}&date={yyyy-mm-dd|optional}&time_range={a_valid_time_range|optional}' \
+curl --location --request POST '{base_url}/api/admin/update-consultation?consultation_id={consultation_id}&session_held_status={session_held_status|optional}&name={name|optional}&email={email|optional}&phone={phone|optional}&additional_phone={additional_phone|optional}&age_range={age_range|optional}&gender={gender|optional}&skin_type={skin_type|optional}&skin_concerns={skin_concern_1,skin_concern_2,skin_concern_n|optional}&current_skincare_products={current_skincare_products|optional}&additional_details={additional_details|optional}&channel={a_valid_channel|optional}&date={yyyy-mm-dd|optional}&time_range={a_valid_time_range|optional}' \
 --header 'Authorization: Bearer {token}'
 ```
 
@@ -847,6 +848,7 @@ curl --location --request POST '{base_url}/api/admin/update-consultation?consult
 		"name": "Felicia H.",
 		"email": "hendersonf52@gmail.com",
 		"phone": "08011229391",
+		"additional_phone": "09012344532",
 		"age_range": "20 - 25",
 		"gender": "female",
 		"skin_type": "normal",
@@ -875,32 +877,33 @@ curl --location --request POST '{base_url}/api/admin/send_consultation_link?cons
 
 ```JSON
 {
-   "code": 200,
-   "message": "Meeting link sent successfully!",
-   "consultation":    {
-      "id": 2,
-      "unique_id": "bk-685e9be65b69c",
-      "api_ref": "62h45vok5p",
-      "payment_status": 0,
-      "session_held_status": "unheld",
-      "cron_trial_count": 3,
-      "name": "Felicia H.",
-      "email": "hendersonf52@gmail.com",
-      "phone": "08011229391",
-      "age_range": "20 - 25",
-      "gender": "female",
-      "skin_type": "normal",
-      "skin_concerns": "acne",
-      "current_skincare_products": "Olive mint cream",
-      "additional_details": "I use olive mint cream",
-      "channel": "whatsapp",
-      "meet_link": "https://meet.google.com/abc",
-      "date": "2025-07-05",
-      "time_range": "2:00 PM - 3:00 PM",
-      "amount_calculated": 15000,
-      "amount_paid": 15000,
-      "created_at": "2025-06-27 14:25:59"
-   },
+	"code": 200,
+	"message": "Meeting link sent successfully!",
+	"consultation": {
+		"id": 2,
+		"unique_id": "bk-685e9be65b69c",
+		"api_ref": "62h45vok5p",
+		"payment_status": 0,
+		"session_held_status": "unheld",
+		"cron_trial_count": 3,
+		"name": "Felicia H.",
+		"email": "hendersonf52@gmail.com",
+		"phone": "08011229391",
+		"additional_phone": "09012344532",
+		"age_range": "20 - 25",
+		"gender": "female",
+		"skin_type": "normal",
+		"skin_concerns": "acne",
+		"current_skincare_products": "Olive mint cream",
+		"additional_details": "I use olive mint cream",
+		"channel": "whatsapp",
+		"meet_link": "https://meet.google.com/abc",
+		"date": "2025-07-05",
+		"time_range": "2:00 PM - 3:00 PM",
+		"amount_calculated": 15000,
+		"amount_paid": 15000,
+		"created_at": "2025-06-27 14:25:59"
+	},
    "token": "68641f6750a7c"
 }
 ```
