@@ -1,21 +1,122 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNotifications } from '../../../contexts/NotificationsContext';
 import LogoutModal from './LogoutModal';
 
-const AdminSidebar = ({ isOpen, isMobile, onClose }) => {
+const AdminSidebar = ({ isOpen, isMobile, onClose, onOpen }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout, user } = useAuth();
   const { unreadCount } = useNotifications();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  
+  // Refs for touch handling
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const touchStartTime = useRef(0);
 
-  const handleLogout = () => {
-    setShowLogoutModal(true);
+  // Enhanced Swipe Gesture Logic
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const SWIPE_THRESHOLD = 50;
+    const EDGE_THRESHOLD = 50;
+    const MAX_TIME = 500;
+    const MAX_VERTICAL_DISTANCE = 150;
+
+    const handleTouchStart = (e) => {
+      const touch = e.touches[0];
+      touchStartX.current = touch.clientX;
+      touchStartY.current = touch.clientY;
+      touchStartTime.current = Date.now();
+    };
+
+    const handleTouchMove = (e) => {
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - touchStartX.current;
+      const deltaY = Math.abs(touch.clientY - touchStartY.current);
+      
+      // Only prevent default for significant horizontal movement
+      if (Math.abs(deltaX) > 20 && Math.abs(deltaX) > deltaY) {
+        // Horizontal swipe detected
+      }
+    };
+
+    const handleTouchEnd = (e) => {
+      const touch = e.changedTouches[0];
+      const touchEndX = touch.clientX;
+      const touchEndY = touch.clientY;
+      const touchEndTime = Date.now();
+      
+      const deltaX = touchEndX - touchStartX.current;
+      const deltaY = Math.abs(touchEndY - touchStartY.current);
+      const swipeTime = touchEndTime - touchStartTime.current;
+
+      // Reset touch values
+      touchStartX.current = 0;
+      touchStartY.current = 0;
+      touchStartTime.current = 0;
+
+      // Validate swipe
+      const isValidHorizontalSwipe = 
+        Math.abs(deltaX) >= SWIPE_THRESHOLD &&
+        deltaY <= MAX_VERTICAL_DISTANCE &&
+        swipeTime <= MAX_TIME;
+
+      if (!isValidHorizontalSwipe) {
+        return;
+      }
+
+      const isRightSwipe = deltaX > 0;
+      const isLeftSwipe = deltaX < 0;
+      const startedFromEdge = touchStartX.current <= EDGE_THRESHOLD;
+
+      // Open sidebar: right swipe from left edge when closed
+      if (!isOpen && isRightSwipe && startedFromEdge) {
+        onOpen();
+        return;
+      }
+
+      // Close sidebar: left swipe when open
+      if (isOpen && isLeftSwipe) {
+        onClose();
+        return;
+      }
+    };
+
+    // Use capture phase and passive: false for better control
+    const options = { passive: false, capture: true };
+    
+    document.addEventListener('touchstart', handleTouchStart, options);
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd, options);
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart, options);
+      document.removeEventListener('touchmove', handleTouchMove, { passive: true });
+      document.removeEventListener('touchend', handleTouchEnd, options);
+    };
+  }, [isOpen, isMobile, onOpen, onClose]);
+
+  const handleOverlayClick = (e) => {
+    if (isMobile && isOpen && e.target === e.currentTarget) {
+      onClose();
+    }
   };
 
+  const handleMouseEnter = () => {
+    if (!isMobile) setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    if (!isMobile) setIsHovered(false);
+  };
+
+  const handleLogout = () => setShowLogoutModal(true);
+  
   const confirmLogout = async () => {
     setIsLoggingOut(true);
     try {
@@ -28,16 +129,14 @@ const AdminSidebar = ({ isOpen, isMobile, onClose }) => {
       setShowLogoutModal(false);
     }
   };
-
-  const cancelLogout = () => {
-    setShowLogoutModal(false);
-  };
-
+  
+  const cancelLogout = () => setShowLogoutModal(false);
+  
   const handleLinkClick = () => {
-    if (isMobile) {
-      onClose();
-    }
+    if (isMobile) onClose();
   };
+  
+  const isExpanded = isOpen || (!isMobile && isHovered);
 
   const navItems = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: ( <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 15C8 16.1046 7.10457 17 6 17C4.89543 17 4 16.1046 4 15C4 13.8954 4.89543 13 6 13C7.10457 13 8 13.8954 8 15Z" fill="currentColor" /><path d="M14 15C14 16.1046 13.1046 17 12 17C10.8954 17 10 16.1046 10 15C10 13.8954 10.8954 13 12 13C13.1046 13 14 13.8954 14 15Z" fill="currentColor" /><path d="M18 13C19.1046 13 20 13.8954 20 15C20 16.1046 19.1046 17 18 17C16.8954 17 16 16.1046 16 15C16 13.8954 16.8954 13 18 13Z" fill="currentColor" /><path d="M14 7C14 8.10457 13.1046 9 12 9C10.8954 9 10 8.10457 10 7C10 5.89543 10.8954 5 12 5C13.1046 5 14 5.89543 14 7Z" fill="currentColor" /></svg> )},
@@ -55,20 +154,29 @@ const AdminSidebar = ({ isOpen, isMobile, onClose }) => {
 
   return (
     <>
+      {/* Mobile Overlay */}
+      {isMobile && isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={handleOverlayClick}
+        />
+      )}
+
+      {/* Sidebar */}
       <div
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         className={`fixed inset-y-0 left-0 z-50 h-screen flex flex-col bg-white border-r border-gray-200 transition-all duration-300 ease-in-out lg:relative lg:translate-x-0 ${
-          isOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:w-20'
+          isExpanded || (isOpen && isMobile) ? 'translate-x-0 w-64' : '-translate-x-full lg:w-20'
         }`}
       >
-        <div className={`flex items-center pt-6 pb-6 ${isOpen ? 'justify-between px-6' : 'justify-center'}`}>
-          <img src="/assets/images/icons/leksy-logo.png" alt="Logo" className={`transition-all duration-300 ${isOpen ? 'w-28' : 'w-14'}`} />
+        <div className={`flex items-center pt-6 pb-6 ${isExpanded ? 'justify-between px-6' : 'justify-center'}`}>
+          <img src="/assets/images/icons/leksy-logo.png" alt="Logo" className={`transition-all duration-300 ${isExpanded ? 'w-28' : 'w-14'}`} />
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 lg:hidden">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-
-  
-        {/* REMOVED: `overflow-y-auto` to prevent scrollbar */}
+        
         <nav className="flex-1">
           <ul className="space-y-1">
             {navItems.map((item) => (
@@ -76,11 +184,11 @@ const AdminSidebar = ({ isOpen, isMobile, onClose }) => {
                 <NavLink
                   to={item.path}
                   onClick={handleLinkClick}
-                  className={({ isActive }) => `flex items-center w-full py-3 transition-colors duration-200 ${isOpen ? 'px-6' : 'px-4 justify-center'} ${isActive ? 'bg-pink-50 text-pink-500' : 'text-gray-700 hover:bg-gray-100'}`}
-                  title={!isOpen ? item.name : ''}
+                  className={({ isActive }) => `flex items-center w-full py-3 transition-colors duration-200 ${isExpanded ? 'px-6' : 'px-4 justify-center'} ${isActive ? 'bg-pink-50 text-pink-500' : 'text-gray-700 hover:bg-gray-100'}`}
+                  title={!isExpanded ? item.name : ''}
                 >
                   <span className={location.pathname.startsWith(item.path) ? 'text-pink-500' : 'text-gray-500'}>{item.icon}</span>
-                  <div className={`flex items-center justify-between w-full ml-3 whitespace-nowrap transition-all duration-200 ${isOpen ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 overflow-hidden'}`}>
+                  <div className={`flex items-center justify-between w-full ml-3 whitespace-nowrap transition-all duration-200 ${isExpanded ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 overflow-hidden'}`}>
                     <span>{item.name}</span>
                     {item.name === 'Notifications' && unreadCount > 0 && (
                       <span className="bg-pink-500 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center">
@@ -92,7 +200,7 @@ const AdminSidebar = ({ isOpen, isMobile, onClose }) => {
               </li>
             ))}
 
-            <li className={`transition-all duration-300 ${isOpen ? 'opacity-100 max-h-12' : 'opacity-0 max-h-0 overflow-hidden'}`}>
+            <li className={`transition-all duration-300 ${isExpanded ? 'opacity-100 max-h-12' : 'opacity-0 max-h-0 overflow-hidden'}`}>
               <div className="pt-6 pb-2">
                 <div className="px-6 text-xs font-medium uppercase tracking-wider text-gray-500">Other Sections</div>
               </div>
@@ -103,11 +211,11 @@ const AdminSidebar = ({ isOpen, isMobile, onClose }) => {
                 <NavLink
                   to={item.path}
                   onClick={handleLinkClick}
-                  className={({ isActive }) => `flex items-center w-full py-3 transition-colors duration-200 ${isOpen ? 'px-6' : 'px-4 justify-center'} ${isActive ? 'bg-pink-50 text-pink-500' : 'text-gray-700 hover:bg-gray-100'}`}
-                  title={!isOpen ? item.name : ''}
+                  className={({ isActive }) => `flex items-center w-full py-3 transition-colors duration-200 ${isExpanded ? 'px-6' : 'px-4 justify-center'} ${isActive ? 'bg-pink-50 text-pink-500' : 'text-gray-700 hover:bg-gray-100'}`}
+                  title={!isExpanded ? item.name : ''}
                 >
                   <span className={location.pathname.startsWith(item.path) ? 'text-pink-500' : 'text-gray-500'}>{item.icon}</span>
-                  <span className={`ml-3 whitespace-nowrap transition-all duration-200 ${isOpen ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 overflow-hidden'}`}>
+                  <span className={`ml-3 whitespace-nowrap transition-all duration-200 ${isExpanded ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 overflow-hidden'}`}>
                     {item.name}
                   </span>
                 </NavLink>
@@ -120,11 +228,11 @@ const AdminSidebar = ({ isOpen, isMobile, onClose }) => {
           <button
             onClick={handleLogout}
             disabled={isLoggingOut}
-            className={`flex items-center w-full py-3 text-sm font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors ${isOpen ? 'px-6' : 'px-4 justify-center'} ${isLoggingOut ? 'opacity-50' : ''}`}
-            title={!isOpen ? 'Logout' : ''}
+            className={`flex items-center w-full py-3 text-sm font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors ${isExpanded ? 'px-6' : 'px-4 justify-center'} ${isLoggingOut ? 'opacity-50' : ''}`}
+            title={!isExpanded ? 'Logout' : ''}
           >
             <span><svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17 16L21 12M21 12L17 8M21 12H9M13 16V17C13 18.6569 11.6569 20 10 20H6C4.34315 20 3 18.6569 3 17V7C3 5.34315 4.34315 4 6 4H10C11.6569 4 13 5.34315 13 7V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
-            <span className={`ml-3 whitespace-nowrap transition-all duration-200 ${isOpen ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 overflow-hidden'}`}>
+            <span className={`ml-3 whitespace-nowrap transition-all duration-200 ${isExpanded ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 overflow-hidden'}`}>
               Log-out
             </span>
           </button>
