@@ -16,7 +16,6 @@ const ScrollToTop = () => {
   return null;
 };
 
-
 // Loading fallback for lazy-loaded components
 const LoadingFallback = () => (
     <div className="flex items-center justify-center h-screen bg-gray-100">
@@ -27,7 +26,7 @@ const LoadingFallback = () => (
     </div>
 );
 
-// Public pages
+// Public pages (keeping imports for when you need them later)
 const LoginPage = lazy(() => import('../pages/public/LoginPage'));
 const HomePage = lazy(() => import('../pages/public/HomePage'));
 const ShopPage = lazy(() => import('../pages/public/ShopPage'));
@@ -42,7 +41,6 @@ const CheckoutSuccessPage = lazy(() => import('../pages/public/CheckoutSuccessPa
 const PrivacyPolicyPage = lazy(() => import('../pages/public/PolicyPages/PrivacyPolicyPage'));
 const TermsAndConditionsPage = lazy(() => import('../pages/public/PolicyPages/TermsAndConditionsPage'));
 const ShippingPolicyPage = lazy(() => import('../pages/public/PolicyPages/ShippingPolicyPage'));
-
 
 // Admin pages
 const DashboardPage = lazy(() => import('../admin/pages/DashboardPage'));
@@ -77,21 +75,20 @@ const AppRoutes = () => {
             <Routes>
                 <Route path="admin/login" element={<LoginWrapper />} />
                 
-                <Route element={<PublicRoutes />}>
-                    <Route index element={<HomePage />} />
-                    <Route path="/shop" element={<ShopPage />} />
-                    <Route path="/product/:productId" element={<ProductDetailPage />} />
-                    <Route path="/cart" element={<CartPage />} />
-                    <Route path="/contact" element={<ContactPage />} />
-                    <Route path="/checkout" element={<CheckoutPage />} />
-                    <Route path="/checkout/checkout-success" element={<CheckoutSuccessPage />} />
-                    <Route path="/wishlist" element={<WishlistPage />} />
-                    <Route path="/consultation" element={<ConsultationPage />} />
-                    <Route path="/consultation/success" element={<ConsultationSuccessPage />} />
-                    <Route path="/policies/privacy" element={<PrivacyPolicyPage />} />
-                    <Route path="/policies/terms-and-conditions" element={<TermsAndConditionsPage />} />
-                    <Route path="/policies/shipping" element={<ShippingPolicyPage />} />
-                </Route>
+                {/* MODIFIED: All public routes now redirect to admin login */}
+                <Route path="/" element={<Navigate to="/admin/login" replace />} />
+                <Route path="/shop" element={<Navigate to="/admin/login" replace />} />
+                <Route path="/product/:productId" element={<Navigate to="/admin/login" replace />} />
+                <Route path="/cart" element={<Navigate to="/admin/login" replace />} />
+                <Route path="/contact" element={<Navigate to="/admin/login" replace />} />
+                <Route path="/checkout" element={<Navigate to="/admin/login" replace />} />
+                <Route path="/checkout/checkout-success" element={<Navigate to="/admin/login" replace />} />
+                <Route path="/wishlist" element={<Navigate to="/admin/login" replace />} />
+                <Route path="/consultation" element={<Navigate to="/admin/login" replace />} />
+                <Route path="/consultation/success" element={<Navigate to="/admin/login" replace />} />
+                <Route path="/policies/privacy" element={<Navigate to="/admin/login" replace />} />
+                <Route path="/policies/terms-and-conditions" element={<Navigate to="/admin/login" replace />} />
+                <Route path="/policies/shipping" element={<Navigate to="/admin/login" replace />} />
                 
                 <Route path="/admin" element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
                     <Route index element={<Navigate to="dashboard" replace />} />
@@ -114,7 +111,8 @@ const AppRoutes = () => {
                     <Route path="delivery" element={<DeliveryFees />} />
                 </Route>
 
-                <Route path="*" element={<Navigate to="/" replace />} />
+                {/* Catch all other routes and redirect to admin login */}
+                <Route path="*" element={<Navigate to="/admin/login" replace />} />
             </Routes>
         </Suspense>
     );

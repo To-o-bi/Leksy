@@ -152,6 +152,29 @@ const AdminSidebar = ({ isOpen, isMobile, onClose, onOpen }) => {
     { name: 'Delivery', path: '/admin/delivery', icon: ( <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7H16V17H3V7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M16 11H20L21.5 13V17H16V11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="7.5" cy="17.5" r="1.5" fill="currentColor"/><circle cx="18.5" cy="17.5" r="1.5" fill="currentColor"/></svg> )},
   ];
 
+  // Logout button component
+  const LogoutButton = ({ isMobileVersion = false }) => (
+    <button
+      onClick={handleLogout}
+      disabled={isLoggingOut}
+      className={`flex items-center w-full py-3 text-sm font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors ${
+        isExpanded ? 'px-6' : 'px-4 justify-center'
+      } ${isLoggingOut ? 'opacity-50' : ''} ${
+        isMobileVersion ? '' : 'rounded-lg'
+      }`}
+      title={!isExpanded ? 'Logout' : ''}
+    >
+      <span>
+        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M17 16L21 12M21 12L17 8M21 12H9M13 16V17C13 18.6569 11.6569 20 10 20H6C4.34315 20 3 18.6569 3 17V7C3 5.34315 4.34315 4 6 4H10C11.6569 4 13 5.34315 13 7V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+      <span className={`ml-3 whitespace-nowrap transition-all duration-200 ${isExpanded ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 overflow-hidden'}`}>
+        Log-out
+      </span>
+    </button>
+  );
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -177,7 +200,7 @@ const AdminSidebar = ({ isOpen, isMobile, onClose, onOpen }) => {
           </button>
         </div>
         
-        <nav className="flex-1">
+        <nav className="flex-1 overflow-y-auto">
           <ul className="space-y-1">
             {navItems.map((item) => (
               <li key={item.path}>
@@ -221,22 +244,22 @@ const AdminSidebar = ({ isOpen, isMobile, onClose, onOpen }) => {
                 </NavLink>
               </li>
             ))}
+
+            {/* Mobile logout button - placed after delivery */}
+            {isMobile && (
+              <li className="border-t border-gray-200 mt-2 pt-2">
+                <LogoutButton isMobileVersion={true} />
+              </li>
+            )}
           </ul>
         </nav>
 
-        <div className="border-t border-gray-200 p-4">
-          <button
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className={`flex items-center w-full py-3 text-sm font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors ${isExpanded ? 'px-6' : 'px-4 justify-center'} ${isLoggingOut ? 'opacity-50' : ''}`}
-            title={!isExpanded ? 'Logout' : ''}
-          >
-            <span><svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17 16L21 12M21 12L17 8M21 12H9M13 16V17C13 18.6569 11.6569 20 10 20H6C4.34315 20 3 18.6569 3 17V7C3 5.34315 4.34315 4 6 4H10C11.6569 4 13 5.34315 13 7V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
-            <span className={`ml-3 whitespace-nowrap transition-all duration-200 ${isExpanded ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 overflow-hidden'}`}>
-              Log-out
-            </span>
-          </button>
-        </div>
+        {/* Desktop logout button - keeps original position for desktop */}
+        {!isMobile && (
+          <div className="border-t border-gray-200 p-4">
+            <LogoutButton />
+          </div>
+        )}
       </div>
       
       <LogoutModal
