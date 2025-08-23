@@ -16,7 +16,6 @@ const ScrollToTop = () => {
   return null;
 };
 
-
 // Loading fallback for lazy-loaded components
 const LoadingFallback = () => (
     <div className="flex items-center justify-center h-screen bg-gray-100">
@@ -42,7 +41,6 @@ const CheckoutSuccessPage = lazy(() => import('../pages/public/CheckoutSuccessPa
 const PrivacyPolicyPage = lazy(() => import('../pages/public/PolicyPages/PrivacyPolicyPage'));
 const TermsAndConditionsPage = lazy(() => import('../pages/public/PolicyPages/TermsAndConditionsPage'));
 const ShippingPolicyPage = lazy(() => import('../pages/public/PolicyPages/ShippingPolicyPage'));
-
 
 // Admin pages
 const DashboardPage = lazy(() => import('../admin/pages/DashboardPage'));
@@ -75,24 +73,10 @@ const AppRoutes = () => {
             {/* --- ADDED: ScrollToTop component is placed here to monitor route changes --- */}
             <ScrollToTop />
             <Routes>
+                {/* Admin login route */}
                 <Route path="admin/login" element={<LoginWrapper />} />
                 
-                <Route element={<PublicRoutes />}>
-                    <Route index element={<HomePage />} />
-                    <Route path="/shop" element={<ShopPage />} />
-                    <Route path="/product/:productId" element={<ProductDetailPage />} />
-                    <Route path="/cart" element={<CartPage />} />
-                    <Route path="/contact" element={<ContactPage />} />
-                    <Route path="/checkout" element={<CheckoutPage />} />
-                    <Route path="/checkout/checkout-success" element={<CheckoutSuccessPage />} />
-                    <Route path="/wishlist" element={<WishlistPage />} />
-                    <Route path="/consultation" element={<ConsultationPage />} />
-                    <Route path="/consultation/success" element={<ConsultationSuccessPage />} />
-                    <Route path="/policies/privacy" element={<PrivacyPolicyPage />} />
-                    <Route path="/policies/terms-and-conditions" element={<TermsAndConditionsPage />} />
-                    <Route path="/policies/shipping" element={<ShippingPolicyPage />} />
-                </Route>
-                
+                {/* Protected admin routes - only accessible after login */}
                 <Route path="/admin" element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
                     <Route index element={<Navigate to="dashboard" replace />} />
                     <Route path="dashboard" element={<DashboardPage />} />
@@ -114,7 +98,8 @@ const AppRoutes = () => {
                     <Route path="delivery" element={<DeliveryFees />} />
                 </Route>
 
-                <Route path="*" element={<Navigate to="/" replace />} />
+                {/* REDIRECT ALL OTHER ROUTES TO ADMIN LOGIN */}
+                <Route path="*" element={<Navigate to="/admin/login" replace />} />
             </Routes>
         </Suspense>
     );
