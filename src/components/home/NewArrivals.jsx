@@ -46,19 +46,19 @@ const NewArrivals = () => {
 
   if (loading && newArrivals.length === 0) {
     return (
-      <section className="py-16">
-        <div className="container mx-auto px-4">
-          <div className="flex justify-between items-center mb-10">
-            <h2 className="text-2xl font-bold">New Arrivals</h2>
-            <div className="h-6 w-16 bg-gray-200 rounded animate-pulse"></div>
+      <section className="py-8 sm:py-12 lg:py-16">
+        <div className="container mx-auto px-3 sm:px-4 md:px-6">
+          <div className="flex justify-between items-center mb-6 sm:mb-8 lg:mb-10">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-0">New Arrivals</h2>
+            <div className="h-5 w-12 sm:h-6 sm:w-16 bg-gray-200 rounded animate-pulse"></div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
             {[...Array(4)].map((_, index) => (
               <div key={`new-arrivals-skeleton-${index}`} className="bg-white rounded-lg shadow-md overflow-hidden animate-pulse">
-                <div className="h-48 bg-gray-200"></div>
-                <div className="p-4">
-                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded mb-3 w-3/4"></div>
+                <div className="h-32 xs:h-40 sm:h-48 bg-gray-200"></div>
+                <div className="p-2 sm:p-3 md:p-4">
+                  <div className="h-3 sm:h-4 bg-gray-200 rounded mb-2"></div>
+                  <div className="h-2 sm:h-3 bg-gray-200 rounded mb-2 sm:mb-3 w-3/4"></div>
                 </div>
               </div>
             ))}
@@ -70,14 +70,14 @@ const NewArrivals = () => {
 
   if (error && newArrivals.length === 0) {
     return (
-      <section className="py-16">
-        <div className="container mx-auto px-4">
+      <section className="py-8 sm:py-12 lg:py-16">
+        <div className="container mx-auto px-3 sm:px-4 md:px-6">
           <div className="text-center">
-            <h2 className="text-2xl font-bold mb-4">New Arrivals</h2>
-            <p className="text-gray-600 mb-4">{error}</p>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-3 sm:mb-4">New Arrivals</h2>
+            <p className="text-gray-600 mb-4 text-sm sm:text-base px-4">{error}</p>
             <button
               onClick={handleRetry}
-              className="px-6 py-2 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full hover:from-pink-600 hover:to-purple-600 transition-all duration-300"
+              className="px-4 sm:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full hover:from-pink-600 hover:to-purple-600 transition-all duration-300 text-sm sm:text-base touch-manipulation"
             >
               Try Again
             </button>
@@ -89,27 +89,27 @@ const NewArrivals = () => {
 
   if (!loading && newArrivals.length === 0) {
     return (
-      <section className="py-16">
-        <div className="container mx-auto px-4">
-            <div className="flex justify-between items-center mb-10">
-                <h2 className="text-2xl font-bold">New Arrivals</h2>
-                <button
-                    onClick={handleSeeAll}
-                    className="text-sm text-pink-500 flex items-center hover:text-pink-600 transition-colors duration-200"
-                >
-                    See all
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                    </svg>
-                </button>
-            </div>
-          <div className="text-center py-12">
-            <div className="text-5xl mb-4">✨</div>
-            <h3 className="text-xl font-medium text-gray-800 mb-2">No new arrivals yet</h3>
-            <p className="text-gray-600 mb-6">Check back soon for the latest products</p>
+      <section className="py-8 sm:py-12 lg:py-16">
+        <div className="container mx-auto px-3 sm:px-4 md:px-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 lg:mb-10 ">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-0">New Arrivals</h2>
+            <button
+              onClick={handleSeeAll}
+              className="text-sm sm:text-base text-pink-500 flex items-center hover:text-pink-600 active:text-pink-700 transition-colors duration-200 touch-manipulation"
+            >
+              See all
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+          <div className="text-center py-8 sm:py-12">
+            <div className="text-3xl sm:text-4xl lg:text-5xl mb-3 sm:mb-4">✨</div>
+            <h3 className="text-lg sm:text-xl font-medium text-gray-800 mb-2 px-4">No new arrivals yet</h3>
+            <p className="text-gray-600 mb-4 sm:mb-6 text-sm sm:text-base px-4">Check back soon for the latest products</p>
             <button 
               onClick={handleRetry}
-              className="px-6 py-2 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full hover:from-pink-600 hover:to-purple-600 transition-all duration-300"
+              className="px-4 sm:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full hover:from-pink-600 hover:to-purple-600 transition-all duration-300 text-sm sm:text-base touch-manipulation"
             >
               Refresh Products
             </button>
@@ -120,24 +120,26 @@ const NewArrivals = () => {
   }
 
   return (
-    <section className="py-16 bg-gradient-to-br from-gray-50/30 to-white">
-      <div className="container mx-auto px-4">
-        <div className="flex justify-between items-center mb-10">
+    <section className="py-8 sm:py-12 lg:py-16 bg-gradient-to-br from-gray-50/30 to-white">
+      <div className="container mx-auto px-3 sm:px-4 md:px-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 lg:mb-10">
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">New Arrivals</h2>
-            <p className="text-gray-600">Discover our latest beauty essentials</p>
+            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-3xl font-bold text-gray-900">New Arrivals</h2>
+            <p className="text-gray-600 text-sm sm:text-base">Discover our latest beauty essentials</p>
           </div>
-          <button 
-            onClick={handleSeeAll}
-            className="text-sm text-pink-500 flex items-center hover:text-pink-600 transition-colors duration-200 font-medium"
-          >
-            See all
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-            </svg>
-          </button>
+          <div>
+            <button 
+              onClick={handleSeeAll}
+              className="text-sm sm:text-base text-pink-500 flex items-center hover:text-pink-600 active:text-pink-700 transition-colors duration-200 font-medium touch-manipulation"
+            >
+              See all
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
           {newArrivals.map((product, index) => (
             <ProductCard 
               key={`new-arrival-${product.uniqueId}`} 

@@ -136,7 +136,7 @@ Can take (optionally):
 
 - [GET] products_ids_array = {product_id_1,product_id_2,product_id_n} // for returning exactly as much specific products as you are interested in (imagine the products in the customer's cart)
 
-- [GET] filter = {serums|moisturizers|bathe and body|sunscreens|toners|face cleansers} // for filtering out the categories of products you are interested in. E.g; ?filter=serum will return every products under serum. (To apply multiple filters, just use comma. E.g; ?filter=serums,bathe and body,sunscreens)
+- [GET] filter = {serums|cleansers|toners|masks|sunscreens|moisturizers|body and bathe|eye cream|beauty} // for filtering out the categories of products you are interested in. E.g; ?filter=serum will return every products under serum. (To apply multiple filters, just use comma. E.g; ?filter=serums,body and bathe,sunscreens)
 
 - [GET] sort = {name|price|category} // can sort by column names, i.e; sort='price', to sort by price (Always ASC)
 ```
@@ -363,7 +363,7 @@ There are two key steps:
 ### 1. Initiate Checkout (This will alert and prepare the payment gateway for the next step)
 
 ```CURL
-curl --location --request POST '{base_url}/api/checkout/initiate?name={name}&email={email}&phone={phone|numeric}&additional_phone={additional_phone|numeric|optional}&delivery_method={pickup/address/bus-park}&state={state|optional}&lga={lga|optional|required:if(state=lagos)}&city={city|optional}&street_address={street_address|optional}&cart={a_valid_json_encoded_cart_object|see_sample_below}&success_redirect={https://leksycosmetics.com/path/to/your-successful-order-page}'
+curl --location --request POST '{base_url}/api/checkout/initiate?name={name}&email={email}&phone={phone|numeric}&additional_phone={additional_phone|numeric|optional}&delivery_method={pickup/address/bus-park}&state={state|optional}&lga={lga|optional|required:if(state=lagos)}&city={city|optional}&street_address={street_address|optional}&additional_details={additional_details|optional}&cart={a_valid_json_encoded_cart_object|see_sample_below}&success_redirect={https://leksycosmetics.com/path/to/your-successful-order-page}'
 ```
 
 ```
@@ -436,11 +436,13 @@ curl --location --request GET '{base_url}/api/fetch-order?order_id={order_id}'
 		"email": "john@doe.com",
 		"name": "John Doe",
 		"phone": "07012312131",
+		"additional_phone": "09012345677",
 		"delivery_method": "address|pickup",
 		"state": "Kogi",
 		"lga": null,
 		"city": "Lokoja",
 		"street address": "1, My Street",
+		"additional_details": "Hello.",
 		"amount_calculated": 25000, // Must be exactly equal to amount_paid, else a fraud has happened. 
 		"amount_paid": 25000,
 		"cart_obj": [
@@ -489,11 +491,13 @@ curl --location --request GET '{base_url}/api/fetch-orders?&order_status={order_
 			"email": "john@doe.com",
 			"name": "John Doe",
 			"phone": "07012312131",
+			"additional_phone": "09012345677",
 			"delivery_method": "address|pickup",
 			"state": "Kogi",
 			"lga": null,
 			"city": "Lokoja",
 			"street address": "1, My Street",
+			"additional_details": "Hello.",
 			"amount_calculated": 25000, // Must be exactly equal to amount_paid, else a fraud has happened. 
 			"amount_paid": 25000,
 			"cart_obj": [
@@ -631,7 +635,7 @@ There are two key steps:
 ### 1. Initiate Consultation (This will alert and prepare the payment gateway for the next step)
 
 ```CURL
-curl --location --request POST '{base_url}/api/consultation/initiate?name={name}&email={email}&phone={phone}&age_range={age_range}&gender={gender}&skin_type={skin_type}&skin_concerns={skin_concern_1,skin_concern_2,skin_concern_n}&current_skincare_products={current_skincare_products|optional}&additional_details={additional_details|optional}&channel={a_valid_channel}&date={yyyy-mm-dd}&time_range={a_valid_time_range}&success_redirect={https://leksycosmetics.com/path/to/your-successful-consultation-page}'
+curl --location --request POST '{base_url}/api/consultation/initiate?name={name}&email={email}&phone={phone}&additional_phone={additional_phone|optional}&age_range={age_range}&gender={gender}&skin_type={skin_type}&skin_concerns={skin_concern_1,skin_concern_2,skin_concern_n}&current_skincare_products={current_skincare_products|optional}&additional_details={additional_details|optional}&channel={a_valid_channel}&date={yyyy-mm-dd}&time_range={a_valid_time_range}&success_redirect={https://leksycosmetics.com/path/to/your-successful-consultation-page}'
 ```
 
 ```
@@ -723,6 +727,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-consultation?consultat
 		"name": "Felicia H.",
 		"email": "hendersonf52@gmail.com",
 		"phone": "08011229391",
+		"additional_phone": "09012345643",
 		"age_range": "20 - 25",
 		"gender": "female",
 		"skin_type": "normal",
@@ -768,6 +773,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-consultations?&payment
 			"name": "Felicia H.",
 			"email": "hendersonf52@gmail.com",
 			"phone": "08011229391",
+			"additional_phone": "09012345643",
 			"age_range": "20 - 25",
 			"gender": "female",
 			"skin_type": "normal",
@@ -794,6 +800,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-consultations?&payment
 			"name": "Felicia H.",
 			"email": "hendersonf52@gmail.com",
 			"phone": "08011229391",
+			"additional_phone": "09012345643",
 			"age_range": "20 - 25",
 			"gender": "female",
 			"skin_type": "normal",
@@ -818,7 +825,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-consultations?&payment
 ## Update Consultation
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/update-consultation?consultation_id={consultation_id}&session_held_status={session_held_status|optional}&name={name|optional}&email={email|optional}&phone={phone|optional}&age_range={age_range|optional}&gender={gender|optional}&skin_type={skin_type|optional}&skin_concerns={skin_concern_1,skin_concern_2,skin_concern_n|optional}&current_skincare_products={current_skincare_products|optional}&additional_details={additional_details|optional}&channel={a_valid_channel|optional}&date={yyyy-mm-dd|optional}&time_range={a_valid_time_range|optional}' \
+curl --location --request POST '{base_url}/api/admin/update-consultation?consultation_id={consultation_id}&session_held_status={session_held_status|optional}&name={name|optional}&email={email|optional}&phone={phone|optional}&additional_phone={additional_phone|optional}&age_range={age_range|optional}&gender={gender|optional}&skin_type={skin_type|optional}&skin_concerns={skin_concern_1,skin_concern_2,skin_concern_n|optional}&current_skincare_products={current_skincare_products|optional}&additional_details={additional_details|optional}&channel={a_valid_channel|optional}&date={yyyy-mm-dd|optional}&time_range={a_valid_time_range|optional}' \
 --header 'Authorization: Bearer {token}'
 ```
 
@@ -841,6 +848,7 @@ curl --location --request POST '{base_url}/api/admin/update-consultation?consult
 		"name": "Felicia H.",
 		"email": "hendersonf52@gmail.com",
 		"phone": "08011229391",
+		"additional_phone": "09012344532",
 		"age_range": "20 - 25",
 		"gender": "female",
 		"skin_type": "normal",
@@ -869,32 +877,33 @@ curl --location --request POST '{base_url}/api/admin/send_consultation_link?cons
 
 ```JSON
 {
-   "code": 200,
-   "message": "Meeting link sent successfully!",
-   "consultation":    {
-      "id": 2,
-      "unique_id": "bk-685e9be65b69c",
-      "api_ref": "62h45vok5p",
-      "payment_status": 0,
-      "session_held_status": "unheld",
-      "cron_trial_count": 3,
-      "name": "Felicia H.",
-      "email": "hendersonf52@gmail.com",
-      "phone": "08011229391",
-      "age_range": "20 - 25",
-      "gender": "female",
-      "skin_type": "normal",
-      "skin_concerns": "acne",
-      "current_skincare_products": "Olive mint cream",
-      "additional_details": "I use olive mint cream",
-      "channel": "whatsapp",
-      "meet_link": "https://meet.google.com/abc",
-      "date": "2025-07-05",
-      "time_range": "2:00 PM - 3:00 PM",
-      "amount_calculated": 15000,
-      "amount_paid": 15000,
-      "created_at": "2025-06-27 14:25:59"
-   },
+	"code": 200,
+	"message": "Meeting link sent successfully!",
+	"consultation": {
+		"id": 2,
+		"unique_id": "bk-685e9be65b69c",
+		"api_ref": "62h45vok5p",
+		"payment_status": 0,
+		"session_held_status": "unheld",
+		"cron_trial_count": 3,
+		"name": "Felicia H.",
+		"email": "hendersonf52@gmail.com",
+		"phone": "08011229391",
+		"additional_phone": "09012344532",
+		"age_range": "20 - 25",
+		"gender": "female",
+		"skin_type": "normal",
+		"skin_concerns": "acne",
+		"current_skincare_products": "Olive mint cream",
+		"additional_details": "I use olive mint cream",
+		"channel": "whatsapp",
+		"meet_link": "https://meet.google.com/abc",
+		"date": "2025-07-05",
+		"time_range": "2:00 PM - 3:00 PM",
+		"amount_calculated": 15000,
+		"amount_paid": 15000,
+		"created_at": "2025-06-27 14:25:59"
+	},
    "token": "68641f6750a7c"
 }
 ```
@@ -978,7 +987,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 ```JSON
 {
 	"code": 200,
-	"message": "Notifications fetch returned 3 results",
+	"message": "Notifications fetch returned 4 results",
 	"notifications": [
 		{
 			"id": 4,
