@@ -119,17 +119,18 @@ export const fetchProducts = async (options = {}) => {
 };
 
 export const getCategories = () => {
-    return [ 'serums', 'moisturizers', 'bathe and body', 'sunscreens', 'toners', 'face cleansers' ];
+    return ['serum', 'cleanser', 'toner', 'mask', 'sunscreen', 'moisturizer', 'body-and-bath', 'eye-cream', 'beauty'];
 };
 
 export const getCategoryDisplayName = (category) => {
     const categoryDisplayNames = {
-        'serums': 'Serums', 'moisturizers': 'Moisturizers', 'bathe and body': 'Bathe and Body',
-        'sunscreens': 'Sunscreens', 'toners': 'Toners', 'face cleansers': 'Face Cleansers'
+        'serum': 'Serums', 'cleanser': 'Cleansers', 'toner': 'Toners',
+        'mask': 'Masks', 'sunscreen': 'Sunscreens', 'moisturizer': 'Moisturizers',
+        'body-and-bath': 'Body and Bath', 'eye-cream': 'Eye Creams', 'beauty': 'Beauty'
     };
     return categoryDisplayNames[category] || category;
 };
 
 export const getSkinConcerns = () => {
-    return [ 'Anti-Aging', 'Oily Skin', 'Dry Skin', 'Acne', 'Hyperpigmentation', 'Sensitive Skin' ];
+    return ['Anti-Aging', 'Oily Skin', 'Dry Skin', 'Acne', 'Hyperpigmentation', 'Sensitive Skin'];
 };
