@@ -136,7 +136,7 @@ Can take (optionally):
 
 - [GET] products_ids_array = {product_id_1,product_id_2,product_id_n} // for returning exactly as much specific products as you are interested in (imagine the products in the customer's cart)
 
-- [GET] filter = {serums|moisturizers|bathe and body|sunscreens|toners|face cleansers} // for filtering out the categories of products you are interested in. E.g; ?filter=serum will return every products under serum. (To apply multiple filters, just use comma. E.g; ?filter=serums,bathe and body,sunscreens)
+- [GET] filter = {serums|cleansers|toners|masks|sunscreens|moisturizers|body and bathe|eye cream|beauty} // for filtering out the categories of products you are interested in. E.g; ?filter=serum will return every products under serum. (To apply multiple filters, just use comma. E.g; ?filter=serums,body and bathe,sunscreens)
 
 - [GET] sort = {name|price|category} // can sort by column names, i.e; sort='price', to sort by price (Always ASC)
 ```
@@ -987,7 +987,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 ```JSON
 {
 	"code": 200,
-	"message": "Notifications fetch returned 3 results",
+	"message": "Notifications fetch returned 4 results",
 	"notifications": [
 		{
 			"id": 4,
