@@ -12,7 +12,8 @@ const NotificationsPage = () => {
     error,
     fetchNotifications,
     markAsRead,
-    markAllAsRead
+    markAllAsRead,
+    refreshNotifications
   } = useNotifications();
 
   const [activeTab, setActiveTab] = useState('all');
@@ -84,8 +85,11 @@ const NotificationsPage = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchNotifications(limit);
-    setRefreshing(false);
+    try {
+      await refreshNotifications(limit);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const formatTimeAgo = (dateString) => {
@@ -128,11 +132,14 @@ const NotificationsPage = () => {
 
   const getNotificationAction = (notification) => {
     const { type, type_id, id: notificationId } = notification;
-    const handleClick = (e) => {
+    const handleClick = async (e) => {
       e.stopPropagation();
+      
+      // Mark as read if it's unread
       if (!notification.read) {
-        markAsRead(notificationId);
+        await markAsRead(notificationId);
       }
+      
       let route = '/admin/dashboard';
       switch (type) {
         case 'consultations': route = `/admin/bookings?bookingId=${type_id}&highlight=true`; break;
@@ -143,6 +150,7 @@ const NotificationsPage = () => {
       }
       navigate(route);
     };
+    
     const getActionText = () => {
       switch (type) {
         case 'consultations': return '📅 View Booking';
@@ -152,6 +160,7 @@ const NotificationsPage = () => {
         default: return '👁️ View Details';
       }
     };
+    
     const getColorClass = () => {
       switch (type) {
         case 'consultations': return 'text-pink-600 hover:text-pink-800 bg-pink-50 hover:bg-pink-100 border-pink-200';
@@ -161,6 +170,7 @@ const NotificationsPage = () => {
         default: return 'text-gray-600 hover:text-gray-800 bg-gray-50 hover:bg-gray-100 border-gray-200';
       }
     };
+    
     return (
       <button
         onClick={handleClick}
@@ -208,6 +218,13 @@ const NotificationsPage = () => {
     return new Date(dateB) - new Date(dateA);
   });
 
+  // Handle notification click to mark as read
+  const handleNotificationClick = async (notification) => {
+    if (!notification.read) {
+      await markAsRead(notification.id);
+    }
+  };
+
   if (loading && isInitialLoad.current) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
@@ -248,7 +265,7 @@ const NotificationsPage = () => {
               {unreadCount > 0 && (<div className="relative"><span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">{unreadCount}</span></div>)}
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
-              <button onClick={handleRefresh} disabled={refreshing} className={`text-sm font-medium transition-all px-3 py-1.5 rounded-md border ${refreshing ? 'cursor-not-allowed' : 'hover:bg-gray-50'}`}>{refreshing ? 'Refreshing...' : 'Refresh'}</button>
+              <button onClick={handleRefresh} disabled={refreshing} className={`text-sm font-medium transition-all px-3 py-1.5 rounded-md border ${refreshing ? 'cursor-not-allowed opacity-50' : 'hover:bg-gray-50'}`}>{refreshing ? 'Refreshing...' : 'Refresh'}</button>
               {unreadCount > 0 && (<button onClick={markAllAsRead} className="text-sm text-pink-500 hover:text-pink-700 font-medium">✓ Mark all as read</button>)}
             </div>
           </div>
@@ -266,7 +283,7 @@ const NotificationsPage = () => {
               <div key={date}>
                 <div className="px-4 sm:px-6 py-3 bg-gray-50 sticky top-0 z-10 border-b"><h3 className="text-sm font-medium text-gray-700">{date}</h3></div>
                 {groupedNotifications[date].map(notification => (
-                  <div key={notification.id} className={`p-4 sm:px-6 sm:py-4 hover:bg-gray-50 cursor-pointer ${!notification.read ? 'bg-pink-50 border-l-4 border-pink-500' : ''}`} onClick={() => !notification.read && markAsRead(notification.id)}>
+                  <div key={notification.id} className={`p-4 sm:px-6 sm:py-4 hover:bg-gray-50 cursor-pointer transition-colors ${!notification.read ? 'bg-pink-50 border-l-4 border-pink-500' : ''}`} onClick={() => handleNotificationClick(notification)}>
                     <div className="flex items-start space-x-4">
                       <div className="flex-shrink-0 pt-1">{getNotificationIcon(notification.type)}</div>
                       <div className="flex-1 min-w-0">
@@ -275,7 +292,10 @@ const NotificationsPage = () => {
                             className={`text-sm font-medium truncate ${!notification.read ? 'text-gray-900' : 'text-gray-600'}`}
                             dangerouslySetInnerHTML={{ __html: decodeHtmlEntities(notification.title) }}
                           />
-                          <span className="text-xs text-gray-500 flex-shrink-0">{notification.created_at ? formatTimeAgo(notification.created_at) : ''}</span>
+                          <div className="flex items-center space-x-2">
+                            {!notification.read && <span className="w-2 h-2 bg-pink-500 rounded-full flex-shrink-0" title="Unread"></span>}
+                            <span className="text-xs text-gray-500 flex-shrink-0">{notification.created_at ? formatTimeAgo(notification.created_at) : ''}</span>
+                          </div>
                         </div>
                         <p
                           className="text-sm text-gray-600 mb-3 line-clamp-2"

@@ -232,7 +232,7 @@ export const productService = {
   }
 };
 
-// Contact Service (unchanged)
+// Contact Service 
 export const contactService = {
   async submit(contactData) {
     // This is a placeholder as isValidEmail is not defined

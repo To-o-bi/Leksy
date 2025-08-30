@@ -1,6 +1,6 @@
 // src/contexts/NotificationsContext.js
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api/axios';
 
 const NotificationsContext = createContext();
@@ -13,14 +13,11 @@ export const NotificationsProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchNotifications = useCallback(async (limit = 20) => {
+  const intervalIdRef = useRef(null); // Use a ref to store the interval ID
+
+  const fetchData = useCallback(async () => {
     try {
-      const response = await api.get('/admin/fetch-notifications', { params: { limit } });
-
-      // --- DEBUG ---
-      console.log('[DEBUG] Fetched data from backend:', response.data.notifications);
-      // --- END DEBUG ---
-
+      const response = await api.get('/admin/fetch-notifications');
       if (response.data && response.data.code === 200) {
         const transformed = response.data.notifications.map(n => ({
           id: n.id,
@@ -32,7 +29,6 @@ export const NotificationsProvider = ({ children }) => {
           created_at: n.created_at,
           raw_description: n.description,
         }));
-        
         setNotifications(transformed);
         setUnreadCount(transformed.filter(n => !n.read).length);
         setError(null);
@@ -48,51 +44,69 @@ export const NotificationsProvider = ({ children }) => {
   }, []);
 
   const markAsRead = useCallback(async (id) => {
-    // ... (This function can be debugged similarly if needed)
-  }, [notifications]);
+    // Optimistic update
+    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
+    setUnreadCount(prev => Math.max(0, prev - 1));
+
+    try {
+      await api.post(`/admin/mark-as-read?target=notifications&id=${id}`);
+      // Upon success, re-fetch to fully sync state.
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err);
+      // On error, revert by re-fetching the correct state.
+      await fetchData();
+    }
+  }, [fetchData]);
 
   const markAllAsRead = useCallback(async () => {
-    const originalNotifications = [...notifications];
-    
+    // Optimistic update
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     setUnreadCount(0);
 
     try {
-      // --- DEBUG ---
-      console.log('[DEBUG] Sending "Mark all as read" request to the backend...');
-      // --- END DEBUG ---
-      
       await api.post('/admin/mark-all-as-read?target=notifications');
-
-      // --- DEBUG ---
-      console.log('[DEBUG] "Mark all as read" request was successful.');
-      // --- END DEBUG ---
-      
+      // Upon success, re-fetch to fully sync state.
+      await fetchData();
     } catch (err) {
-      // --- DEBUG ---
-      console.error('[DEBUG] "Mark all as read" request FAILED:', err);
-      // --- END DEBUG ---
-
       console.error('Failed to mark all notifications as read:', err);
-      setNotifications(originalNotifications);
-      setUnreadCount(originalNotifications.filter(n => !n.read).length);
+      // On error, revert by re-fetching the correct state.
+      await fetchData();
     }
-  }, [notifications]);
+  }, [fetchData]);
 
+  const refreshNotifications = useCallback(async () => {
+    setLoading(true);
+    await fetchData();
+  }, [fetchData]);
+
+  // Main effect hook for fetching and setting up the interval
   useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(() => fetchNotifications(), 30000);
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
+    // Initial fetch
+    fetchData();
+
+    // Set up the interval and store its ID in the ref
+    intervalIdRef.current = setInterval(() => {
+      fetchData();
+    }, 30000);
+
+    // Clean up the interval when the component unmounts
+    return () => {
+      if (intervalIdRef.current) {
+        clearInterval(intervalIdRef.current);
+      }
+    };
+  }, [fetchData]);
 
   const value = {
     notifications,
     unreadCount,
     loading,
     error,
-    fetchNotifications,
+    fetchNotifications: refreshNotifications, // Alias for the user-facing function
     markAsRead,
-    markAllAsRead
+    markAllAsRead,
+    refreshNotifications: refreshNotifications
   };
 
   return (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Search, RefreshCw, ExternalLink, Users, Clock, User, CheckCircle, ArrowLeft, Menu, X } from 'lucide-react';
+import ReplyConfirmationModal from './ReplyConfirmationModal'; // Corrected import path
 import { contactService } from '../../../api';
 
 // FIX: Define a key for localStorage to avoid typos
@@ -31,6 +32,7 @@ const AdminInbox = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notification, setNotification] = useState(null);
+  const [showModal, setShowModal] = useState(false); // State for modal
 
   // HTML Entity Decoder Function
   const decodeHtml = (html) => {
@@ -171,10 +173,12 @@ const AdminInbox = () => {
     setSelectedMessage(prev => ({ ...message, read: true }));
   };
 
-  const handleOpenGmail = () => {
+  const confirmReply = () => {
     if (!selectedMessage) return;
+    setShowModal(false);
     
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(selectedMessage.email)}&su=${encodeURIComponent(`Re: ${selectedMessage.subject}`)}&body=${encodeURIComponent(`Hi ${selectedMessage.name},\n\nThank you for your message:\n\n"${selectedMessage.message}"\n\nBest regards,\nAdmin Team`)}`;
+    const supportEmail = 'support@leksycosmetics.com';
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&from=${encodeURIComponent(supportEmail)}&to=${encodeURIComponent(selectedMessage.email)}&su=${encodeURIComponent(`Re: ${selectedMessage.subject}`)}&body=${encodeURIComponent(`Hi ${selectedMessage.name},\n\nThank you for your message:\n\n"${selectedMessage.message}"\n\nBest regards,\nLeksy Cosmetics Support Team`)}`;
     window.open(gmailUrl, '_blank');
     
     setNotification({ type: 'success', message: 'Opening Gmail to reply...' });
@@ -272,11 +276,19 @@ const AdminInbox = () => {
               onClick={() => setNotification(null)} 
               className="ml-4 text-gray-400 hover:text-gray-600 text-lg sm:text-xl transition-colors flex-shrink-0"
             >
-              ×
+              &times;
             </button>
           </div>
         </div>
       )}
+      
+      {/* Confirmation Modal */}
+      <ReplyConfirmationModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onConfirm={confirmReply}
+        email="support@leksycosmetics.com"
+      />
 
       <div className="flex h-screen">
         {/* Mobile Header - Only visible on mobile when message is selected */}
@@ -429,7 +441,6 @@ const AdminInbox = () => {
         </div>
 
         {/* Message Detail View */}
-        {/* FIXED: Added overflow-y-auto to this container */}
         <div className={`${
           selectedMessage ? 'flex' : 'hidden lg:flex'
         } flex-1 flex-col bg-white/40 backdrop-blur-sm pt-20 lg:pt-0 overflow-y-auto`}>
@@ -475,7 +486,6 @@ const AdminInbox = () => {
               </div>
               
               {/* Message Content */}
-              {/* FIXED: Removed overflow-y-auto from this inner container */}
               <div className="p-4 sm:p-6 bg-white/30">
                 <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100/60">
                   <p className="text-gray-700 leading-relaxed whitespace-pre-line text-sm sm:text-base break-words">
@@ -485,11 +495,10 @@ const AdminInbox = () => {
               </div>
 
               {/* Reply Button */}
-              {/* FIXED: Removed mt-auto to eliminate the large gap */}
               <div className="p-4 sm:p-6">
                 <div className="flex items-center justify-center">
                   <button 
-                    onClick={handleOpenGmail}
+                    onClick={() => setShowModal(true)}
                     className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-medium flex items-center gap-2 sm:gap-3 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 text-base sm:text-lg w-full sm:w-auto justify-center"
                   >
                     <Mail className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -498,7 +507,7 @@ const AdminInbox = () => {
                   </button>
                 </div>
                 <p className="text-center text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3 px-4">
-                  This will open Gmail in a new tab with a pre-filled reply to {selectedMessage.name}
+                  This will open Gmail in a new tab with a pre-filled reply from support@leksycosmetics.com
                 </p>
               </div>
             </>
