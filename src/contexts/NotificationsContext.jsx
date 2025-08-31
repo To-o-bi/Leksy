@@ -15,7 +15,7 @@ export const NotificationsProvider = ({ children }) => {
 
   const intervalIdRef = useRef(null); // Use a ref to store the interval ID
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (source = 'unknown') => {
     try {
       const response = await api.get('/admin/fetch-notifications');
       if (response.data && response.data.code === 200) {
@@ -29,8 +29,10 @@ export const NotificationsProvider = ({ children }) => {
           created_at: n.created_at,
           raw_description: n.description,
         }));
+        
         setNotifications(transformed);
-        setUnreadCount(transformed.filter(n => !n.read).length);
+        const newUnreadCount = transformed.filter(n => !n.read).length;
+        setUnreadCount(newUnreadCount);
         setError(null);
       } else {
         throw new Error(response.data?.message || 'Failed to fetch notifications');
@@ -41,23 +43,32 @@ export const NotificationsProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [notifications.length, unreadCount]); // Added dependencies for logging
 
   const markAsRead = useCallback(async (id) => {
+    const targetNotification = notifications.find(n => n.id === id);
+    if (!targetNotification || targetNotification.read) return;
+
     // Optimistic update
     setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
     setUnreadCount(prev => Math.max(0, prev - 1));
 
     try {
-      await api.post(`/admin/mark-as-read?target=notifications&id=${id}`);
+      const formData = new FormData();
+      formData.append('target', 'notifications');
+      formData.append('id', id);
+      
+      const response = await api.post('/admin/mark-as-read', formData);
+      console.log(`📥 [MARK-AS-READ API RESPONSE] Full JSON:`, JSON.stringify(response.data, null, 2));
+      
       // Upon success, re-fetch to fully sync state.
-      await fetchData();
+      await fetchData('mark-as-read-success');
     } catch (err) {
       console.error('Failed to mark notification as read:', err);
       // On error, revert by re-fetching the correct state.
-      await fetchData();
+      await fetchData('mark-as-read-error');
     }
-  }, [fetchData]);
+  }, [fetchData, notifications]);
 
   const markAllAsRead = useCallback(async () => {
     // Optimistic update
@@ -65,29 +76,34 @@ export const NotificationsProvider = ({ children }) => {
     setUnreadCount(0);
 
     try {
-      await api.post('/admin/mark-all-as-read?target=notifications');
+      const formData = new FormData();
+      formData.append('target', 'notifications');
+      
+      const response = await api.post('/admin/mark-all-as-read', formData);
+      console.log(`📥 [MARK-ALL-AS-READ API RESPONSE] Full JSON:`, JSON.stringify(response.data, null, 2));
+      
       // Upon success, re-fetch to fully sync state.
-      await fetchData();
+      await fetchData('mark-all-as-read-success');
     } catch (err) {
       console.error('Failed to mark all notifications as read:', err);
       // On error, revert by re-fetching the correct state.
-      await fetchData();
+      await fetchData('mark-all-as-read-error');
     }
   }, [fetchData]);
 
   const refreshNotifications = useCallback(async () => {
     setLoading(true);
-    await fetchData();
+    await fetchData('manual-refresh');
   }, [fetchData]);
 
   // Main effect hook for fetching and setting up the interval
   useEffect(() => {
     // Initial fetch
-    fetchData();
+    fetchData('initial-load');
 
     // Set up the interval and store its ID in the ref
     intervalIdRef.current = setInterval(() => {
-      fetchData();
+      fetchData('auto-refresh-interval');
     }, 30000);
 
     // Clean up the interval when the component unmounts
@@ -97,6 +113,8 @@ export const NotificationsProvider = ({ children }) => {
       }
     };
   }, [fetchData]);
+
+  // Removed the additional state monitoring effect
 
   const value = {
     notifications,

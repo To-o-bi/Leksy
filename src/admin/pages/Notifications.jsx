@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../contexts/NotificationsContext';
 import Message from '../../components/common/Message';
