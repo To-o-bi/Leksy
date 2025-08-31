@@ -43,7 +43,7 @@ export const NotificationsProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [notifications.length, unreadCount]); // Added dependencies for logging
+  }, []); // Added dependencies for logging
 
   const markAsRead = useCallback(async (id) => {
     const targetNotification = notifications.find(n => n.id === id);
@@ -59,7 +59,6 @@ export const NotificationsProvider = ({ children }) => {
       formData.append('id', id);
       
       const response = await api.post('/admin/mark-as-read', formData);
-      console.log(`📥 [MARK-AS-READ API RESPONSE] Full JSON:`, JSON.stringify(response.data, null, 2));
       
       // Upon success, re-fetch to fully sync state.
       await fetchData('mark-as-read-success');
@@ -80,7 +79,6 @@ export const NotificationsProvider = ({ children }) => {
       formData.append('target', 'notifications');
       
       const response = await api.post('/admin/mark-all-as-read', formData);
-      console.log(`📥 [MARK-ALL-AS-READ API RESPONSE] Full JSON:`, JSON.stringify(response.data, null, 2));
       
       // Upon success, re-fetch to fully sync state.
       await fetchData('mark-all-as-read-success');
