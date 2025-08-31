@@ -136,6 +136,17 @@ const AllOrders = () => {
     setNotification({ type, message });
   }, []);
 
+  // New function to calculate delivery fee
+  const calculateDeliveryFee = useCallback((order) => {
+    const totalItemPrice = (order.cart || []).reduce((sum, item) => {
+      const price = Number(item.product_price) || 0;
+      const quantity = Number(item.ordered_quantity) || 1;
+      return sum + (price * quantity);
+    }, 0);
+    const amountPaid = Number(order.amount_paid) || 0;
+    return Math.max(0, amountPaid - totalItemPrice);
+  }, []);
+
   // Enhanced cart parsing function
   const parseCartData = useCallback((cartData) => {
     if (!cartData) {
@@ -223,7 +234,8 @@ const AllOrders = () => {
         streetAddress: order.street_address,
         deliveryFee: order.delivery_fee,
         cart: cartItems, // Use the parsed cart items
-        rawData: order
+        additionalDetails: order.additional_details, // Added additional details
+        rawData: order,
       };
     });
   }, [formatDate, parseCartData]);
@@ -276,7 +288,8 @@ const AllOrders = () => {
       // First, try using the cart data we already have
       if (order.cart && order.cart.length > 0) {
         console.log('Using existing cart data:', order.cart);
-        setSelectedOrder(order);
+        const deliveryFee = calculateDeliveryFee({ cart: order.cart, amount_paid: order.amount });
+        setSelectedOrder({ ...order, deliveryFee });
         setShowModal(true);
         return;
       }
@@ -299,11 +312,14 @@ const AllOrders = () => {
           cart: cartItems,
           // Update any other fields that might be more detailed
           amount: orderData.amount_paid || orderData.amount_calculated || order.amount,
+          amount_paid: orderData.amount_paid,
           address: orderData.street_address ?
-            `${orderData.street_address}, ${orderData.city}, ${orderData.state}` : order.address
+            `${orderData.street_address}, ${orderData.city}, ${orderData.state}` : order.address,
+          additionalDetails: orderData.additional_details,
+          rawData: orderData,
         };
-
-        setSelectedOrder(enhancedOrder);
+        const deliveryFee = calculateDeliveryFee(enhancedOrder);
+        setSelectedOrder({ ...enhancedOrder, deliveryFee });
       } else {
         // Fallback to original order data even if fetch fails
         setSelectedOrder(order);
@@ -313,11 +329,12 @@ const AllOrders = () => {
     } catch (err) {
       console.error('Error fetching order details:', err);
       // Still show the modal with available data
-      setSelectedOrder(order);
+      const deliveryFee = calculateDeliveryFee({ cart: order.cart, amount_paid: order.amount });
+      setSelectedOrder({ ...order, deliveryFee });
       setShowModal(true);
       showNotification('warning', 'Could not load detailed order information, showing available data');
     }
-  }, [parseCartData, showNotification]);
+  }, [parseCartData, showNotification, calculateDeliveryFee]);
 
   // Handle delivery status change
   const handleDeliveryStatusChange = useCallback(async (orderId, newStatus) => {
@@ -455,10 +472,10 @@ const AllOrders = () => {
     <div className="space-y-6">
       {notification && (
         <div className={`fixed top-4 right-4 w-11/12 max-w-sm p-4 rounded-md shadow-lg z-50 ${notification.type === 'success'
-            ? 'bg-green-50 text-green-800 border border-green-200'
-            : notification.type === 'warning'
-              ? 'bg-yellow-50 text-yellow-800 border border-yellow-200'
-              : 'bg-red-50 text-red-800 border border-red-200'
+          ? 'bg-green-50 text-green-800 border border-green-200'
+          : notification.type === 'warning'
+            ? 'bg-yellow-50 text-yellow-800 border border-yellow-200'
+            : 'bg-red-50 text-red-800 border border-red-200'
           }`}>
           <div className="flex items-center justify-between">
             <span className="break-words">{notification.message}</span>
@@ -682,7 +699,11 @@ const AllOrders = () => {
                 <div className="space-y-2 text-sm">
                   <div><span className="font-medium">Order ID:</span> {selectedOrder.id}</div>
                   <div><span className="font-medium">Date:</span> {selectedOrder.date}</div>
-                  <div><span className="font-medium">Amount:</span> {formatCurrency(selectedOrder.amount)}</div>
+                  <div>
+                    <span className="font-medium">Total Amount:</span>
+                    <span className="ml-2 font-bold text-pink-600">{formatCurrency(selectedOrder.amount)}</span>
+                  </div>
+                  <div><span className="font-medium">Delivery Fee:</span> {formatCurrency(selectedOrder.deliveryFee)}</div>
                   <div><span className="font-medium">Payment:</span>
                     <span className={`ml-2 px-2 py-1 rounded text-xs ${getStatusBadgeStyle(selectedOrder.orderStatus)}`}>
                       {selectedOrder.orderStatus}
@@ -719,6 +740,14 @@ const AllOrders = () => {
                       )}
                     </div>
                   </div>
+                  {selectedOrder.additionalDetails && (
+                    <div>
+                      <span className="font-medium">Additional Details:</span>
+                      <div className="mt-1 text-gray-600 whitespace-pre-wrap">
+                        {selectedOrder.additionalDetails}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
