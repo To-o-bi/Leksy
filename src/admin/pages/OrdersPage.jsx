@@ -768,17 +768,35 @@ const AllOrders = () => {
 
                     return (
                       <div key={item.product_id || index} className="flex flex-col sm:flex-row justify-between sm:items-center p-3 bg-gray-50 rounded">
-                        <div className="flex-1 mb-2 sm:mb-0">
-                          <p className="font-medium text-gray-900">
-                            {item.product_name || item.name || 'Unnamed Product'}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            Quantity: {itemQuantity}
-                            {item.product_id && (
-                              <span className="ml-2 text-xs text-gray-400">ID: {item.product_id}</span>
-                            )}
-                          </p>
-                        </div>
+                        <a
+                          href={`/product/${item.product_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 mb-2 sm:mb-0 flex items-center hover:bg-gray-100 transition-colors rounded-lg -m-3 p-3 cursor-pointer"
+                        >
+                          {item.product_image && (
+                            <img
+                              src={item.product_image}
+                              alt={item.product_name || 'Product Image'}
+                              className="w-12 h-12 rounded-lg object-cover mr-4"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = `https://placehold.co/48x48/F3F4F6/6B7280?text=IMG`;
+                              }}
+                            />
+                          )}
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {item.product_name || item.name || 'Unnamed Product'}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              Quantity: {itemQuantity}
+                              {item.product_id && (
+                                <span className="ml-2 text-xs text-gray-400">ID: {item.product_id}</span>
+                              )}
+                            </p>
+                          </div>
+                        </a>
                         <div className="text-right flex-shrink-0">
                           <p className="font-semibold text-gray-900">
                             {formatCurrency(itemTotal)}

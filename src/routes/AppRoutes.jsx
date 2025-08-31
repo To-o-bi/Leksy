@@ -16,7 +16,6 @@ const ScrollToTop = () => {
   return null;
 };
 
-
 // Loading fallback for lazy-loaded components
 const LoadingFallback = () => (
     <div className="flex items-center justify-center h-screen bg-gray-100">
@@ -43,6 +42,8 @@ const PrivacyPolicyPage = lazy(() => import('../pages/public/PolicyPages/Privacy
 const TermsAndConditionsPage = lazy(() => import('../pages/public/PolicyPages/TermsAndConditionsPage'));
 const ShippingPolicyPage = lazy(() => import('../pages/public/PolicyPages/ShippingPolicyPage'));
 
+// 404 Not Found page
+const NotFound = lazy(() => import('../pages/public/NotFound'));
 
 // Admin pages
 const DashboardPage = lazy(() => import('../admin/pages/DashboardPage'));
@@ -91,6 +92,8 @@ const AppRoutes = () => {
                     <Route path="/policies/privacy" element={<PrivacyPolicyPage />} />
                     <Route path="/policies/terms-and-conditions" element={<TermsAndConditionsPage />} />
                     <Route path="/policies/shipping" element={<ShippingPolicyPage />} />
+                    {/* 404 page for public routes */}
+                    <Route path="/404" element={<NotFound />} />
                 </Route>
                 
                 <Route path="/admin" element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
@@ -110,11 +113,15 @@ const AppRoutes = () => {
                     <Route path="bookings" element={<BookingsPage />} />
                     <Route path="bookings/:id" element={<BookingsPage />} />      
 
-                    <Route path="newletter" element={<NewsletterAdmin />} />
+                    <Route path="newsletter" element={<NewsletterAdmin />} />
                     <Route path="delivery" element={<DeliveryFees />} />
+                    
+                    {/* 404 page for admin routes */}
+                    <Route path="*" element={<NotFound />} />
                 </Route>
 
-                <Route path="*" element={<Navigate to="/" replace />} />
+                {/* Catch-all route for any unmatched paths */}
+                <Route path="*" element={<NotFound />} />
             </Routes>
         </Suspense>
     );
