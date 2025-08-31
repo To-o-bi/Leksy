@@ -788,9 +788,19 @@ const AllOrders = () => {
                       </div>
                     );
                   })}
-
-                  {/* Order Total */}
+                  
+                  {/* === Delivery Fee === */}
                   <div className="mt-4 pt-3 border-t border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-gray-700">Delivery Fee</span>
+                      <span className="font-semibold text-gray-900">
+                        {formatCurrency(selectedOrder.deliveryFee)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* === Order Total === */}
+                  <div className="mt-2">
                     <div className="flex justify-between items-center">
                       <span className="text-lg font-semibold text-gray-900">Total</span>
                       <span className="text-lg font-bold text-pink-600">
