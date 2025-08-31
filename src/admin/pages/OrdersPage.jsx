@@ -136,17 +136,6 @@ const AllOrders = () => {
     setNotification({ type, message });
   }, []);
 
-  // New function to calculate delivery fee
-  const calculateDeliveryFee = useCallback((order) => {
-    const totalItemPrice = (order.cart || []).reduce((sum, item) => {
-      const price = Number(item.product_price) || 0;
-      const quantity = Number(item.ordered_quantity) || 1;
-      return sum + (price * quantity);
-    }, 0);
-    const amountPaid = Number(order.amount_paid) || 0;
-    return Math.max(0, amountPaid - totalItemPrice);
-  }, []);
-
   // Enhanced cart parsing function
   const parseCartData = useCallback((cartData) => {
     if (!cartData) {
@@ -288,8 +277,13 @@ const AllOrders = () => {
       // First, try using the cart data we already have
       if (order.cart && order.cart.length > 0) {
         console.log('Using existing cart data:', order.cart);
-        const deliveryFee = calculateDeliveryFee({ cart: order.cart, amount_paid: order.amount });
-        setSelectedOrder({ ...order, deliveryFee });
+        const subtotal = (order.cart || []).reduce((sum, item) => {
+          const price = Number(item.product_price) || 0;
+          const quantity = Number(item.ordered_quantity) || 1;
+          return sum + (price * quantity);
+        }, 0);
+        const deliveryFee = Math.max(0, Number(order.amount) - subtotal);
+        setSelectedOrder({ ...order, deliveryFee, subtotal });
         setShowModal(true);
         return;
       }
@@ -318,8 +312,13 @@ const AllOrders = () => {
           additionalDetails: orderData.additional_details,
           rawData: orderData,
         };
-        const deliveryFee = calculateDeliveryFee(enhancedOrder);
-        setSelectedOrder({ ...enhancedOrder, deliveryFee });
+        const subtotal = (enhancedOrder.cart || []).reduce((sum, item) => {
+          const price = Number(item.product_price) || 0;
+          const quantity = Number(item.ordered_quantity) || 1;
+          return sum + (price * quantity);
+        }, 0);
+        const deliveryFee = Math.max(0, Number(enhancedOrder.amount) - subtotal);
+        setSelectedOrder({ ...enhancedOrder, deliveryFee, subtotal });
       } else {
         // Fallback to original order data even if fetch fails
         setSelectedOrder(order);
@@ -329,12 +328,17 @@ const AllOrders = () => {
     } catch (err) {
       console.error('Error fetching order details:', err);
       // Still show the modal with available data
-      const deliveryFee = calculateDeliveryFee({ cart: order.cart, amount_paid: order.amount });
-      setSelectedOrder({ ...order, deliveryFee });
+      const subtotal = (order.cart || []).reduce((sum, item) => {
+        const price = Number(item.product_price) || 0;
+        const quantity = Number(item.ordered_quantity) || 1;
+        return sum + (price * quantity);
+      }, 0);
+      const deliveryFee = Math.max(0, Number(order.amount) - subtotal);
+      setSelectedOrder({ ...order, deliveryFee, subtotal });
       setShowModal(true);
       showNotification('warning', 'Could not load detailed order information, showing available data');
     }
-  }, [parseCartData, showNotification, calculateDeliveryFee]);
+  }, [parseCartData, showNotification]);
 
   // Handle delivery status change
   const handleDeliveryStatusChange = useCallback(async (orderId, newStatus) => {
@@ -789,8 +793,18 @@ const AllOrders = () => {
                     );
                   })}
                   
-                  {/* === Delivery Fee === */}
+                  {/* === Order Items Subtotal === */}
                   <div className="mt-4 pt-3 border-t border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-gray-700">Order Items Subtotal</span>
+                      <span className="font-semibold text-gray-900">
+                        {formatCurrency(selectedOrder.subtotal)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* === Delivery Fee === */}
+                  <div className="mt-2">
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-gray-700">Delivery Fee</span>
                       <span className="font-semibold text-gray-900">
