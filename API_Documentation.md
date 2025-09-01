@@ -579,6 +579,8 @@ curl --location --request GET '{base_url}/api/admin/fetch-contact-submission?sub
 		"phone": "09111292921",
 		"subject": "Something",
 		"message": "Stuff",
+		"isRead": true,
+		"replied_by": "Admin Username=>12/08/2021 10:30:00",
 		"created_at": "2002-08-05"
 	}
 }
@@ -603,10 +605,27 @@ curl --location --request GET '{base_url}/api/admin/fetch-contact-submissions?li
 			"phone": "09111292921",
 			"subject": "Something",
 			"message": "Stuff",
+			"isRead": true,
+			"replied_by": "Admin Username|=12/08/2021 10:30:00",
 			"created_at": "2002-08-05"
 		},
 		...
 	]
+}
+```
+
+
+## Mark As Replied
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/mark-as-replied?id={id|integer}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Successfully marked the contact submission as replied!",
 }
 ```
 
@@ -996,7 +1015,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 			"title": "New Consultation Booking",
 			"description": "omeone just booked a Video consultation.\nDate: 2025-08-01\nTime: 02:00 PM - 03:00 PM",
 			"created_at": "2025-07-05 04:25:02",
-   "isRead": true
+			"isRead": true
 		},
 		{
 			"id": 3,
@@ -1005,7 +1024,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 			"title": "New Order Received",
 			"description": "Felicia placed an order worth of &amp;#8358;18,100. Full details available in the orders section.",
 			"created_at": "2025-07-05 04:20:57",
-   "isRead": true
+			"isRead": true
 		},
 		{
 			"id": 2,
@@ -1014,7 +1033,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 			"title": "Low Stock Alert",
 			"description": "Product: Abc is currently running low! Remaining: 5 qty.",
 			"created_at": "2025-07-05 04:20:48",
-   "isRead": true
+			"isRead": true
 		},
 		{
 			"id": 1,
@@ -1023,7 +1042,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-notifications?limit={l
 			"title": "New Contact Form Submission",
 			"description": "Message: Hello testingg...",
 			"created_at": "2025-07-05 04:17:49",
-   "isRead": true
+			"isRead": true
 		}
 	],
 	"token": "68641f6750a7c"
