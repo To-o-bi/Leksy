@@ -1,29 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Search, RefreshCw, ExternalLink, Users, Clock, User, CheckCircle, ArrowLeft, Menu, X } from 'lucide-react';
-import ReplyConfirmationModal from './ReplyConfirmationModal'; // Corrected import path
-import { contactService } from '../../../api';
-
-// FIX: Define a key for localStorage to avoid typos
-const MESSAGE_STATUS_KEY = 'adminInboxMessageStatus';
-
-// FIX: Helper function to get all saved statuses from localStorage
-const getSavedStatuses = () => {
-  try {
-    const saved = localStorage.getItem(MESSAGE_STATUS_KEY);
-    return saved ? JSON.parse(saved) : {};
-  } catch (error) {
-    return {};
-  }
-};
-
-// FIX: Helper function to save the status for a single message
-const saveMessageStatus = (id, newStatus) => {
-  const allStatuses = getSavedStatuses();
-  const currentStatus = allStatuses[id] || { read: false, replied: false };
-  // Merge old and new status, e.g., { read: true } + { replied: true } = { read: true, replied: true }
-  allStatuses[id] = { ...currentStatus, ...newStatus };
-  localStorage.setItem(MESSAGE_STATUS_KEY, JSON.stringify(allStatuses));
-};
+import ReplyConfirmationModal from './ReplyConfirmationModal'; 
+import { contactService, api, ENDPOINTS } from '../../../api';
 
 const AdminInbox = () => {
   const [messages, setMessages] = useState([]);
@@ -32,7 +10,7 @@ const AdminInbox = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notification, setNotification] = useState(null);
-  const [showModal, setShowModal] = useState(false); // State for modal
+  const [showModal, setShowModal] = useState(false);
 
   // HTML Entity Decoder Function
   const decodeHtml = (html) => {
@@ -64,6 +42,37 @@ const AdminInbox = () => {
     return 'from-pink-500 to-rose-500';
   };
 
+  // API function to mark a contact submission as read
+  const markAsRead = async (id) => {
+    try {
+      // Method 1: Using query parameters (matching your CURL example)
+      const response = await api.post(`/admin/mark-as-read?target=contact_submissions&id=${id}`);
+      
+      // Log only the response JSON for mark-as-read
+      console.log('Mark-as-read API Response JSON:', JSON.stringify(response.data, null, 2));
+      
+      if (response.data && response.data.code === 200) {
+        return response.data;
+      } else {
+        throw new Error(response.data?.message || 'Unexpected response format');
+      }
+    } catch (error) {
+      // Try alternative method with FormData (as in your original code)
+      try {
+        const formData = new FormData();
+        formData.append('target', 'contact_submissions');
+        formData.append('id', id);
+        
+        const response = await api.postFormData('/admin/mark-as-read', formData);
+        console.log('Mark-as-read API Response JSON (FormData method):', JSON.stringify(response.data, null, 2));
+        return response.data;
+      } catch (formDataError) {
+        console.error('Failed to mark message as read:', formDataError);
+        throw formDataError;
+      }
+    }
+  };
+
   useEffect(() => {
     loadMessages();
   }, []);
@@ -72,6 +81,7 @@ const AdminInbox = () => {
     try {
       setLoading(true);
       setError(null);
+      
       const result = await contactService.fetchSubmissions({ limit: 100 });
       const responseData = result.data || result;
 
@@ -79,11 +89,14 @@ const AdminInbox = () => {
         const submissionsData = responseData.submissions || [];
         
         if (submissionsData && submissionsData.length > 0) {
-          const savedStatuses = getSavedStatuses();
-
           const formattedMessages = submissionsData.map((submission, index) => {
             const id = submission.id || submission.submission_id || `msg_${index}`;
-            const status = savedStatuses[id] || { read: false, replied: false };
+
+            // Handle different possible values for isRead
+            let readStatus = false;
+            if (submission.isRead === true || submission.isRead === 1 || submission.isRead === '1' || submission.isRead === 'true') {
+              readStatus = true;
+            }
 
             return {
               id: id,
@@ -93,8 +106,8 @@ const AdminInbox = () => {
               subject: decodeHtml(submission.subject || 'No subject'),
               message: decodeHtml(submission.message || ''),
               created_at: submission.created_at || new Date().toISOString(),
-              read: status.read,
-              replied: status.replied,
+              read: readStatus, // Use properly converted database read status
+              replied: false, // This would need to be tracked separately or added to the API
               date: formatDate(submission.created_at),
               time: formatTime(submission.created_at)
             };
@@ -140,6 +153,8 @@ const AdminInbox = () => {
     }
   };
 
+  
+
   const formatTime = (dateString) => {
     if (!dateString) return '';
     try {
@@ -162,15 +177,39 @@ const AdminInbox = () => {
     }
   };
 
-  const handleSelectMessage = (message) => {
+  const handleSelectMessage = async (message) => {
     if (!message.read) {
-      const updatedMessages = messages.map(msg => 
-        msg.id === message.id ? { ...msg, read: true } : msg
-      );
-      setMessages(updatedMessages);
-      saveMessageStatus(message.id, { read: true });
+      try {
+        // Call API to mark as read in database
+        const result = await markAsRead(message.id);
+        
+        // Update local state
+        const updatedMessages = messages.map(msg => 
+          msg.id === message.id ? { ...msg, read: true } : msg
+        );
+        setMessages(updatedMessages);
+        
+        // Update selected message
+        const updatedSelectedMessage = { ...message, read: true };
+        setSelectedMessage(updatedSelectedMessage);
+        
+        setNotification({
+          type: 'success',
+          message: 'Message marked as read'
+        });
+        
+      } catch (error) {
+        setNotification({
+          type: 'error',
+          message: 'Failed to mark message as read'
+        });
+        
+        // Still set the selected message even if mark as read failed
+        setSelectedMessage(message);
+      }
+    } else {
+      setSelectedMessage(message);
     }
-    setSelectedMessage(prev => ({ ...message, read: true }));
   };
 
   const confirmReply = () => {
@@ -179,6 +218,7 @@ const AdminInbox = () => {
     
     const supportEmail = 'support@leksycosmetics.com';
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&from=${encodeURIComponent(supportEmail)}&to=${encodeURIComponent(selectedMessage.email)}&su=${encodeURIComponent(`Re: ${selectedMessage.subject}`)}&body=${encodeURIComponent(`Hi ${selectedMessage.name},\n\nThank you for your message:\n\n"${selectedMessage.message}"\n\nBest regards,\nLeksy Cosmetics Support Team`)}`;
+    
     window.open(gmailUrl, '_blank');
     
     setNotification({ type: 'success', message: 'Opening Gmail to reply...' });
@@ -189,7 +229,6 @@ const AdminInbox = () => {
       );
       setMessages(updatedMessages);
       setSelectedMessage(prev => ({ ...prev, replied: true }));
-      saveMessageStatus(selectedMessage.id, { replied: true });
     }
   };
 
@@ -214,6 +253,10 @@ const AdminInbox = () => {
     total: messages.length,
     unread: messages.filter(m => !m.read).length
   };
+
+  // Add logging for stats
+  console.log('📊 Current stats:', stats);
+  console.log('📋 Current messages read status:', messages.map(m => ({ id: m.id, read: m.read })));
 
   if (loading) {
     return (
