@@ -48,9 +48,6 @@ const AdminInbox = () => {
       // Method 1: Using query parameters (matching your CURL example)
       const response = await api.post(`/admin/mark-as-read?target=contact_submissions&id=${id}`);
       
-      // Log only the response JSON for mark-as-read
-      console.log('Mark-as-read API Response JSON:', JSON.stringify(response.data, null, 2));
-      
       if (response.data && response.data.code === 200) {
         return response.data;
       } else {
@@ -64,12 +61,45 @@ const AdminInbox = () => {
         formData.append('id', id);
         
         const response = await api.postFormData('/admin/mark-as-read', formData);
-        console.log('Mark-as-read API Response JSON (FormData method):', JSON.stringify(response.data, null, 2));
         return response.data;
       } catch (formDataError) {
         console.error('Failed to mark message as read:', formDataError);
         throw formDataError;
       }
+    }
+  };
+
+  // API function to mark a contact submission as replied
+  const markAsReplied = async (id) => {
+    try {
+      console.log('🚀 Attempting to mark message as replied - ID:', id);
+      
+      const formData = new FormData();
+      formData.append('id', id);
+      
+      console.log('📤 Sending FormData to /admin/mark-as-replied with ID:', id);
+      
+      const response = await api.postFormData('/admin/mark-as-replied', formData);
+      
+      console.log('✅ Mark-as-replied API Response - Full Response Object:', response);
+      console.log('📋 Mark-as-replied API Response - JSON Data:', JSON.stringify(response.data, null, 2));
+      console.log('🔍 Mark-as-replied API Response - Status:', response.status);
+      console.log('📊 Mark-as-replied API Response - Headers:', response.headers);
+      
+      if (response.data && response.data.code === 200) {
+        console.log('✅ Mark-as-replied SUCCESS - Message marked as replied successfully');
+        return response.data;
+      } else {
+        console.log('❌ Mark-as-replied FAILED - Unexpected response format');
+        console.log('🔍 Expected code: 200, Received code:', response.data?.code);
+        console.log('💬 Response message:', response.data?.message);
+        throw new Error(response.data?.message || 'Unexpected response format');
+      }
+    } catch (error) {
+      console.error('💥 Mark-as-replied ERROR - Full error object:', error);
+      console.error('💥 Mark-as-replied ERROR - Error message:', error.message);
+      console.error('💥 Mark-as-replied ERROR - Error response:', error.response?.data);
+      throw error;
     }
   };
 
@@ -107,7 +137,7 @@ const AdminInbox = () => {
               message: decodeHtml(submission.message || ''),
               created_at: submission.created_at || new Date().toISOString(),
               read: readStatus, // Use properly converted database read status
-              replied: false, // This would need to be tracked separately or added to the API
+              replied: submission.replied_by ? true : false, // Check if replied_by field exists
               date: formatDate(submission.created_at),
               time: formatTime(submission.created_at)
             };
@@ -212,7 +242,7 @@ const AdminInbox = () => {
     }
   };
 
-  const confirmReply = () => {
+  const confirmReply = async () => {
     if (!selectedMessage) return;
     setShowModal(false);
     
@@ -224,11 +254,28 @@ const AdminInbox = () => {
     setNotification({ type: 'success', message: 'Opening Gmail to reply...' });
     
     if (!selectedMessage.replied) {
-      const updatedMessages = messages.map(msg => 
-        msg.id === selectedMessage.id ? { ...msg, replied: true } : msg
-      );
-      setMessages(updatedMessages);
-      setSelectedMessage(prev => ({ ...prev, replied: true }));
+      try {
+        // Call API to mark as replied in database
+        await markAsReplied(selectedMessage.id);
+        
+        // Update local state
+        const updatedMessages = messages.map(msg => 
+          msg.id === selectedMessage.id ? { ...msg, replied: true } : msg
+        );
+        setMessages(updatedMessages);
+        setSelectedMessage(prev => ({ ...prev, replied: true }));
+        
+        setNotification({
+          type: 'success',
+          message: 'Message marked as replied and Gmail opened'
+        });
+        
+      } catch (error) {
+        setNotification({
+          type: 'error',
+          message: 'Gmail opened but failed to mark as replied in database'
+        });
+      }
     }
   };
 
@@ -253,10 +300,6 @@ const AdminInbox = () => {
     total: messages.length,
     unread: messages.filter(m => !m.read).length
   };
-
-  // Add logging for stats
-  console.log('📊 Current stats:', stats);
-  console.log('📋 Current messages read status:', messages.map(m => ({ id: m.id, read: m.read })));
 
   if (loading) {
     return (
