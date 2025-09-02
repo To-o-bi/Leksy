@@ -63,7 +63,6 @@ const AdminInbox = () => {
         const response = await api.postFormData('/admin/mark-as-read', formData);
         return response.data;
       } catch (formDataError) {
-        console.error('Failed to mark message as read:', formDataError);
         throw formDataError;
       }
     }
@@ -72,33 +71,17 @@ const AdminInbox = () => {
   // API function to mark a contact submission as replied
   const markAsReplied = async (id) => {
     try {
-      console.log('🚀 Attempting to mark message as replied - ID:', id);
-      
       const formData = new FormData();
       formData.append('id', id);
       
-      console.log('📤 Sending FormData to /admin/mark-as-replied with ID:', id);
-      
       const response = await api.postFormData('/admin/mark-as-replied', formData);
       
-      console.log('✅ Mark-as-replied API Response - Full Response Object:', response);
-      console.log('📋 Mark-as-replied API Response - JSON Data:', JSON.stringify(response.data, null, 2));
-      console.log('🔍 Mark-as-replied API Response - Status:', response.status);
-      console.log('📊 Mark-as-replied API Response - Headers:', response.headers);
-      
       if (response.data && response.data.code === 200) {
-        console.log('✅ Mark-as-replied SUCCESS - Message marked as replied successfully');
         return response.data;
       } else {
-        console.log('❌ Mark-as-replied FAILED - Unexpected response format');
-        console.log('🔍 Expected code: 200, Received code:', response.data?.code);
-        console.log('💬 Response message:', response.data?.message);
         throw new Error(response.data?.message || 'Unexpected response format');
       }
     } catch (error) {
-      console.error('💥 Mark-as-replied ERROR - Full error object:', error);
-      console.error('💥 Mark-as-replied ERROR - Error message:', error.message);
-      console.error('💥 Mark-as-replied ERROR - Error response:', error.response?.data);
       throw error;
     }
   };

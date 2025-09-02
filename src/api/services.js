@@ -219,10 +219,10 @@ export const productService = {
   }
 };
 
-// Contact Service 
+// Improved Contact Service with better error handling
 export const contactService = {
   async submit(contactData) {
-    // This is a placeholder as isValidEmail is not defined
+    // Validate required fields
     const required = ['name', 'email', 'phone', 'subject', 'message'];
     required.forEach(field => {
       if (!contactData[field]?.trim()) {
@@ -230,18 +230,66 @@ export const contactService = {
       }
     });
 
-    const formData = new FormData();
-    required.forEach(field => {
-      formData.append(field, contactData[field].trim());
-    });
+    // Additional email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(contactData.email)) {
+      throw new Error('Invalid email format');
+    }
 
-    const response = await api.postFormData(ENDPOINTS.SUBMIT_CONTACT, formData);
-    return response.data;
+    try {
+      const formData = new FormData();
+      required.forEach(field => {
+        formData.append(field, contactData[field].trim());
+      });
+
+      // Add timestamp to help with duplicate detection
+      formData.append('timestamp', new Date().toISOString());
+
+      console.log('Sending request to:', ENDPOINTS.SUBMIT_CONTACT);
+      
+      const response = await api.postFormData(ENDPOINTS.SUBMIT_CONTACT, formData);
+      
+      // Log the response for debugging
+      console.log('API Response:', response);
+      
+      return response.data;
+      
+    } catch (error) {
+      console.error('Contact service error:', error);
+      
+      // Improve error messages based on common scenarios
+      if (error.response) {
+        // Server responded with error status
+        const status = error.response.status;
+        const message = error.response.data?.message || 'Server error';
+        
+        if (status === 429) {
+          throw new Error('Too many requests. Please wait a moment and try again.');
+        } else if (status === 400) {
+          throw new Error(`Validation error: ${message}`);
+        } else if (status === 500) {
+          throw new Error('Server error. Please try again later.');
+        } else {
+          throw new Error(`Request failed: ${message}`);
+        }
+      } else if (error.request) {
+        // Request was made but no response received
+        throw new Error('No response from server. Check your internet connection.');
+      } else {
+        // Something else happened
+        throw new Error(error.message || 'An unexpected error occurred');
+      }
+    }
   },
 
   async fetchSubmissions(filters = {}) {
-    const response = await api.get(ENDPOINTS.FETCH_CONTACT_SUBMISSIONS, filters);
-    return response.data;
+    try {
+      const response = await api.get(ENDPOINTS.FETCH_CONTACT_SUBMISSIONS, filters);
+      return response.data;
+    } catch (error) {
+      console.error('Fetch submissions error:', error);
+      throw error;
+    }
   }
 };
 
