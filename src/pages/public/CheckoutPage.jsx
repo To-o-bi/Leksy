@@ -425,7 +425,7 @@ const CheckoutPage = () => {
                   {/* START: Added Additional Phone Field */}
                   <div className="md:col-span-2">
                     <label htmlFor="additional_phone" className="block text-sm font-medium text-gray-700 mb-2">
-                      Additional Phone (Optional)
+                      Alternative Phone Number (Optional)
                     </label>
                     <input 
                       type="tel" 

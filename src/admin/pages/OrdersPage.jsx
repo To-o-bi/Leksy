@@ -191,6 +191,8 @@ const AllOrders = () => {
         name: order.name,
         email: order.email,
         phone: order.phone,
+        // Added additional_phone from the API response to the order object.
+        additionalPhone: order.additional_phone,
         amount: order.amount_paid || order.amount_calculated || 0,
         date: formatDate(order.created_at),
         rawDate: order.created_at,
@@ -276,6 +278,8 @@ const AllOrders = () => {
           cart: cartItems,
           amount: orderData.amount_paid || orderData.amount_calculated || order.amount,
           amount_paid: orderData.amount_paid,
+          // Correctly fetching and setting additional phone and details
+          additionalPhone: orderData.additional_phone,
           address: orderData.street_address ?
             `${orderData.street_address}, ${orderData.city}, ${orderData.state}` : order.address,
           additionalDetails: orderData.additional_details,
@@ -693,6 +697,11 @@ const AllOrders = () => {
                   <div><span className="font-medium">Name:</span> {selectedOrder.name}</div>
                   <div><span className="font-medium">Email:</span> {selectedOrder.email}</div>
                   <div><span className="font-medium">Phone:</span> {selectedOrder.phone}</div>
+                  {/* BEGIN: Added conditional rendering for Additional Phone */}
+                  {selectedOrder.additionalPhone && (
+                    <div><span className="font-medium">Additional Phone:</span> {selectedOrder.additionalPhone}</div>
+                  )}
+                  {/* END: Added conditional rendering */}
                   <div><span className="font-medium">Method:</span> {getDeliveryMethodDisplay(selectedOrder.deliveryMethod)}</div>
                   <div>
                     <span className="font-medium">Address:</span>
@@ -775,7 +784,7 @@ const AllOrders = () => {
                       </div>
                     );
                   })}
-                  
+
                   {/* Order Items Subtotal */}
                   <div className="mt-4 pt-3 border-t border-gray-200">
                     <div className="flex justify-between items-center">

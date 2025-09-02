@@ -293,7 +293,7 @@ export const contactService = {
   }
 };
 
-// Order Service (Final Version)
+// Order Service - Updated
 export const orderService = {
   async initiateCheckout(checkoutData) {
     this._validateCheckoutData(checkoutData);
@@ -306,10 +306,34 @@ export const orderService = {
       cart: JSON.stringify(checkoutData.cart)
     };
 
+    // Add additional_phone if provided
+    if (checkoutData.additional_phone?.trim()) {
+      params.additional_phone = checkoutData.additional_phone.trim();
+    }
+
+    // Add additional_details if provided
+    if (checkoutData.additional_details?.trim()) {
+      params.additional_details = checkoutData.additional_details.trim();
+    }
+
+    // Add LGA if provided (for Lagos state)
+    if (checkoutData.lga?.trim()) {
+      params.lga = checkoutData.lga.trim();
+    }
+
     if (checkoutData.delivery_method === 'address') {
       params.state = checkoutData.state.trim();
       params.city = checkoutData.city.trim();
       params.street_address = checkoutData.street_address.trim();
+    }
+
+    // Handle bus-park delivery method
+    if (checkoutData.delivery_method === 'bus-park') {
+      // Bus park delivery typically doesn't require address details
+      // but might require state for delivery fee calculation
+      if (checkoutData.state?.trim()) {
+        params.state = checkoutData.state.trim();
+      }
     }
 
     if (checkoutData.success_redirect) {
@@ -362,8 +386,8 @@ export const orderService = {
 
   _validateCheckoutData(checkoutData) {
     if (!checkoutData.phone?.trim()) throw new Error('Phone is required');
-    if (!['pickup', 'address'].includes(checkoutData.delivery_method)) {
-      throw new Error('Invalid delivery method');
+    if (!['pickup', 'address', 'bus-park'].includes(checkoutData.delivery_method)) {
+      throw new Error('Invalid delivery method. Must be pickup, address, or bus-park');
     }
     if (!checkoutData.cart?.length) throw new Error('Cart cannot be empty');
 
@@ -371,9 +395,14 @@ export const orderService = {
       const addressFields = ['state', 'city', 'street_address'];
       addressFields.forEach(field => {
         if (!checkoutData[field]?.trim()) {
-          throw new Error(`${field.replace('_', ' ')} is required`);
+          throw new Error(`${field.replace('_', ' ')} is required for address delivery`);
         }
       });
+    }
+
+    // Validate additional_phone format if provided
+    if (checkoutData.additional_phone && !/^\d{10,15}$/.test(checkoutData.additional_phone.replace(/\D/g, ''))) {
+      throw new Error('Additional phone must be a valid phone number');
     }
   }
 };

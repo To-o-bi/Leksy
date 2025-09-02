@@ -1,4 +1,3 @@
-
 // src/api/CheckoutService.js
 
 const BASE_URL = 'https://leksycosmetics.com';
@@ -31,11 +30,15 @@ export const initiateCheckout = async (formData, deliveryMethod, cart, successRe
   searchParams.append('email', formData.email);
   searchParams.append('phone', formData.phone);
   
-  // START: Added logic for additional_phone
+  // START: Corrected logic for additional_phone and added additional_details
   if (formData.additional_phone && formData.additional_phone.trim() !== '') {
     searchParams.append('additional_phone', formData.additional_phone);
   }
-  // END: Added logic for additional_phone
+  // The API uses `additional_details` for order notes.
+  if (formData.notes && formData.notes.trim() !== '') {
+    searchParams.append('additional_details', formData.notes);
+  }
+  // END: Corrected logic
 
   searchParams.append('delivery_method', deliveryMethod);
   searchParams.append('cart', JSON.stringify(cartForAPI));
