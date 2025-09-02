@@ -139,7 +139,6 @@ const AllOrders = () => {
   // Enhanced cart parsing function
   const parseCartData = useCallback((cartData) => {
     if (!cartData) {
-      console.log('No cart data provided');
       return [];
     }
 
@@ -147,8 +146,6 @@ const AllOrders = () => {
       let parsedCart = [];
 
       if (typeof cartData === 'string') {
-        console.log('Cart data is string, attempting to parse:', cartData);
-
         // First, decode HTML entities if present
         let decodedData = cartData;
         if (cartData.includes('&quot;')) {
@@ -158,16 +155,12 @@ const AllOrders = () => {
             .replace(/&lt;/g, '<')
             .replace(/&gt;/g, '>')
             .replace(/&#039;/g, "'");
-          console.log('Decoded HTML entities:', decodedData);
         }
 
         parsedCart = JSON.parse(decodedData);
       } else if (Array.isArray(cartData)) {
-        console.log('Cart data is already an array:', cartData);
         parsedCart = cartData;
       } else if (typeof cartData === 'object') {
-        console.log('Cart data is object:', cartData);
-        // If it's an object, try to extract array or convert to array
         if (cartData.items && Array.isArray(cartData.items)) {
           parsedCart = cartData.items;
         } else {
@@ -176,33 +169,22 @@ const AllOrders = () => {
       }
 
       if (!Array.isArray(parsedCart)) {
-        console.error('Parsed cart is not an array:', parsedCart);
         return [];
       }
 
-      console.log('Successfully parsed cart:', parsedCart);
       return parsedCart;
     } catch (error) {
-      console.error('Failed to parse cart data:', error, 'Original data:', cartData);
       return [];
     }
   }, []);
 
   // Format order data from the main list fetch, including cart items
   const formatOrderListData = useCallback((ordersData) => {
-    console.log('Raw orders data received:', ordersData);
-
     const ordersArray = ordersData.products || ordersData.orders || [];
-    console.log('Orders array:', ordersArray);
 
     return ordersArray.map(order => {
-      console.log('Processing order:', order.order_id, 'Cart data:', order.cart_obj_str || order.cart_obj);
-
-      // Try both cart_obj_str and cart_obj fields
       const cartData = order.cart_obj_str || order.cart_obj;
       const cartItems = parseCartData(cartData);
-
-      console.log('Parsed cart items for order', order.order_id, ':', cartItems);
 
       return {
         id: order.order_id,
@@ -222,8 +204,8 @@ const AllOrders = () => {
         city: order.city,
         streetAddress: order.street_address,
         deliveryFee: order.delivery_fee,
-        cart: cartItems, // Use the parsed cart items
-        additionalDetails: order.additional_details, // Added additional details
+        cart: cartItems,
+        additionalDetails: order.additional_details,
         rawData: order,
       };
     });
@@ -240,19 +222,15 @@ const AllOrders = () => {
       if (orderStatus !== 'all') filters.order_status = orderStatus;
       if (deliveryStatus !== 'all') filters.delivery_status = deliveryStatus;
 
-      console.log('Fetching orders with filters:', filters);
       const result = await orderService.fetchOrders(filters);
-      console.log('API response:', result);
 
       if (result?.code === 200) {
         const formattedOrders = formatOrderListData(result);
-        console.log('Formatted orders:', formattedOrders);
         setOrders(formattedOrders);
       } else {
         throw new Error(result?.message || 'Failed to fetch orders');
       }
     } catch (err) {
-      console.error('Error fetching orders:', err);
       let errorMessage = 'Failed to load orders. Please try again.';
       if (err.message.includes('CORS')) {
         errorMessage = 'CORS error: Please contact your backend administrator.';
@@ -272,11 +250,8 @@ const AllOrders = () => {
   // Enhanced function to fetch detailed order data when viewing
   const viewOrderDetails = useCallback(async (order) => {
     try {
-      console.log('Viewing order details for:', order.id);
-
       // First, try using the cart data we already have
       if (order.cart && order.cart.length > 0) {
-        console.log('Using existing cart data:', order.cart);
         const subtotal = (order.cart || []).reduce((sum, item) => {
           const price = Number(item.product_price) || 0;
           const quantity = Number(item.ordered_quantity) || 1;
@@ -289,22 +264,16 @@ const AllOrders = () => {
       }
 
       // If no cart data, fetch detailed order info
-      console.log('No cart data found, fetching detailed order info...');
       const detailedOrder = await orderService.fetchOrder(order.id);
-      console.log('Detailed order response:', detailedOrder);
 
       if (detailedOrder?.code === 200 && detailedOrder.product) {
         const orderData = detailedOrder.product;
-        // Try both cart_obj_str and cart_obj fields for detailed order
         const cartData = orderData.cart_obj_str || orderData.cart_obj;
         const cartItems = parseCartData(cartData);
-
-        console.log('Detailed cart items:', cartItems);
 
         const enhancedOrder = {
           ...order,
           cart: cartItems,
-          // Update any other fields that might be more detailed
           amount: orderData.amount_paid || orderData.amount_calculated || order.amount,
           amount_paid: orderData.amount_paid,
           address: orderData.street_address ?
@@ -326,7 +295,6 @@ const AllOrders = () => {
 
       setShowModal(true);
     } catch (err) {
-      console.error('Error fetching order details:', err);
       // Still show the modal with available data
       const subtotal = (order.cart || []).reduce((sum, item) => {
         const price = Number(item.product_price) || 0;
@@ -489,7 +457,7 @@ const AllOrders = () => {
       )}
 
       <div className="bg-white rounded-lg p-4 md:p-6 shadow-sm">
-        {/* === Header: Responsive Flex === */}
+        {/* Header: Responsive Flex */}
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-semibold text-gray-800">All Orders</h1>
@@ -507,7 +475,7 @@ const AllOrders = () => {
           </button>
         </div>
 
-        {/* === Filters & Search: Responsive Flex & Width === */}
+        {/* Filters & Search: Responsive Flex & Width */}
         <div className="space-y-4 mb-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -559,7 +527,7 @@ const AllOrders = () => {
           </div>
         </div>
 
-        {/* === Orders Table: Card layout on mobile, Table on desktop === */}
+        {/* Orders Table: Card layout on mobile, Table on desktop */}
         <div className="w-full">
           {/* Desktop Table Headers */}
           <div className="hidden md:grid md:grid-cols-[1fr,2fr,1fr,1fr,1.5fr,1fr,1fr,1fr] gap-4 border-b border-gray-200 pb-3">
@@ -576,8 +544,6 @@ const AllOrders = () => {
                 className={`md:grid md:grid-cols-[1fr,2fr,1fr,1fr,1.5fr,1fr,1fr,1fr] md:gap-4 md:items-center transition-colors rounded-lg md:rounded-none p-4 md:p-0 border md:border-0 md:border-t border-gray-200 hover:bg-gray-50 ${highlightedOrderId === order.id ? 'bg-yellow-50 animate-pulse' : ''}`}
                 id={`order-${order.id}`}
               >
-                {/* Mobile labels are hidden on medium screens and up (md:hidden) */}
-                {/* Cells use flex on mobile, become simple grid items on desktop */}
                 <div className="flex justify-between items-center md:block py-1 md:py-4">
                   <span className="font-semibold text-gray-600 md:hidden">Order ID</span>
                   <span className="text-sm font-mono text-pink-600">{order.id}</span>
@@ -657,7 +623,7 @@ const AllOrders = () => {
           </div>
         </div>
 
-        {/* === Pagination: Responsive Flex === */}
+        {/* Pagination: Responsive Flex */}
         {paginationData.totalPages > 1 && (
           <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="text-sm text-gray-500">
@@ -761,7 +727,6 @@ const AllOrders = () => {
               {selectedOrder.cart && selectedOrder.cart.length > 0 ? (
                 <div className="space-y-2">
                   {selectedOrder.cart.map((item, index) => {
-                    console.log('Rendering cart item:', item);
                     const itemPrice = Number(item.product_price) || 0;
                     const itemQuantity = Number(item.ordered_quantity) || 1;
                     const itemTotal = itemPrice * itemQuantity;
@@ -811,7 +776,7 @@ const AllOrders = () => {
                     );
                   })}
                   
-                  {/* === Order Items Subtotal === */}
+                  {/* Order Items Subtotal */}
                   <div className="mt-4 pt-3 border-t border-gray-200">
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-gray-700">Order Items Subtotal</span>
@@ -821,7 +786,7 @@ const AllOrders = () => {
                     </div>
                   </div>
 
-                  {/* === Delivery Fee === */}
+                  {/* Delivery Fee */}
                   <div className="mt-2">
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-gray-700">Delivery Fee</span>
@@ -831,7 +796,7 @@ const AllOrders = () => {
                     </div>
                   </div>
 
-                  {/* === Order Total === */}
+                  {/* Order Total */}
                   <div className="mt-2">
                     <div className="flex justify-between items-center">
                       <span className="text-lg font-semibold text-gray-900">Total</span>
@@ -848,16 +813,6 @@ const AllOrders = () => {
                   <p className="text-sm text-gray-400 mt-1">
                     Cart data may not be available or failed to load
                   </p>
-                  {selectedOrder.rawData && (
-                    <details className="mt-3 text-left">
-                      <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-600">
-                        Debug: Show raw order data
-                      </summary>
-                      <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-auto max-h-32">
-                        {JSON.stringify(selectedOrder.rawData, null, 2)}
-                      </pre>
-                    </details>
-                  )}
                 </div>
               )}
             </div>
