@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom'; // Import ReactDOM for portals
 import { useLocation } from 'react-router-dom';
-import { Search, Eye, RefreshCw, AlertCircle, Calendar, Phone, Mail, User, CheckCircle, Clock } from 'lucide-react';
+import { Search, Eye, RefreshCw, AlertCircle, Calendar, Phone, Mail, User, CheckCircle, Clock, Info } from 'lucide-react';
 import api from '../../api/axios';
 
 const BookingsPage = () => {
@@ -237,8 +237,6 @@ const BookingsPage = () => {
     setShowModal(true);
     setOverrideLink(false);
   };
-
-  const sendReminder = (email) => setNotification({ type: 'success', message: `Reminder sent to ${email}` });
   
   const closeModal = () => {
     setShowModal(false);
@@ -433,6 +431,16 @@ const BookingsPage = () => {
                       <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded-r-lg"><div className="flex"><div className="flex-shrink-0"><CheckCircle className="h-5 w-5 text-green-400" /></div><div className="ml-3"><p className="text-sm text-green-700">This consultation has been completed. Actions are disabled.</p></div></div></div>
                     ) : (
                       <>
+                        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-lg">
+                          <div className="flex">
+                            <div className="flex-shrink-0">
+                              <Info className="h-5 w-5 text-blue-400" />
+                            </div>
+                            <div className="ml-3">
+                              <p className="text-sm text-blue-700">Reminders are automatically sent to the customer 24 hours before the consultation.</p>
+                            </div>
+                          </div>
+                        </div>
                         {selectedBooking.channel?.toLowerCase() !== 'whatsapp' && (
                           <div className="space-y-2">
                             <label htmlFor="meetLink" className="text-sm font-medium text-gray-700">Meeting Link</label>
@@ -453,7 +461,6 @@ const BookingsPage = () => {
                             )}
                           </div>
                         )}
-                        <button onClick={() => sendReminder(selectedBooking.email)} className="w-full px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 text-sm">Send Reminder</button>
                         <button onClick={() => updateSessionStatus(selectedBooking.id, 'completed')} className="w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm flex items-center justify-center">
                           <CheckCircle className="h-4 w-4 mr-2" /> Mark as Completed
                         </button>
