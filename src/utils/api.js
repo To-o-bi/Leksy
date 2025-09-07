@@ -3,7 +3,6 @@
 const BASE_URL = 'https://leksycosmetics.com/api';
 
 export const handleApiError = (error, defaultMessage = 'An error occurred') => {
-    console.error('API Error:', error);
     if (error.response) {
         return error.response.data?.message || defaultMessage;
     } else if (error.request) {
@@ -27,7 +26,18 @@ const normalizeProduct = (product) => {
             concerns = product.concern_options.split(',').map(c => c.trim()).filter(Boolean);
         }
     }
-    return { ...product, concern_options: concerns };
+
+    const normalizedProduct = {
+        ...product,
+        concern_options: concerns,
+        price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
+        slashed_price: product.slashed_price ? 
+            (typeof product.slashed_price === 'string' ? parseFloat(product.slashed_price) : product.slashed_price) : null,
+        images: Array.isArray(product.images) ? product.images : 
+                (product.images ? [product.images] : [])
+    };
+
+    return normalizedProduct;
 };
 
 const CONCERN_LABEL_TO_VALUE = {

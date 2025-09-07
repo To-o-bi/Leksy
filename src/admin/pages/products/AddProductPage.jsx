@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Image, Plus, X, AlertCircle, CheckCircle, Star } from 'lucide-react';
+import { ChevronLeft, Image, Plus, X, AlertCircle, CheckCircle } from 'lucide-react';
 import { productService } from '../../../api/services';
 import ConfirmationModal from '../../../components/common/ConfirmationModal';
 
@@ -9,9 +9,14 @@ const AddProductPage = () => {
     const navigate = useNavigate();
 
     const [formData, setFormData] = useState({
-        name: '', price: '', slashed_price: '', category: '', quantity: '',
-        description: '', concern_options: [], images: [],
-        deal_price: '', deal_end_date: ''
+        name: '', 
+        price: '', 
+        slashed_price: '', 
+        category: '', 
+        quantity: '',
+        description: '', 
+        concern_options: [], 
+        images: []
     });
 
     const [errors, setErrors] = useState({});
@@ -58,7 +63,7 @@ const AddProductPage = () => {
 
     const validateForm = () => {
         const newErrors = {};
-        const { name, price, slashed_price, category, quantity, description, concern_options, images, deal_price, deal_end_date } = formData;
+        const { name, price, slashed_price, category, quantity, description, concern_options, images } = formData;
 
         if (!name.trim()) newErrors.name = "Product name is required";
         if (!price || price <= 0) newErrors.price = "Price must be greater than 0";
@@ -70,21 +75,6 @@ const AddProductPage = () => {
 
         if (slashed_price && Number(slashed_price) <= Number(price)) {
             newErrors.slashed_price = "Slashed price should be greater than current price";
-        }
-
-        if ((deal_price && !deal_end_date) || (!deal_price && deal_end_date)) {
-            newErrors.deal_price = "Both Deal Price and End Date are required to set a deal.";
-            newErrors.deal_end_date = "Both fields are required for a deal.";
-        } else if (deal_price) {
-            if (Number(deal_price) <= 0) {
-                newErrors.deal_price = "Deal price must be greater than 0.";
-            } else if (Number(deal_price) >= Number(price)) {
-                newErrors.deal_price = "Deal price must be less than the current price.";
-            }
-        }
-
-        if (deal_end_date && new Date(deal_end_date) <= new Date()) {
-            newErrors.deal_end_date = "Deal end date must be in the future.";
         }
 
         setErrors(newErrors);
@@ -100,21 +90,6 @@ const AddProductPage = () => {
         setIsSubmitting(true);
         setNotification(null);
         try {
-            // **FIXED**: Robustly format the date for the API
-            let formattedDateForApi = null;
-            if (formData.deal_end_date) {
-                const date = new Date(formData.deal_end_date);
-                if (!isNaN(date)) {
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    const hours = String(date.getHours()).padStart(2, '0');
-                    const minutes = String(date.getMinutes()).padStart(2, '0');
-                    // API requires seconds, so we add them.
-                    formattedDateForApi = `${year}-${month}-${day} ${hours}:${minutes}:00`;
-                }
-            }
-
             const productData = {
                 name: formData.name.trim(),
                 price: parseFloat(formData.price),
@@ -123,9 +98,7 @@ const AddProductPage = () => {
                 category: formData.category,
                 concern_options: formData.concern_options,
                 images: formData.images,
-                slashed_price: formData.slashed_price ? parseFloat(formData.slashed_price) : null,
-                deal_price: formData.deal_price ? parseFloat(formData.deal_price) : null,
-                deal_end_date: formattedDateForApi,
+                slashed_price: formData.slashed_price ? parseFloat(formData.slashed_price) : null
             };
 
             const result = await productService.addProduct(productData);
@@ -136,7 +109,6 @@ const AddProductPage = () => {
                 throw new Error(result?.message || 'Failed to add product');
             }
         } catch (error) {
-            console.error('Error adding product:', error);
             let errorMessage = error.message || 'Failed to add product. Please try again.';
             if (error.message.includes('Authentication')) errorMessage = 'Please log in again to continue.';
             setNotification({ type: 'error', message: errorMessage });
@@ -349,48 +321,72 @@ const AddProductPage = () => {
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Product Name*</label>
                                         <input
-                                            type="text" name="name" value={formData.name} onChange={handleInputChange} disabled={isSubmitting}
+                                            type="text" 
+                                            name="name" 
+                                            value={formData.name} 
+                                            onChange={handleInputChange} 
+                                            disabled={isSubmitting}
                                             className={`w-full border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`}
                                             placeholder="Enter product name"
                                         />
-                                        {errors.name && (<p className="mt-1 text-red-500 text-sm flex items-center"><AlertCircle size={16} className="mr-1" />{errors.name}</p>)}
+                                        {errors.name && (
+                                            <p className="mt-1 text-red-500 text-sm flex items-center">
+                                                <AlertCircle size={16} className="mr-1" />
+                                                {errors.name}
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
                                         <div className="w-full sm:w-1/2">
                                             <label className="block text-sm font-medium text-gray-700 mb-2">Current Price*</label>
                                             <div className="relative">
-                                                <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none"><span className="text-gray-700 font-bold">₦</span></div>
-                                                <input type="number" name="price" value={formData.price} onChange={handleInputChange} disabled={isSubmitting} min="0" step="0.01" className={`w-full border ${errors.price ? 'border-red-500' : 'border-gray-300'} rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`} placeholder="0.00" />
+                                                <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                                                    <span className="text-gray-700 font-bold">₦</span>
+                                                </div>
+                                                <input 
+                                                    type="number" 
+                                                    name="price" 
+                                                    value={formData.price} 
+                                                    onChange={handleInputChange} 
+                                                    disabled={isSubmitting} 
+                                                    min="0" 
+                                                    step="0.01" 
+                                                    className={`w-full border ${errors.price ? 'border-red-500' : 'border-gray-300'} rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`} 
+                                                    placeholder="0.00" 
+                                                />
                                             </div>
-                                            {errors.price && (<p className="mt-1 text-red-500 text-sm flex items-center"><AlertCircle size={16} className="mr-1" />{errors.price}</p>)}
+                                            {errors.price && (
+                                                <p className="mt-1 text-red-500 text-sm flex items-center">
+                                                    <AlertCircle size={16} className="mr-1" />
+                                                    {errors.price}
+                                                </p>
+                                            )}
                                         </div>
                                         <div className="w-full sm:w-1/2">
                                             <label className="block text-sm font-medium text-gray-700 mb-2">Slashed Price (Optional)</label>
                                             <div className="relative">
-                                                <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none"><span className="text-gray-700 font-bold">₦</span></div>
-                                                <input type="number" name="slashed_price" value={formData.slashed_price} onChange={handleInputChange} disabled={isSubmitting} min="0" step="0.01" className={`w-full border ${errors.slashed_price ? 'border-red-500' : 'border-gray-300'} rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`} placeholder="0.00" />
-                                            </div>
-                                            {errors.slashed_price && (<p className="mt-1 text-red-500 text-sm flex items-center"><AlertCircle size={16} className="mr-1" />{errors.slashed_price}</p>)}
-                                        </div>
-                                    </div>
-
-                                    <div className="p-4 bg-pink-50 border border-pink-200 rounded-lg">
-                                        <h3 className="font-semibold text-pink-800 mb-3 flex items-center"><Star size={18} className="mr-2 text-pink-500"/>Best Deal (Optional)</h3>
-                                        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-                                            <div className="w-full sm:w-1/2">
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Deal Price</label>
-                                                <div className="relative">
-                                                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none"><span className="text-gray-700 font-bold">₦</span></div>
-                                                    <input type="number" name="deal_price" value={formData.deal_price} onChange={handleInputChange} disabled={isSubmitting} min="0" step="0.01" className={`w-full border ${errors.deal_price ? 'border-red-500' : 'border-gray-300'} rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`} placeholder="0.00" />
+                                                <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                                                    <span className="text-gray-700 font-bold">₦</span>
                                                 </div>
-                                                {errors.deal_price && (<p className="mt-1 text-red-500 text-sm flex items-center"><AlertCircle size={16} className="mr-1" />{errors.deal_price}</p>)}
+                                                <input 
+                                                    type="number" 
+                                                    name="slashed_price" 
+                                                    value={formData.slashed_price} 
+                                                    onChange={handleInputChange} 
+                                                    disabled={isSubmitting} 
+                                                    min="0" 
+                                                    step="0.01" 
+                                                    className={`w-full border ${errors.slashed_price ? 'border-red-500' : 'border-gray-300'} rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`} 
+                                                    placeholder="0.00" 
+                                                />
                                             </div>
-                                            <div className="w-full sm:w-1/2">
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Deal End Date</label>
-                                                <input type="datetime-local" name="deal_end_date" value={formData.deal_end_date} onChange={handleInputChange} disabled={isSubmitting} className={`w-full border ${errors.deal_end_date ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`} />
-                                                {errors.deal_end_date && (<p className="mt-1 text-red-500 text-sm flex items-center"><AlertCircle size={16} className="mr-1" />{errors.deal_end_date}</p>)}
-                                            </div>
+                                            {errors.slashed_price && (
+                                                <p className="mt-1 text-red-500 text-sm flex items-center">
+                                                    <AlertCircle size={16} className="mr-1" />
+                                                    {errors.slashed_price}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
 
@@ -398,20 +394,49 @@ const AddProductPage = () => {
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">Category*</label>
                                             <div className="relative">
-                                                <select name="category" value={formData.category} onChange={handleInputChange} disabled={isSubmitting} className={`w-full border ${errors.category ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-pink-500`}>
+                                                <select 
+                                                    name="category" 
+                                                    value={formData.category} 
+                                                    onChange={handleInputChange} 
+                                                    disabled={isSubmitting} 
+                                                    className={`w-full border ${errors.category ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-pink-500`}
+                                                >
                                                     <option value="">Select Category</option>
-                                                    {categories.map(cat => (<option key={cat.value} value={cat.value}>{cat.label}</option>))}
+                                                    {categories.map(cat => (
+                                                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                                                    ))}
                                                 </select>
                                                 <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <polyline points="6 9 12 15 18 9" />
+                                                    </svg>
                                                 </div>
                                             </div>
-                                            {errors.category && (<p className="mt-1 text-red-500 text-sm flex items-center"><AlertCircle size={16} className="mr-1" />{errors.category}</p>)}
+                                            {errors.category && (
+                                                <p className="mt-1 text-red-500 text-sm flex items-center">
+                                                    <AlertCircle size={16} className="mr-1" />
+                                                    {errors.category}
+                                                </p>
+                                            )}
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">Available Quantity*</label>
-                                            <input type="number" name="quantity" value={formData.quantity} onChange={handleInputChange} disabled={isSubmitting} min="0" className={`w-full border ${errors.quantity ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`} placeholder="Enter quantity" />
-                                            {errors.quantity && (<p className="mt-1 text-red-500 text-sm flex items-center"><AlertCircle size={16} className="mr-1" />{errors.quantity}</p>)}
+                                            <input 
+                                                type="number" 
+                                                name="quantity" 
+                                                value={formData.quantity} 
+                                                onChange={handleInputChange} 
+                                                disabled={isSubmitting} 
+                                                min="0" 
+                                                className={`w-full border ${errors.quantity ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`} 
+                                                placeholder="Enter quantity" 
+                                            />
+                                            {errors.quantity && (
+                                                <p className="mt-1 text-red-500 text-sm flex items-center">
+                                                    <AlertCircle size={16} className="mr-1" />
+                                                    {errors.quantity}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
 
@@ -419,32 +444,90 @@ const AddProductPage = () => {
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Skin Concerns*</label>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             {concernOptions.map(concern => (
-                                                <label key={concern.value} className={`flex items-center p-3 rounded-lg border cursor-pointer ${formData.concern_options.includes(concern.value) ? 'bg-pink-50 border-pink-300' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                                                    <input type="checkbox" checked={formData.concern_options.includes(concern.value)} onChange={() => handleConcernToggle(concern.value)} disabled={isSubmitting} className="sr-only" />
-                                                    <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center flex-shrink-0 ${formData.concern_options.includes(concern.value) ? 'bg-pink-500 border-pink-500' : 'border-gray-300'}`}>
-                                                        {formData.concern_options.includes(concern.value) && (<svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>)}
+                                                <label 
+                                                    key={concern.value} 
+                                                    className={`flex items-center p-3 rounded-lg border cursor-pointer ${
+                                                        formData.concern_options.includes(concern.value) 
+                                                            ? 'bg-pink-50 border-pink-300' 
+                                                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                                                    }`}
+                                                >
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={formData.concern_options.includes(concern.value)} 
+                                                        onChange={() => handleConcernToggle(concern.value)} 
+                                                        disabled={isSubmitting} 
+                                                        className="sr-only" 
+                                                    />
+                                                    <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center flex-shrink-0 ${
+                                                        formData.concern_options.includes(concern.value) 
+                                                            ? 'bg-pink-500 border-pink-500' 
+                                                            : 'border-gray-300'
+                                                    }`}>
+                                                        {formData.concern_options.includes(concern.value) && (
+                                                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                            </svg>
+                                                        )}
                                                     </div>
-                                                    <span className={`text-sm font-medium ${formData.concern_options.includes(concern.value) ? 'text-pink-700' : 'text-gray-700'}`}>{concern.label}</span>
+                                                    <span className={`text-sm font-medium ${
+                                                        formData.concern_options.includes(concern.value) 
+                                                            ? 'text-pink-700' 
+                                                            : 'text-gray-700'
+                                                    }`}>
+                                                        {concern.label}
+                                                    </span>
                                                 </label>
                                             ))}
                                         </div>
-                                        {errors.concern_options && (<p className="mt-2 text-red-500 text-sm flex items-center"><AlertCircle size={16} className="mr-1" />{errors.concern_options}</p>)}
+                                        {errors.concern_options && (
+                                            <p className="mt-2 text-red-500 text-sm flex items-center">
+                                                <AlertCircle size={16} className="mr-1" />
+                                                {errors.concern_options}
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Product Description*</label>
-                                        <textarea name="description" value={formData.description} onChange={handleInputChange} disabled={isSubmitting} rows="5" className={`w-full border ${errors.description ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 resize-vertical`} placeholder="Write detailed information..." />
-                                        {errors.description && (<p className="mt-1 text-red-500 text-sm flex items-center"><AlertCircle size={16} className="mr-1" />{errors.description}</p>)}
+                                        <textarea 
+                                            name="description" 
+                                            value={formData.description} 
+                                            onChange={handleInputChange} 
+                                            disabled={isSubmitting} 
+                                            rows="5" 
+                                            className={`w-full border ${errors.description ? 'border-red-500' : 'border-gray-300'} rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 resize-vertical`} 
+                                            placeholder="Write detailed information..." 
+                                        />
+                                        {errors.description && (
+                                            <p className="mt-1 text-red-500 text-sm flex items-center">
+                                                <AlertCircle size={16} className="mr-1" />
+                                                {errors.description}
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="pt-6 border-t">
-                                        <button type="submit" disabled={isSubmitting} className={`w-full ${isSubmitting ? 'bg-pink-400 cursor-not-allowed' : 'bg-pink-500 hover:bg-pink-600'} text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center transition-colors`}>
+                                        <button 
+                                            type="submit" 
+                                            disabled={isSubmitting} 
+                                            className={`w-full ${
+                                                isSubmitting 
+                                                    ? 'bg-pink-400 cursor-not-allowed' 
+                                                    : 'bg-pink-500 hover:bg-pink-600'
+                                            } text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center transition-colors`}
+                                        >
                                             {isSubmitting ? (
                                                 <>
-                                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
+                                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                                    </svg>
                                                     Adding Product...
                                                 </>
-                                            ) : ("Add Product")}
+                                            ) : (
+                                                "Add Product"
+                                            )}
                                         </button>
                                     </div>
                                 </div>

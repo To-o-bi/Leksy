@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Save, Upload, X, AlertCircle, CheckCircle, Star } from 'lucide-react';
+import { ChevronLeft, Save, Upload, X, AlertCircle, CheckCircle } from 'lucide-react';
 import { productService } from '../../../api';
 import ConfirmationModal from '../../../components/common/ConfirmationModal';
 
@@ -14,7 +14,7 @@ const formatCategoryName = (category) => category.split('-').map(word => word.ch
 
 const parseApiResponse = (response) => {
     if (typeof response === 'string' && response.includes('<br />')) {
-        try { const jsonMatch = response.match(/\{.*\}$/); if (jsonMatch) return JSON.parse(jsonMatch[0]); if (response.includes('"code":200')) return { code: 200, message: 'Product updated successfully!' }; } catch (e) { console.warn('Could not parse response JSON:', e); }
+        try { const jsonMatch = response.match(/\{.*\}$/); if (jsonMatch) return JSON.parse(jsonMatch[0]); if (response.includes('"code":200')) return { code: 200, message: 'Product updated successfully!' }; } catch (e) { return response; }
     }
     return response;
 };
@@ -56,20 +56,19 @@ const EditProductPage = () => {
     const [errors, setErrors] = useState({});
     const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
 
-    const [formData, setFormData] = useState({ name: '', price: '', slashed_price: '', description: '', quantity: '', category: '', concern_options: [], deal_price: '', deal_end_date: '' });
+    const [formData, setFormData] = useState({ name: '', price: '', slashed_price: '', description: '', quantity: '', category: '', concern_options: [] });
     const [newImages, setNewImages] = useState([]);
     const [newImagePreviews, setNewImagePreviews] = useState([]);
     const [existingImages, setExistingImages] = useState([]);
     const [removedImages, setRemovedImages] = useState([]);
 
-    // --- Start of Added Code for HTML Entity Decoding ---
     const decodeHtmlEntities = (text) => {
         if (typeof text !== 'string' || !text.includes('&')) {
             return text;
         }
         let currentText = text;
         let previousText = '';
-        let i = 0; // Safety break
+        let i = 0;
         while (currentText !== previousText && i < 5) {
             previousText = currentText;
             try {
@@ -81,21 +80,16 @@ const EditProductPage = () => {
                     break;
                 }
             } catch (e) {
-                console.error("Failed to decode HTML entities", e);
                 return text;
             }
             i++;
         }
         return currentText;
     };
-    // --- End of Added Code ---
 
     const hasChanges = useCallback(() => {
         if (!originalData) return false;
         const areArraysEqual = (a, b) => { const arrA = a || [], arrB = b || []; if (arrA.length !== arrB.length) return false; return [...arrA].sort().join() === [...arrB].sort().join(); };
-
-        const originalDate = originalData.deal_end_date ? originalData.deal_end_date.slice(0, 16).replace(' ', 'T') : '';
-        const formDate = formData.deal_end_date || '';
 
         return (
             formData.name !== originalData.name ||
@@ -105,14 +99,21 @@ const EditProductPage = () => {
             parseInt(formData.quantity, 10) !== originalData.available_qty ||
             formData.category !== originalData.category ||
             !areArraysEqual(formData.concern_options, originalData.concern_options) ||
-            parseFloat(formData.deal_price || 0) !== (originalData.deal_price || 0) ||
-            formDate !== originalDate ||
             newImages.length > 0 ||
             removedImages.length > 0
         );
     }, [formData, originalData, newImages, removedImages]);
 
-    const handleError = useCallback((error, defaultMessage) => { console.error('Error:', error); if (error.message?.includes('Authentication')) { setSubmitError('Please log in again to continue.'); setTimeout(() => navigate('/admin/login'), 2000); } else if (error.message?.includes('not found') || error.status === 404) { setProductNotFound(true); } else { setSubmitError(error.message || defaultMessage); } }, [navigate]);
+    const handleError = useCallback((error, defaultMessage) => {
+        if (error.message?.includes('Authentication')) { 
+            setSubmitError('Please log in again to continue.'); 
+            setTimeout(() => navigate('/admin/login'), 2000); 
+        } else if (error.message?.includes('not found') || error.status === 404) { 
+            setProductNotFound(true); 
+        } else { 
+            setSubmitError(error.message || defaultMessage); 
+        } 
+    }, [navigate]);
 
     useEffect(() => {
         const fetchProductData = async () => {
@@ -122,24 +123,26 @@ const EditProductPage = () => {
                 if (!response || response.code !== 200 || !response.product) { setProductNotFound(true); setLoading(false); return; }
                 const productData = response.product;
 
-                // Decode name and description
                 const decodedName = decodeHtmlEntities(productData.name || '');
                 const decodedDescription = decodeHtmlEntities(productData.description || '');
 
                 let fetchedConcerns = [];
-                if (typeof productData.concern_options === 'string') { try { const parsed = JSON.parse(productData.concern_options); fetchedConcerns = Array.isArray(parsed) ? parsed : []; } catch { fetchedConcerns = productData.concern_options.split(',').map(c => c.trim()).filter(Boolean); } }
-                else if (Array.isArray(productData.concern_options)) { fetchedConcerns = productData.concern_options; }
-
-                const formattedDealEndDate = productData.deal_end_date
-                    ? productData.deal_end_date.slice(0, 16).replace(' ', 'T')
-                    : '';
+                if (typeof productData.concern_options === 'string') { 
+                    try { 
+                        const parsed = JSON.parse(productData.concern_options); 
+                        fetchedConcerns = Array.isArray(parsed) ? parsed : []; 
+                    } catch { 
+                        fetchedConcerns = productData.concern_options.split(',').map(c => c.trim()).filter(Boolean); 
+                    } 
+                } else if (Array.isArray(productData.concern_options)) { 
+                    fetchedConcerns = productData.concern_options; 
+                }
 
                 const fullOriginalData = { 
                     ...productData, 
                     name: decodedName,
                     description: decodedDescription,
-                    concern_options: fetchedConcerns, 
-                    deal_end_date: productData.deal_end_date || '' 
+                    concern_options: fetchedConcerns
                 };
                 setOriginalData(fullOriginalData);
 
@@ -150,38 +153,78 @@ const EditProductPage = () => {
                     category: productData.category || '',
                     quantity: productData.available_qty?.toString() || '',
                     description: decodedDescription,
-                    concern_options: fetchedConcerns,
-                    deal_price: productData.deal_price?.toString() || '',
-                    deal_end_date: formattedDealEndDate
+                    concern_options: fetchedConcerns
                 });
 
                 setExistingImages(Array.isArray(productData.images) ? productData.images : []);
-            } catch (error) { handleError(error, 'Failed to load product data.'); }
-            finally { setLoading(false); }
+            } catch (error) { 
+                handleError(error, 'Failed to load product data.'); 
+            } finally { 
+                setLoading(false); 
+            }
         };
         fetchProductData();
     }, [id, handleError]);
 
-    const handleChange = useCallback((e) => { const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: value })); if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' })); if (submitError) setSubmitError(''); }, [errors, submitError]);
-    const handleConcernToggle = useCallback((concernValue) => { setFormData(prev => { const currentConcerns = prev.concern_options || []; const updatedConcerns = currentConcerns.includes(concernValue) ? currentConcerns.filter(c => c !== concernValue) : [...currentConcerns, concernValue]; return { ...prev, concern_options: updatedConcerns }; }); if (errors.concern_options) setErrors(prev => ({ ...prev, concern_options: '' })); if (submitError) setSubmitError(''); }, [errors.concern_options, submitError]);
+    const handleChange = useCallback((e) => { 
+        const { name, value } = e.target; 
+        setFormData(prev => ({ ...prev, [name]: value })); 
+        if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' })); 
+        if (submitError) setSubmitError(''); 
+    }, [errors, submitError]);
+
+    const handleConcernToggle = useCallback((concernValue) => { 
+        setFormData(prev => { 
+            const currentConcerns = prev.concern_options || []; 
+            const updatedConcerns = currentConcerns.includes(concernValue) ? currentConcerns.filter(c => c !== concernValue) : [...currentConcerns, concernValue]; 
+            return { ...prev, concern_options: updatedConcerns }; 
+        }); 
+        if (errors.concern_options) setErrors(prev => ({ ...prev, concern_options: '' })); 
+        if (submitError) setSubmitError(''); 
+    }, [errors.concern_options, submitError]);
 
     const handleImageChange = useCallback((e) => {
-        if (existingImages.length + newImages.length + e.target.files.length > IMAGE_CONFIG.maxCount) { setErrors(prev => ({ ...prev, images: `Maximum ${IMAGE_CONFIG.maxCount} images allowed.` })); return; }
+        if (existingImages.length + newImages.length + e.target.files.length > IMAGE_CONFIG.maxCount) { 
+            setErrors(prev => ({ ...prev, images: `Maximum ${IMAGE_CONFIG.maxCount} images allowed.` })); 
+            return; 
+        }
         const validFiles = [], invalidFiles = [];
-        Array.from(e.target.files).forEach(file => { const validation = validateImageFile(file); if (validation.valid) validFiles.push(file); else invalidFiles.push({ name: file.name, reason: validation.error }); });
+        Array.from(e.target.files).forEach(file => { 
+            const validation = validateImageFile(file); 
+            if (validation.valid) validFiles.push(file); 
+            else invalidFiles.push({ name: file.name, reason: validation.error }); 
+        });
         if (invalidFiles.length > 0) setErrors(prev => ({ ...prev, images: invalidFiles.map(f => `${f.name}: ${f.reason}`).join(', ') }));
-        if (validFiles.length > 0) { setNewImages(prev => [...prev, ...validFiles]); if (errors.images) setErrors(prev => ({ ...prev, images: '' })); if (submitError) setSubmitError('');
+        if (validFiles.length > 0) { 
+            setNewImages(prev => [...prev, ...validFiles]); 
+            if (errors.images) setErrors(prev => ({ ...prev, images: '' })); 
+            if (submitError) setSubmitError('');
             const newPreviews = [];
-            validFiles.forEach(file => { const reader = new FileReader(); reader.onloadend = () => { newPreviews.push(reader.result); if (newPreviews.length === validFiles.length) setNewImagePreviews(prev => [...prev, ...newPreviews]); }; reader.readAsDataURL(file); });
+            validFiles.forEach(file => { 
+                const reader = new FileReader(); 
+                reader.onloadend = () => { 
+                    newPreviews.push(reader.result); 
+                    if (newPreviews.length === validFiles.length) setNewImagePreviews(prev => [...prev, ...newPreviews]); 
+                }; 
+                reader.readAsDataURL(file); 
+            });
         }
         if (fileInputRef.current) fileInputRef.current.value = '';
     }, [existingImages.length, newImages.length, errors, submitError]);
 
-    const handleRemoveImage = useCallback((index, type) => { if (type === 'new') { setNewImages(prev => prev.filter((_, i) => i !== index)); setNewImagePreviews(prev => prev.filter((_, i) => i !== index)); } else { setRemovedImages(prev => [...prev, existingImages[index]]); setExistingImages(prev => prev.filter((_, i) => i !== index)); } }, [existingImages]);
+    const handleRemoveImage = useCallback((index, type) => { 
+        if (type === 'new') { 
+            setNewImages(prev => prev.filter((_, i) => i !== index)); 
+            setNewImagePreviews(prev => prev.filter((_, i) => i !== index)); 
+        } else { 
+            setRemovedImages(prev => [...prev, existingImages[index]]); 
+            setExistingImages(prev => prev.filter((_, i) => i !== index)); 
+        } 
+    }, [existingImages]);
 
     const validateForm = useCallback(() => {
         const newErrors = {};
-        const { name, price, slashed_price, description, quantity, category, concern_options, deal_price, deal_end_date } = formData;
+        const { name, price, slashed_price, description, quantity, category, concern_options } = formData;
         if (!name.trim() || name.trim().length < 2) newErrors.name = 'Product name is required (min 2 chars)';
         if (!price || isNaN(price) || parseFloat(price) <= 0) newErrors.price = 'Please enter a valid price';
         if (!description.trim() || description.trim().length < 10) newErrors.description = 'Description is required (min 10 chars)';
@@ -190,21 +233,6 @@ const EditProductPage = () => {
         if (!concern_options || concern_options.length === 0) newErrors.concern_options = 'At least one skin concern must be selected';
         if (slashed_price && (isNaN(slashed_price) || parseFloat(slashed_price) <= 0 || parseFloat(slashed_price) <= parseFloat(price))) newErrors.slashed_price = 'Original price must be greater than current price';
         if (existingImages.length === 0 && newImages.length === 0) newErrors.images = 'At least one product image is required';
-
-        if ((deal_price && !deal_end_date) || (!deal_price && deal_end_date)) {
-            newErrors.deal_price = "Both Deal Price and End Date are required to set a deal.";
-            newErrors.deal_end_date = "Both fields are required for a deal.";
-        } else if (deal_price) {
-            if (Number(deal_price) <= 0) {
-                newErrors.deal_price = "Deal price must be greater than 0.";
-            } else if (Number(deal_price) >= Number(price)) {
-                newErrors.deal_price = "Deal price must be less than the current price.";
-            }
-        }
-
-        if (deal_end_date && new Date(deal_end_date) <= new Date()) {
-            newErrors.deal_end_date = "Deal end date must be in the future.";
-        }
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -217,7 +245,8 @@ const EditProductPage = () => {
         setSubmitting(true); setSubmitError(''); setSubmitSuccess(false);
 
         try {
-            const productData = {}; const areArraysEqual = (a, b) => (a || []).sort().join() === (b || []).sort().join();
+            const productData = {}; 
+            const areArraysEqual = (a, b) => (a || []).sort().join() === (b || []).sort().join();
 
             if (formData.name !== originalData.name) productData.name = formData.name.trim();
             if (parseFloat(formData.price) !== originalData.price) productData.price = parseFloat(formData.price);
@@ -229,24 +258,22 @@ const EditProductPage = () => {
             const newSlashed = formData.slashed_price ? parseFloat(formData.slashed_price) : null;
             if (newSlashed !== (originalData.slashed_price || null)) productData.slashed_price = newSlashed;
 
-            const newDealPrice = formData.deal_price ? parseFloat(formData.deal_price) : null;
-            if (newDealPrice !== (originalData.deal_price || null)) {
-                productData.deal_price = newDealPrice;
-            }
-
-            const formDate = formData.deal_end_date ? formData.deal_end_date.replace('T', ' ') + ':00' : null;
-            if (formDate !== (originalData.deal_end_date || null)) {
-                productData.deal_end_date = formDate;
-            }
-
             if (newImages.length > 0) productData.images = newImages;
             if (removedImages.length > 0) productData.removed_images = removedImages;
 
-            const response = await productService.updateProduct(id, productData); const parsed = parseApiResponse(response);
-            if (parsed && (parsed.code === 200 || parsed.code === '200')) { setSubmitSuccess(true); setTimeout(() => navigate('/admin/products/stock', { state: { notification: { type: 'success', message: `Product "${formData.name}" updated.` } } }), 2000); }
-            else { throw new Error(parsed?.message || 'Failed to update product'); }
-        } catch (error) { handleError(error, 'An error occurred while updating.'); }
-        finally { setSubmitting(false); }
+            const response = await productService.updateProduct(id, productData); 
+            const parsed = parseApiResponse(response);
+            if (parsed && (parsed.code === 200 || parsed.code === '200')) { 
+                setSubmitSuccess(true); 
+                setTimeout(() => navigate('/admin/products/stock', { state: { notification: { type: 'success', message: `Product "${formData.name}" updated.` } } }), 2000); 
+            } else { 
+                throw new Error(parsed?.message || 'Failed to update product'); 
+            }
+        } catch (error) { 
+            handleError(error, 'An error occurred while updating.'); 
+        } finally { 
+            setSubmitting(false); 
+        }
     }, [validateForm, hasChanges, formData, originalData, newImages, removedImages, id, navigate, handleError]);
 
     const handleGoBack = useCallback(() => { if (hasChanges()) setIsLeaveModalOpen(true); else navigate('/admin/products/stock'); }, [hasChanges, navigate]);
@@ -279,14 +306,6 @@ const EditProductPage = () => {
                                 <FormField key="price" label="Price" name="price" type="number" required currency min="0" step="0.01" value={formData.price} error={errors.price} onChange={handleChange} disabled={submitting} />
                                 <FormField key="slashed_price" label="Original Price (Optional)" name="slashed_price" type="number" currency min="0" step="0.01" value={formData.slashed_price} error={errors.slashed_price} onChange={handleChange} disabled={submitting} />
                                 <FormField key="quantity" label="Quantity" name="quantity" type="number" required min="0" value={formData.quantity} error={errors.quantity} onChange={handleChange} disabled={submitting} />
-                            </div>
-
-                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                <h3 className="font-semibold text-blue-800 mb-3 flex items-center"><Star size={18} className="mr-2 text-blue-500"/>Best Deal (Optional)</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <FormField key="deal_price" label="Deal Price" name="deal_price" type="number" currency min="0" step="0.01" value={formData.deal_price} error={errors.deal_price} onChange={handleChange} disabled={submitting} placeholder="e.g., 2500" />
-                                    <FormField key="deal_end_date" label="Deal End Date" name="deal_end_date" type="datetime-local" value={formData.deal_end_date} error={errors.deal_end_date} onChange={handleChange} disabled={submitting} />
-                                </div>
                             </div>
 
                             <div className="space-y-6">

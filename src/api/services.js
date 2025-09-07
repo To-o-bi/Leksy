@@ -125,6 +125,7 @@ export const productService = {
     if (filters.productIds?.length) params.products_ids_array = filters.productIds.join(',');
     if (filters.sort) params.sort = filters.sort;
     if (filters.limit) params.limit = filters.limit;
+    if (filters.concernOptions?.length) params.concern_options_filter = filters.concernOptions.join(',');
 
     const response = await api.get(ENDPOINTS.FETCH_PRODUCTS, params);
     return response.data;
@@ -149,6 +150,7 @@ export const productService = {
     const formData = new FormData();
     formData.append('product_id', productId);
 
+    // Basic fields
     const fields = ['name', 'price', 'description', 'available_qty', 'category', 'slashed_price'];
     fields.forEach(field => {
       if (productData[field] !== undefined && productData[field] !== null) {
@@ -168,10 +170,7 @@ export const productService = {
     }
 
     if (productData.images?.length) {
-      // 👇 *** CHANGE THIS BACK ***
-      // Reverted to 'images[]' as requested by the backend error message
       productData.images.forEach(image => formData.append('images[]', image));
-      // 👆 *** END OF CHANGE ***
     }
 
     const response = await api.postFormData(ENDPOINTS.UPDATE_PRODUCT, formData);
@@ -189,28 +188,54 @@ export const productService = {
   },
 
   _validateProductData(productData) {
-    // This is a placeholder for your validation logic
-    // Assuming CATEGORIES is defined elsewhere
-    return true; 
+    if (!productData.name?.trim()) {
+      throw new Error('Product name is required');
+    }
+    
+    if (!productData.price || productData.price <= 0) {
+      throw new Error('Valid price is required');
+    }
+
+    if (!productData.category) {
+      throw new Error('Category is required');
+    }
+
+    if (!productData.description?.trim()) {
+      throw new Error('Description is required');
+    }
+
+    if (productData.quantity === undefined || productData.quantity < 0) {
+      throw new Error('Valid quantity is required');
+    }
+
+    if (!productData.concern_options?.length) {
+      throw new Error('At least one concern option is required');
+    }
+
+    return true;
   },
 
   _buildProductFormData(productData) {
     const formData = new FormData();
-    const fields = ['name', 'price', 'description', 'quantity', 'category'];
     
+    // Basic required fields
+    const fields = ['name', 'price', 'description', 'quantity', 'category'];
     fields.forEach(field => {
       formData.append(field, productData[field].toString().trim());
     });
 
+    // Concern options
     const concerns = Array.isArray(productData.concern_options) 
       ? productData.concern_options.join(',') 
       : productData.concern_options.toString();
     formData.append('concern_options', concerns);
 
+    // Optional slashed price
     if (productData.slashed_price) {
       formData.append('slashed_price', productData.slashed_price.toString());
     }
 
+    // Images
     if (productData.images?.length) {
       productData.images.forEach(image => formData.append('images[]', image));
     }
