@@ -309,8 +309,17 @@ const ProductStockPage = () => {
           placeholder="Search by product name or category..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full p-2 pl-10 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          className="w-full p-2 pl-10 pr-10 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
         />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Clear search"
+          >
+            <X size={18} />
+          </button>
+        )}
       </div>
 
 

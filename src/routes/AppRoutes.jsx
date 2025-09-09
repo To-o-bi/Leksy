@@ -26,7 +26,7 @@ const LoadingFallback = () => (
     </div>
 );
 
-// Public pages
+// Public pages (kept for reference but not used)
 const LoginPage = lazy(() => import('../pages/public/LoginPage'));
 const HomePage = lazy(() => import('../pages/public/HomePage'));
 const ShopPage = lazy(() => import('../pages/public/ShopPage'));
@@ -76,26 +76,26 @@ const AppRoutes = () => {
             {/* --- ADDED: ScrollToTop component is placed here to monitor route changes --- */}
             <ScrollToTop />
             <Routes>
+                {/* Keep admin login route accessible */}
                 <Route path="admin/login" element={<LoginWrapper />} />
                 
-                <Route element={<PublicRoutes />}>
-                    <Route index element={<HomePage />} />
-                    <Route path="/shop" element={<ShopPage />} />
-                    <Route path="/product/:productId" element={<ProductDetailPage />} />
-                    <Route path="/cart" element={<CartPage />} />
-                    <Route path="/contact" element={<ContactPage />} />
-                    <Route path="/checkout" element={<CheckoutPage />} />
-                    <Route path="/checkout/checkout-success" element={<CheckoutSuccessPage />} />
-                    <Route path="/wishlist" element={<WishlistPage />} />
-                    <Route path="/consultation" element={<ConsultationPage />} />
-                    <Route path="/consultation/success" element={<ConsultationSuccessPage />} />
-                    <Route path="/policies/privacy" element={<PrivacyPolicyPage />} />
-                    <Route path="/policies/terms-and-conditions" element={<TermsAndConditionsPage />} />
-                    <Route path="/policies/shipping" element={<ShippingPolicyPage />} />
-                    {/* 404 page for public routes */}
-                    <Route path="/404" element={<NotFound />} />
-                </Route>
+                {/* REDIRECT ALL PUBLIC ROUTES TO ADMIN DASHBOARD */}
+                <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/shop" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/product/:productId" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/cart" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/contact" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/checkout" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/checkout/checkout-success" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/wishlist" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/consultation" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/consultation/success" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/policies/privacy" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/policies/terms-and-conditions" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/policies/shipping" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/404" element={<Navigate to="/admin/dashboard" replace />} />
                 
+                {/* Admin routes remain unchanged and protected */}
                 <Route path="/admin" element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
                     <Route index element={<Navigate to="dashboard" replace />} />
                     <Route path="dashboard" element={<DashboardPage />} />
@@ -120,8 +120,8 @@ const AppRoutes = () => {
                     <Route path="*" element={<NotFound />} />
                 </Route>
 
-                {/* Catch-all route for any unmatched paths */}
-                <Route path="*" element={<NotFound />} />
+                {/* Catch-all route redirects to admin dashboard */}
+                <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
             </Routes>
         </Suspense>
     );
