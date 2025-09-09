@@ -75,80 +75,68 @@ const HeroBanner = () => {
           </div>
         </div>
         
-        {/* Hero Cards Section - Flex grow to fill remaining space */}
-        <div className="flex-grow flex items-end justify-center relative max-w-6xl mx-auto w-full pb-16">
-          <div className="relative w-full h-80 flex justify-center items-end">
-            {/* Card 1 - Far Left (lowest in arc) */}
-            <div className="absolute left-0 bottom-0 transform rotate-[20deg] hover:rotate-[15deg] transition-transform duration-500 z-10">
-              <div className="w-48 h-72 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-br from-pink-100 to-pink-50">
-                <img 
-                  src="https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?w=300&h=450&fit=crop&crop=face"
-                  alt="Woman with face mask enjoying spa treatment"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            </div>
-            
-            {/* Card 2 - Center Left (higher) */}
-            <div className="absolute left-24 bottom-12 transform rotate-[10deg] hover:rotate-[6deg] transition-transform duration-500 z-20">
-              <div className="w-52 h-76 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-br from-pink-100 to-pink-50">
-                <img 
-                  src="https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=300&h=450&fit=crop&crop=face"
-                  alt="Woman relaxing during skincare treatment"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            </div>
-            
-            {/* Card 3 - Center (highest point of concave arc) */}
-            <div className="absolute left-1/2 transform -translate-x-1/2 bottom-20 rotate-[0deg] hover:rotate-[2deg] transition-transform duration-500 z-30">
-              <div className="w-56 h-80 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-br from-pink-100 to-pink-50">
-                <img 
-                  src="https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=300&h=450&fit=crop&crop=face"
-                  alt="Woman applying skincare in mirror"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            </div>
-            
-            {/* Card 4 - Center Right (higher) */}
-            <div className="absolute right-24 bottom-12 transform rotate-[-10deg] hover:rotate-[-6deg] transition-transform duration-500 z-20">
-              <div className="w-52 h-76 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-br from-pink-100 to-pink-50">
-                <img 
-                  src="https://images.unsplash.com/photo-1612817288484-6f916006741a?w=300&h=450&fit=crop&crop=face"
-                  alt="Woman with glowing skin after treatment"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            </div>
-            
-            {/* Card 5 - Far Right (lowest in arc) */}
-            <div className="absolute right-0 bottom-0 transform rotate-[-20deg] hover:rotate-[-15deg] transition-transform duration-500 z-10">
-              <div className="w-48 h-72 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-br from-pink-100 to-pink-50">
-                <img 
-                  src="https://images.unsplash.com/photo-1616683693086-68b0165e6e44?w=300&h=450&fit=crop&crop=face"
-                  alt="Woman with healthy glowing skin"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            </div>
-          </div>
+      {/* Stacked Image Cards Section */}
+      {/* Curved/Fanned Image Cards Section */}
+      <div className="relative h-80 md:h-96 mt-16 md:mt-20">
+        <div className="absolute inset-0 flex items-center justify-center">
           
-          {/* Bottom text and arrow */}
-          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-center z-40">
-            <div className="flex flex-col items-center">
-              <svg 
-                className="w-8 h-8 text-gray-400 mb-2 animate-bounce" 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-              </svg>
-              <p className="text-sm text-gray-600 font-medium">Your Skincare Journey Starts Here</p>
+            {/* Card 1: Far Left */}
+            <div className="absolute w-56 h-40 md:w-72 md:h-48 lg:w-80 lg:h-56 transform -rotate-[35deg] -translate-x-[180px] md:-translate-x-[220px] lg:-translate-x-[280px] translate-y-8 md:translate-y-12 z-10 rounded-3xl overflow-hidden shadow-2xl transition-all duration-500 hover:scale-105 hover:z-50 hover:-rotate-[30deg]">
+              <img 
+                src="https://images.unsplash.com/photo-1612817288484-6f916006741a?w=400&h=300&fit=crop&crop=face"
+                alt="Woman with glowing skin after treatment"
+                className="w-full h-full object-cover"
+              />
             </div>
-          </div>
+
+            {/* Card 2: Left */}
+            <div className="absolute w-56 h-40 md:w-72 md:h-48 lg:w-80 lg:h-56 transform -rotate-[15deg] -translate-x-[90px] md:-translate-x-[110px] lg:-translate-x-[140px] -translate-y-2 md:-translate-y-4 z-20 rounded-3xl overflow-hidden shadow-2xl transition-all duration-500 hover:scale-105 hover:z-50 hover:-rotate-[10deg]">
+              <img 
+                src="https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400&h=300&fit=crop&crop=face"
+                alt="Woman applying skincare in mirror"
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            {/* Card 3: Center */}
+            <div className="absolute w-45 h-80 transform rotate-0 translate-x-0 -translate-y-6 md:-translate-y-8 z-30 rounded-3xl overflow-hidden shadow-2xl transition-all duration-500 hover:scale-110 hover:z-50">
+              <img 
+                src="https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=300&fit=crop&crop=face"
+                alt="Woman relaxing during skincare treatment"
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            {/* Card 4: Right */}
+            <div className="absolute w-56 h-40 md:w-72 md:h-48 lg:w-80 lg:h-56 transform rotate-[15deg] translate-x-[90px] md:translate-x-[110px] lg:translate-x-[140px] -translate-y-2 md:-translate-y-4 z-20 rounded-3xl overflow-hidden shadow-2xl transition-all duration-500 hover:scale-105 hover:z-50 hover:rotate-[10deg]">
+              <img 
+                src="https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?w=400&h=300&fit=crop&crop=face"
+                alt="Woman with face mask enjoying spa treatment"
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            {/* Card 5: Far Right */}
+            <div className="absolute w-56 h-40 md:w-72 md:h-48 lg:w-80 lg:h-56 transform rotate-[35deg] translate-x-[180px] md:translate-x-[220px] lg:translate-x-[280px] translate-y-8 md:translate-y-12 z-10 rounded-3xl overflow-hidden shadow-2xl transition-all duration-500 hover:scale-105 hover:z-50 hover:rotate-[30deg]">
+              <img 
+                src="https://images.unsplash.com/photo-1560750588-73207b1ef5b8?w=400&h=300&fit=crop&crop=face"
+                alt="Woman enjoying facial treatment"
+                className="w-full h-full object-cover"
+              />
+            </div>
         </div>
+      </div>
+       {/* Scroll Down Indicator */}
+       <div className="relative z-10 text-center mt-24 md:mt-32">
+            <div className="inline-block p-1 border-2 border-gray-400 rounded-full animate-bounce">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <polyline points="19 12 12 19 5 12"></polyline>
+                </svg>
+            </div>
+            <p className="mt-2 text-gray-500 text-sm tracking-widest">Your Skincare Journey Starts Here</p>
+        </div>
+        
       </div>
     </section>
   );
