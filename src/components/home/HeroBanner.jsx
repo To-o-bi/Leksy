@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 // This is the main component for the application.
 // I've recreated the hero banner with the requested arc design for the images.
@@ -11,6 +11,17 @@ const App = () => {
 };
 
 const HeroBanner = () => {
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    // Start animation after component mounts
+    const timer = setTimeout(() => {
+      setIsAnimating(true);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <section className="relative h-screen bg-white overflow-hidden flex flex-col font-sans">
       {/* Decorative floating petals */}
@@ -74,22 +85,88 @@ const HeroBanner = () => {
         
         {/* Image Card Section in Arc */}
         <div className="flex-grow relative flex items-center justify-center -mt-8 sm:-mt-12">
-           <div className="flex items-center justify-center space-x-2">
-                {/* Card 1 */}
-                <div className="transform rotate-[-15deg] translate-y-8 z-0 w-48 h-56 sm:w-56 sm:h-64 rounded-2xl bg-white shadow-xl overflow-hidden transition-transform duration-300 hover:scale-105 hover:rotate-[-12deg] hover:z-30">
-                    <img src="https://images.unsplash.com/photo-1556228852-6d45a7ae2673?w=400&h=500&fit=crop" alt="Woman with face mask" className="w-full h-full object-cover"/>
+           <div className="flex items-center justify-center space-x-[-1.5rem] sm:space-x-[-1rem]">
+                {/* Card 1 - Slides from center to left */}
+                <div className={`group transform transition-all duration-1000 ease-out w-44 h-60 sm:w-52 sm:h-72 cursor-pointer ${
+                  isAnimating 
+                    ? 'rotate-[-18deg] translate-y-12 translate-x-0 z-0 opacity-100' 
+                    : 'rotate-[2deg] -translate-y-6 translate-x-32 z-0 opacity-0'
+                } hover:scale-110 hover:rotate-[-10deg] hover:z-40`} 
+                style={{ transitionDelay: isAnimating ? '800ms' : '0ms' }}>
+                    <div className="relative w-full h-full rounded-3xl bg-gradient-to-br from-pink-50 to-white p-1 shadow-2xl hover:shadow-pink-200/50">
+                        <div className="w-full h-full rounded-3xl overflow-hidden bg-white shadow-inner">
+                            <img src="/assets/images/hero/card-1.jpg" alt="Woman with face mask" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
+                            <div className="absolute inset-0 bg-gradient-to-t from-pink-500/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        </div>
+                        <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-400 to-pink-600 rounded-3xl blur opacity-0 group-hover:opacity-20 transition-opacity duration-500"></div>
+                    </div>
                 </div>
-                {/* Card 2 */}
-                <div className="transform rotate-[-5deg] -translate-y-4 z-10 w-48 h-56 sm:w-56 sm:h-64 rounded-2xl bg-white shadow-xl overflow-hidden transition-transform duration-300 hover:scale-105 hover:rotate-[-3deg] hover:z-30">
-                    <img src="https://images.unsplash.com/photo-1614748839853-f724249a5b3a?w=400&h=500&fit=crop" alt="Woman applying cream" className="w-full h-full object-cover"/>
+                
+                {/* Card 2 - Slides from center to left */}
+                <div className={`group transform transition-all duration-1000 ease-out w-44 h-60 sm:w-52 sm:h-72 cursor-pointer ${
+                  isAnimating 
+                    ? 'rotate-[-8deg] -translate-y-2 translate-x-0 z-10 opacity-100' 
+                    : 'rotate-[2deg] -translate-y-6 translate-x-16 z-10 opacity-0'
+                } hover:scale-110 hover:rotate-[-2deg] hover:z-40`}
+                style={{ transitionDelay: isAnimating ? '600ms' : '0ms' }}>
+                    <div className="relative w-full h-full rounded-3xl bg-gradient-to-br from-pink-100 to-white p-1 shadow-2xl hover:shadow-pink-300/60">
+                        <div className="w-full h-full rounded-3xl overflow-hidden bg-white shadow-inner">
+                            <img src="/assets/images/hero/card-2.jpg" alt="Woman with face mask" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
+                            <div className="absolute inset-0 bg-gradient-to-t from-pink-400/25 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        </div>
+                        <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-300 to-pink-500 rounded-3xl blur opacity-0 group-hover:opacity-25 transition-opacity duration-500"></div>
+                    </div>
                 </div>
-                {/* Card 3 */}
-                <div className="transform rotate-[5deg] -translate-y-4 z-20 w-48 h-56 sm:w-56 sm:h-64 rounded-2xl bg-white shadow-xl overflow-hidden transition-transform duration-300 hover:scale-105 hover:rotate-[3deg] hover:z-30">
-                    <img src="https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400&h=500&fit=crop" alt="Woman applying skincare in mirror" className="w-full h-full object-cover"/>
+                
+                {/* Card 3 - Center (Featured) - First to animate */}
+                <div className={`group transform transition-all duration-1800 ease-in-out w-48 h-64 sm:w-56 sm:h-76 cursor-pointer ${
+                  isAnimating 
+                    ? 'rotate-[2deg] -translate-y-6 translate-x-0 z-20 opacity-100' 
+                    : 'rotate-[2deg] translate-y-8 translate-x-0 z-20 opacity-0'
+                } hover:scale-110 hover:rotate-[1deg] hover:z-40`}
+                style={{ transitionDelay: isAnimating ? '200ms' : '0ms' }}>
+                    <div className="relative w-full h-full rounded-3xl bg-gradient-to-br from-pink-200 to-pink-50 p-1.5 shadow-2xl hover:shadow-pink-400/70">
+                        <div className="w-full h-full rounded-3xl overflow-hidden bg-white shadow-inner">
+                            <img src="/assets/images/hero/card-3.jpg" alt="Woman with face mask" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
+                            <div className="absolute inset-0 bg-gradient-to-t from-pink-500/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        </div>
+                        <div className="absolute -inset-1 bg-gradient-to-r from-pink-400 via-pink-500 to-pink-400 rounded-3xl blur opacity-0 group-hover:opacity-30 transition-opacity duration-500"></div>
+                        {/* Sparkle effect for center card */}
+                        <div className="absolute top-2 right-2 w-3 h-3 bg-pink-400 rounded-full opacity-60 animate-ping"></div>
+                        <div className="absolute bottom-4 left-3 w-2 h-2 bg-pink-300 rounded-full opacity-40 animate-pulse"></div>
+                    </div>
                 </div>
-                {/* Card 4 */}
-                <div className="transform rotate-[15deg] translate-y-8 z-10 w-48 h-56 sm:w-56 sm:h-64 rounded-2xl bg-white shadow-xl overflow-hidden transition-transform duration-300 hover:scale-105 hover:rotate-[12deg] hover:z-30">
-                    <img src="https://images.unsplash.com/photo-1590393431327-5154e1a0c00a?w=400&h=500&fit=crop" alt="Relaxing woman with eyes closed" className="w-full h-full object-cover"/>
+                
+                {/* Card 4 - Slides from center to right */}
+                <div className={`group transform transition-all duration-1000 ease-out w-44 h-60 sm:w-52 sm:h-72 cursor-pointer ${
+                  isAnimating 
+                    ? 'rotate-[8deg] -translate-y-2 translate-x-0 z-10 opacity-100' 
+                    : 'rotate-[2deg] -translate-y-6 -translate-x-16 z-10 opacity-0'
+                } hover:scale-110 hover:rotate-[2deg] hover:z-40`}
+                style={{ transitionDelay: isAnimating ? '600ms' : '0ms' }}>
+                    <div className="relative w-full h-full rounded-3xl bg-gradient-to-br from-pink-100 to-white p-1 shadow-2xl hover:shadow-pink-300/60">
+                        <div className="w-full h-full rounded-3xl overflow-hidden bg-white shadow-inner">
+                            <img src="/assets/images/hero/card-4.jpg" alt="Woman with face mask" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
+                            <div className="absolute inset-0 bg-gradient-to-t from-pink-400/25 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        </div>
+                        <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-500 to-pink-300 rounded-3xl blur opacity-0 group-hover:opacity-25 transition-opacity duration-500"></div>
+                    </div>
+                </div>
+                
+                {/* Card 5 - Slides from center to right */}
+                <div className={`group transform transition-all duration-1000 ease-out w-44 h-60 sm:w-52 sm:h-72 cursor-pointer ${
+                  isAnimating 
+                    ? 'rotate-[18deg] translate-y-12 translate-x-0 z-0 opacity-100' 
+                    : 'rotate-[2deg] -translate-y-6 -translate-x-32 z-0 opacity-0'
+                } hover:scale-110 hover:rotate-[10deg] hover:z-40`}
+                style={{ transitionDelay: isAnimating ? '800ms' : '0ms' }}>
+                    <div className="relative w-full h-full rounded-3xl bg-gradient-to-br from-pink-50 to-white p-1 shadow-2xl hover:shadow-pink-200/50">
+                        <div className="w-full h-full rounded-3xl overflow-hidden bg-white shadow-inner">
+                            <img src="/assets/images/hero/card-5.jpg" alt="Woman with face mask" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
+                            <div className="absolute inset-0 bg-gradient-to-t from-pink-500/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        </div>
+                        <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-600 to-pink-400 rounded-3xl blur opacity-0 group-hover:opacity-20 transition-opacity duration-500"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -110,4 +187,3 @@ const HeroBanner = () => {
 };
 
 export default App;
-
