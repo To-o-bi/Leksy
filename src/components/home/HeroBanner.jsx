@@ -18,23 +18,14 @@ const HeroBanner = () => {
       <div className="container mx-auto px-4 relative z-10 flex flex-col h-full">
         {/* Main Content */}
         <div className="text-center max-w-4xl mx-auto pt-8 pb-6 flex-shrink-0">
-          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-3 leading-tight">
-            Your <span className="text-pink-500 relative">
-              Beauty
-              <span className="absolute -top-2 -right-2 text-pink-400">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="animate-pulse">
-                  <path d="M12 2L15.09 8.26L22 9L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9L8.91 8.26L12 2Z"/>
-                </svg>
+          <h1 className="text-6xl font-bold mb-3 leading-tight">
+           Where Every <span className="text-pink-500 relative">
+              Skincare
+              <span className="absolute -top-2 -right-2 text-pink-400">                
               </span>
-            </span>,
+            </span> <br />Moments Count
           </h1>
-          <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold mb-6 text-gray-800">
-            Our Priority{' '}
-            <span className="inline-flex items-center">
-              <span className="text-pink-500 mr-2">💖</span>
-              <span className="text-pink-400">💕</span>
-            </span>
-          </h2>
+          
           
           <p className="text-base md:text-lg lg:text-xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
             Shop our best-selling skincare & cosmetics, designed for radiant, flawless skin.
@@ -44,7 +35,7 @@ const HeroBanner = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
             <button 
               onClick={() => window.location.href = '/shop'}
-              className="group bg-pink-500 text-white py-3 px-8 rounded-full font-semibold text-base hover:bg-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center"
+              className="group bg-pink-500 text-white py-3 px-8  font-semibold text-base hover:bg-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center"
             >
               Explore our Products
               <svg 

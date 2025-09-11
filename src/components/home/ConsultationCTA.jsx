@@ -1,56 +1,49 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 const ConsultationCTA = () => {
-  const [videoLoaded, setVideoLoaded] = useState(false);
-  const [videoError, setVideoError] = useState(false);
-  const navigate = useNavigate();
+  const [mediaLoaded, setMediaLoaded] = useState(false);
+  const [mediaError, setMediaError] = useState(false);
   
-  // Sample video URL - replace with your actual video path
-  const videoUrl = "/assets/video/skincare-2.mp4";
+  // GIF URL 
+  const gifUrl = "/assets/video/skincare-1.gif";
   
-  // Fallback image if video fails to load
+  // Fallback image if GIF fails to load
   const fallbackImageUrl = "/assets/images/skincare-consultation-bg.jpg";
 
-  // Handle video load success
-  const handleVideoLoaded = () => {
-    setVideoLoaded(true);
+  // Handle media load success
+  const handleMediaLoaded = () => {
+    setMediaLoaded(true);
   };
 
-  // Handle video load error
-  const handleVideoError = () => {
-    setVideoError(true);
+  // Handle media load error
+  const handleMediaError = () => {
+    setMediaError(true);
   };
 
   const handleConsultationClick = () => {
-    // Navigate to consultation page
-    navigate('/consultation');
+    // Navigate to consultation page - replace with your routing logic
+    console.log('Navigate to consultation page');
+    // navigate('/consultation');
   };
 
   return (
     <div>
       <section className="relative py-20 md:py-24 text-white overflow-hidden">
-        {/* Video Background with Fallback */}
-        {!videoError ? (
-          <video 
-            className={`absolute top-0 left-0 w-full h-full object-cover z-0 transition-opacity duration-500 ${videoLoaded ? 'opacity-100' : 'opacity-0'}`}
-            autoPlay
-            muted
-            loop
-            playsInline
-            onLoadedData={handleVideoLoaded}
-            onError={handleVideoError}
-          >
-            <source src={videoUrl} type="video/mp4" />
-            <source src={videoUrl.replace('.mp4', '.webm')} type="video/webm" />
-            {/* Browser will try each source in order until one works */}
-          </video>
+        {/* GIF Background with Fallback */}
+        {!mediaError ? (
+          <img 
+            src={gifUrl}
+            alt=""
+            className={`absolute top-0 left-0 w-full h-full object-cover z-0 transition-opacity duration-500 ${mediaLoaded ? 'opacity-100' : 'opacity-0'}`}
+            onLoad={handleMediaLoaded}
+            onError={handleMediaError}
+          />
         ) : (
           <div 
             className="absolute top-0 left-0 w-full h-full bg-center bg-cover z-0"
             style={{ backgroundImage: `url(${fallbackImageUrl})` }}
             aria-hidden="true"
-          ></div>
+          />
         )}
         
         {/* Gradient Overlay for better text contrast */}
@@ -66,7 +59,7 @@ const ConsultationCTA = () => {
             backgroundImage: 'url(/assets/images/pattern-dots.png)',
             backgroundSize: '30px 30px'
           }}
-        ></div>
+        />
         
         {/* Content */}
         <div className="container mx-auto px-4 relative z-20">
@@ -96,7 +89,7 @@ const ConsultationCTA = () => {
             <div className="mt-10 flex flex-wrap justify-center items-center gap-2">
               <span className="text-white/80 text-sm">Trusted by</span>
               <div className="flex gap-3 items-center">
-                <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded text-xs font-medium">2,500+ clients</span>
+                <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded text-xs font-medium">22,500+ clients</span>
                 <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded text-xs font-medium">⭐️ 4.9/5 rating</span>
                 <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded text-xs font-medium">Certified experts</span>
               </div>

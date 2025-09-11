@@ -11,14 +11,62 @@ export const useProducts = () => {
     return context;
 };
 
+// Updated categoryVisuals to match your actual category names with custom image sizes
 const categoryVisuals = {
-    'Serums': { image: '/assets/images/categories/moisturizer.png',  bgColor: 'bg-pink-100', hoverColor: 'hover:bg-pink-200' },
-    'Moisturizers': { image: '/assets/images/categories/moisturizer.png', bgColor: 'bg-amber-50', hoverColor: 'hover:bg-amber-100' },
-    'Bathe and body': { image: '/assets/images/categories/body.png', bgColor: 'bg-green-50', hoverColor: 'hover:bg-green-100' },
-    'Sunscreens': { image: '/assets/images/categories/sunscreen.png', bgColor: 'bg-purple-100', hoverColor: 'hover:bg-purple-200' },
-    'Toners': { image: '/assets/images/categories/toner.png', bgColor: 'bg-blue-100', hoverColor: 'hover:bg-blue-200' },
-    'Face cleansers': { image: '/assets/images/categories/cleanser.png', bgColor: 'bg-emerald-100', hoverColor: 'hover:bg-emerald-200' },
-    'default': { image: '/placeholder.jpg', bgColor: 'bg-gray-100', hoverColor: 'hover:bg-gray-200' }
+    'serum': { 
+        image: '/assets/images/categories/serum.png', 
+        bgColor: 'bg-pink-100', 
+        hoverColor: 'hover:bg-pink-200',
+        imageSize: 'w-16 h-16' // default size
+    },
+    'moisturizer': { 
+        image: '/assets/images/categories/moisturizer.png', 
+        bgColor: 'bg-amber-50', 
+        hoverColor: 'hover:bg-amber-100',
+        imageSize: 'w-16 h-16' // default size
+    },
+    'body-and-bath': { 
+        image: '/assets/images/categories/body.png', 
+        bgColor: 'bg-pink-100', 
+        hoverColor: 'hover:bg-pink-200',
+        imageSize: 'w-24 h-24' // slightly bigger
+    },
+    'sunscreen': { 
+        image: '/assets/images/categories/sunscreen.png', 
+        bgColor: 'bg-purple-100', 
+        hoverColor: 'hover:bg-purple-200',
+        imageSize: 'w-16 h-16' // default size
+    },
+    'toner': { 
+        image: '/assets/images/categories/toner.png', 
+        bgColor: 'bg-blue-100', 
+        hoverColor: 'hover:bg-blue-200',
+        imageSize: 'w-16 h-16' // default size
+    },
+    'cleanser': { 
+        image: '/assets/images/categories/cleanser.png', 
+        bgColor: 'bg-emerald-100', 
+        hoverColor: 'hover:bg-emerald-200',
+        imageSize: 'w-16 h-16' // default size
+    },
+    'eye-cream': { 
+        image: '/assets/images/categories/eye.png', 
+        bgColor: 'bg-gray-100', 
+        hoverColor: 'hover:bg-gray-200',
+        imageSize: 'w-20 h-20' // slightly bigger
+    },
+    'mask': { 
+        image: '/assets/images/categories/mask.png', 
+        bgColor: 'bg-amber-50', 
+        hoverColor: 'hover:bg-amber-100',
+        imageSize: '!w-20 !h-20' // slightly bigger with !important
+    },
+    'default': { 
+        image: '/placeholder.jpg', 
+        bgColor: 'bg-gray-100', 
+        hoverColor: 'hover:bg-gray-200',
+        imageSize: 'w-16 h-16' // default size
+    }
 };
 
 export const ProductProvider = ({ children }) => {
@@ -38,7 +86,10 @@ export const ProductProvider = ({ children }) => {
         }, {});
         
         return Object.entries(categoryCounts).map(([name, count], index) => {
-            const visuals = categoryVisuals[name] || categoryVisuals.default;
+            // Use toLowerCase() for matching and provide fallback
+            const normalizedName = name.toLowerCase();
+            const visuals = categoryVisuals[normalizedName] || categoryVisuals.default;
+            
             return {
                 id: index + 1,
                 name,
