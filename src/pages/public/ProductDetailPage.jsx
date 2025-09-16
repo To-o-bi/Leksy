@@ -6,6 +6,7 @@ import RelatedProducts from '../../components/product/RelatedProducts';
 import Loader from '../../components/common/Loader';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import { getCategoryDisplayName } from '../../utils/api';
+import Meta from '../../components/common/Meta'; // ADDED META IMPORT
 
 const ProductDetailPage = () => {
     const { productId } = useParams();
@@ -86,16 +87,19 @@ const ProductDetailPage = () => {
 
     if (error) {
         return (
-            <div className="container mx-auto px-4 py-16 text-center">
-                <h2 className="text-2xl font-semibold text-red-600">{error}</h2>
-                <p className="mt-2 text-gray-600">Sorry, we couldn't find the product you're looking for.</p>
-                <button 
-                    className="mt-6 px-6 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600 transition-colors"
-                    onClick={() => navigate('/shop')}
-                >
-                    Back to Shop
-                </button>
-            </div>
+            <>
+                <Meta title="Product Not Found - Leksy Cosmetics" description="The product you are looking for does not exist or is unavailable." />
+                <div className="container mx-auto px-4 py-16 text-center">
+                    <h2 className="text-2xl font-semibold text-red-600">{error}</h2>
+                    <p className="mt-2 text-gray-600">Sorry, we couldn't find the product you're looking for.</p>
+                    <button 
+                        className="mt-6 px-6 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600 transition-colors"
+                        onClick={() => navigate('/shop')}
+                    >
+                        Back to Shop
+                    </button>
+                </div>
+            </>
         );
     }
 
@@ -111,21 +115,35 @@ const ProductDetailPage = () => {
     ];
 
     return (
-        <div className="min-h-screen bg-white">
-            <div className="container mx-auto px-4 py-4 sm:py-6">
-                <Breadcrumb items={breadcrumbItems} />
-            </div>
-            
-            <div className="container mx-auto px-4 pb-8">
-                {product && <ProductDetail product={product} />}
-            </div>
-            
-            {/* The RelatedProducts component is now linked and will display here */}
-            {relatedProducts.length > 0 && (
-                <RelatedProducts products={relatedProducts} />
+        <>
+            {/* DYNAMIC META TAGS FOR THE PRODUCT */}
+            {product && (
+                <Meta 
+                    title={`${product.name} - Leksy Cosmetics`}
+                    description={product.description?.substring(0, 155) || `Discover ${product.name}, a premium product from Leksy Cosmetics.`}
+                    keywords={`buy ${product.name}, ${product.category}, leksy cosmetics, skincare`}
+                    image={product.images && product.images[0]?.url}
+                    url={`/product/${productId}`}
+                />
             )}
-        </div>
+
+            <div className="min-h-screen bg-white">
+                <div className="container mx-auto px-4 py-4 sm:py-6">
+                    <Breadcrumb items={breadcrumbItems} />
+                </div>
+                
+                <div className="container mx-auto px-4 pb-8">
+                    {product && <ProductDetail product={product} />}
+                </div>
+                
+                {/* The RelatedProducts component is now linked and will display here */}
+                {relatedProducts.length > 0 && (
+                    <RelatedProducts products={relatedProducts} />
+                )}
+            </div>
+        </>
     );
 };
 
 export default ProductDetailPage;
+

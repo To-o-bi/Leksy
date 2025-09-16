@@ -55,6 +55,12 @@ const categoryVisuals = {
         hoverColor: 'hover:bg-gray-200',
         imageSize: 'w-20 h-20' // slightly bigger
     },
+    'beauty': { 
+        image: '/assets/images/categories/beauty.png', 
+        bgColor: 'bg-red-100', 
+        hoverColor: 'hover:bg-red-200',
+        imageSize: 'w-20 h-20' // slightly bigger
+    },
     'mask': { 
         image: '/assets/images/categories/mask.png', 
         bgColor: 'bg-amber-50', 
