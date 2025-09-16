@@ -22,15 +22,62 @@ const BestSellers = () => {
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  
+  // Local error state for component-specific error handling
+  const [componentError, setComponentError] = useState(null);
+
+  // Enhanced error message formatter
+  const formatErrorMessage = (error) => {
+    if (!error) return null;
+    
+    const errorString = typeof error === 'string' ? error : error.message || error.toString();
+    const lowerError = errorString.toLowerCase();
+    
+    // Handle common error scenarios with user-friendly messages
+    if (lowerError.includes('timeout') || lowerError.includes('exceeded')) {
+      return 'Connection is taking longer than expected. Please check your internet connection.';
+    }
+    
+    if (lowerError.includes('network') || lowerError.includes('fetch')) {
+      return 'Unable to connect to our servers. Please check your internet connection.';
+    }
+    
+    if (lowerError.includes('404') || lowerError.includes('not found')) {
+      return 'Product information is currently unavailable.';
+    }
+    
+    if (lowerError.includes('500') || lowerError.includes('server')) {
+      return 'Our servers are temporarily unavailable. Please try again in a moment.';
+    }
+    
+    if (lowerError.includes('cors') || lowerError.includes('cross-origin')) {
+      return 'Connection blocked by security settings. Please try refreshing the page.';
+    }
+    
+    if (lowerError.includes('unauthorized') || lowerError.includes('403')) {
+      return 'Access denied. Please refresh the page and try again.';
+    }
+    
+    if (lowerError.includes('rate limit') || lowerError.includes('too many')) {
+      return 'Too many requests. Please wait a moment before trying again.';
+    }
+    
+    // Generic fallback for any other errors
+    return 'Unable to load products at the moment. Please try again.';
+  };
 
   // Create a stable fetchProducts function using useCallback
   const fetchProducts = useCallback(async () => {
+    setComponentError(null);
     clearError();
     
     try {
       await fetchAllProducts();
     } catch (err) {
       console.error('Error fetching products in BestSellers component:', err);
+      // Set a user-friendly error message
+      const userFriendlyError = formatErrorMessage(err);
+      setComponentError(userFriendlyError);
     }
   }, [fetchAllProducts, clearError]);
 
@@ -65,10 +112,12 @@ const BestSellers = () => {
     return () => window.removeEventListener('resize', updateScreenSize);
   }, []);
 
-  // Retry handler
+  // Enhanced retry handler with error clearing
   const handleRetry = useCallback(() => {
+    setComponentError(null);
+    clearError();
     refreshProducts();
-  }, [refreshProducts]);
+  }, [refreshProducts, clearError]);
 
   // Navigate to shop page
   const handleSeeAll = useCallback(() => {
@@ -129,6 +178,9 @@ const BestSellers = () => {
     return product.id || product.product_id || `product-${index}`;
   };
 
+  // Determine which error to display (component-specific or context error)
+  const displayError = componentError || (error ? formatErrorMessage(error) : null);
+
   // Loading state - Enhanced mobile skeleton
   if (loading) {
     return (
@@ -159,20 +211,30 @@ const BestSellers = () => {
     );
   }
 
-  // Error state - Enhanced mobile layout
-  if (error && bestSellers.length === 0) {
+  // Error state - Enhanced mobile layout with professional error messages
+  if (displayError && bestSellers.length === 0) {
     return (
       <section className="py-8 sm:py-16 bg-white">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h2 className="text-xl sm:text-2xl font-bold mb-4">Best Selling Products</h2>
-            <p className="text-gray-600 mb-4 text-sm sm:text-base px-4">{error}</p>
-            <button
-              onClick={handleRetry}
-              className="px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full hover:from-pink-600 hover:to-purple-600 transition-all duration-300 text-sm sm:text-base touch-manipulation active:scale-95 min-h-[44px]"
-            >
-              Try Again
-            </button>
+            <h2 className="text-xl sm:text-2xl font-bold mb-6">Best Selling Products</h2>            
+           
+            <p className="text-gray-600 mb-6 text-sm sm:text-base px-4 max-w-md mx-auto leading-relaxed">
+              {displayError}
+            </p>
+            
+            <div className="space-y-3">
+              <button
+                onClick={handleRetry}
+                className="px-6 sm:px-8 py-3 bg-gradient-to-r from-pink-500 to-pink-500 text-white rounded-full hover:from-pink-600 hover:to-pink-600 transition-all duration-300 text-sm sm:text-base font-medium touch-manipulation active:scale-95 min-h-[44px] shadow-lg hover:shadow-xl"
+              >
+                Try Again
+              </button>
+              
+              <div className="text-xs text-gray-500">
+                If the problem persists, please refresh the page
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -180,7 +242,7 @@ const BestSellers = () => {
   }
 
   // No products state - Enhanced mobile layout
-  if (bestSellers.length === 0 && !loading && !error) {
+  if (bestSellers.length === 0 && !loading && !displayError) {
     return (
       <section className="py-8 sm:py-16 bg-white">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -203,7 +265,7 @@ const BestSellers = () => {
             <p className="text-gray-600 mb-4 sm:mb-6 text-sm sm:text-base">Check back soon for our best selling products</p>
             <button 
               onClick={handleRetry}
-              className="px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full hover:from-pink-600 hover:to-purple-600 transition-all duration-300 text-sm sm:text-base touch-manipulation active:scale-95 min-h-[44px]"
+              className="px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-pink-500 to-pink-500 text-white rounded-full hover:from-pink-600 hover:to-pink-600 transition-all duration-300 text-sm sm:text-base touch-manipulation active:scale-95 min-h-[44px]"
             >
               Refresh Products
             </button>
@@ -319,14 +381,14 @@ const BestSellers = () => {
           </div>
         )}
 
-        {/* Enhanced refresh option */}
-        {error && bestSellers.length > 0 && (
-          <div className="text-center mt-6 sm:mt-8">
+        {/* Simple error indicator for partial failures */}
+        {displayError && bestSellers.length > 0 && (
+          <div className="text-center mt-6">
             <button
               onClick={handleRetry}
-              className="text-xs sm:text-sm text-gray-500 hover:text-pink-600 transition-colors duration-200 touch-manipulation active:scale-95 min-h-[44px] px-4 py-2"
+              className="text-sm text-gray-500 hover:text-pink-600 transition-colors"
             >
-              Refresh Best Sellers
+              Refresh products
             </button>
           </div>
         )}

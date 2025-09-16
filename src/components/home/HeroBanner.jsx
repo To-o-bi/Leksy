@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 // A simple reusable Tooltip component
 const Tooltip = ({ text }) => (
@@ -13,15 +13,73 @@ const Tooltip = ({ text }) => (
 const HeroBanner = () => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [socialExpanded, setSocialExpanded] = useState(false);
+  const [showTeaser, setShowTeaser] = useState(false);
+  const [inactiveCardIndex, setInactiveCardIndex] = useState(null);
+
+  // Refs to hold timer IDs
+  const inactivityTimerRef = useRef(null);
+  const randomCardPlayerRef = useRef(null);
 
   useEffect(() => {
-    // Start animation after component mounts
-    const timer = setTimeout(() => {
+    // This function will play a random card video
+    const playRandomCard = () => {
+      // Pick a random card from 0 to 4
+      const randomIndex = Math.floor(Math.random() * 5);
+      setInactiveCardIndex(randomIndex);
+
+      // After 3 seconds, stop the video and go back to the image
+      randomCardPlayerRef.current = setTimeout(() => {
+        setInactiveCardIndex(null);
+      }, 3000);
+    };
+
+    // This function resets the inactivity timer
+    const resetInactivityTimer = () => {
+      // Clear any existing timers
+      clearTimeout(inactivityTimerRef.current);
+      clearTimeout(randomCardPlayerRef.current);
+      // Ensure no card is stuck in the 'active' state
+      setInactiveCardIndex(null); 
+
+      // Set a new timer for 5 seconds. If it's not cleared by user activity, playRandomCard will fire.
+      inactivityTimerRef.current = setTimeout(playRandomCard, 5000);
+    };
+    
+    // Start the main card fan-out animation after component mounts
+    const animationTimer = setTimeout(() => {
       setIsAnimating(true);
     }, 500);
 
-    return () => clearTimeout(timer);
-  }, []);
+    // After the fan-out animation is complete, start the video teaser on the center card
+    const teaserStartTimer = setTimeout(() => {
+      setShowTeaser(true);
+    }, 2600); 
+
+    // After 3 seconds, stop the teaser and begin listening for user inactivity
+    const teaserEndTimer = setTimeout(() => {
+      setShowTeaser(false);
+
+      // Set up event listeners for user activity
+      const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+      events.forEach(event => window.addEventListener(event, resetInactivityTimer));
+      // Start the first inactivity timer
+      resetInactivityTimer();
+
+    }, 5600);
+
+    // Cleanup function: runs when the component is unmounted
+    return () => {
+      clearTimeout(animationTimer);
+      clearTimeout(teaserStartTimer);
+      clearTimeout(teaserEndTimer);
+      clearTimeout(inactivityTimerRef.current);
+      clearTimeout(randomCardPlayerRef.current);
+
+      // Remove all event listeners to prevent memory leaks
+      const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+      events.forEach(event => window.removeEventListener(event, resetInactivityTimer));
+    };
+  }, []); // Empty dependency array ensures this effect runs only once
 
   const toggleSocial = () => {
     setSocialExpanded(!socialExpanded);
@@ -37,21 +95,33 @@ const HeroBanner = () => {
   return (
     <section className="relative h-screen bg-white overflow-hidden flex flex-col font-sans">
       
+      {/* Background Clouds Layer */}
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+        <img src="/assets/images/hero/cloud.png" alt="Decorative cloud" className="absolute -top-20 -left-40 w-[32rem] h-[32rem] opacity-20 animate-pulse" style={{ animationDuration: '8s' }} />
+        <img src="/assets/images/hero/cloud.png" alt="Decorative cloud" className="absolute top-1/4 -right-32 w-[36rem] h-[36rem] opacity-15 animate-pulse" style={{ animationDelay: '-2s', animationDuration: '10s' }} />
+        <img src="/assets/images/hero/cloud.png" alt="Decorative cloud" className="absolute bottom-0 -left-20 w-[28rem] h-[28rem] opacity-25 animate-pulse" style={{ animationDelay: '-4s', animationDuration: '9s' }}/>
+      </div>
+
       <div className="container mx-auto px-4 relative z-10 flex flex-col h-full">
         {/* Main Content */}
-        <div className="text-center max-w-4xl mx-auto pt-8 pb-6 flex-shrink-0">
-          <h1 className="text-5xl md:text-6xl font-bold mb-3 leading-tight text-gray-800 flex items-center justify-center gap-x-2">
+        <div className="text-center max-w-4xl mx-auto pt-8 pb-6 flex-shrink-0 relative">
+          {/* Cloud for the text */}
+          <img src="/assets/images/hero/cloud.png" alt="Decorative cloud" className="absolute -top-16 -right-24 w-72 h-72 opacity-10 pointer-events-none animate-pulse" style={{ animationDuration: '7s' }} />
+          
+          <h1 className="relative z-10 text-5xl md:text-6xl font-bold mb-3 leading-tight text-gray-800 flex items-center justify-center gap-x-2">
             Your <span className="text-pink-500">Beauty,</span> Our Priority           
           </h1>
           
-          <p className="text-base md:text-lg text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
+          <p className="relative z-10 text-base md:text-lg text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
             Shop our best-selling skincare & cosmetics, designed for radiant, flawless skin.
           </p>
           
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-2">
+          <div className="relative flex flex-col sm:flex-row gap-4 justify-center items-center mb-2">
+            {/* Cloud for the button */}
+            <img src="/assets/images/hero/cloud.png" alt="Decorative cloud" className="absolute -bottom-16 -left-20 w-64 h-64 opacity-20 pointer-events-none animate-pulse" style={{ animationDelay: '-1.5s', animationDuration: '8s' }} />
             <button 
-              className="group bg-pink-500 text-white py-3 px-8 rounded-full font-semibold text-base hover:bg-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center"
+              className="relative z-10 group bg-pink-500 text-white py-3 px-8 rounded-full font-semibold text-base hover:bg-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center"
             >
               Explore our Products
               <svg 
@@ -65,7 +135,7 @@ const HeroBanner = () => {
             </button>
             
             <button 
-              className="group border-2 border-pink-500 text-pink-500 py-3 px-8 rounded-full font-semibold text-base hover:bg-pink-500 hover:text-white transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center"
+              className="relative z-10 group border-2 border-pink-500 text-pink-500 py-3 px-8 rounded-full font-semibold text-base hover:bg-pink-500 hover:text-white transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center"
             >
               Book Consultation
               <svg 
@@ -84,7 +154,7 @@ const HeroBanner = () => {
         {/* Image Card Section in Arc */}
         <div className="flex-grow relative flex items-center justify-center -mt-8 sm:-mt-12">
             <div className="flex items-center justify-center space-x-[-1.5rem] sm:space-x-[-1rem]">
-                {/* Card 1 - Slides from center to left */}
+                {/* Card 1 - Slides from center to left (Index 0) */}
                 <div className={`group transform transition-all duration-1000 ease-out w-44 h-60 sm:w-52 sm:h-72 cursor-pointer ${
                   isAnimating 
                     ? 'rotate-[-18deg] translate-y-12 translate-x-0 z-0 opacity-100' 
@@ -93,15 +163,15 @@ const HeroBanner = () => {
                 style={{ transitionDelay: isAnimating ? '800ms' : '0ms' }}>
                     <div className="relative w-full h-full rounded-3xl bg-gradient-to-br from-pink-50 to-white p-1 shadow-2xl hover:shadow-pink-200/50">
                         <div className="w-full h-full rounded-3xl overflow-hidden bg-white shadow-inner relative">
-                            <img src="/assets/images/hero/card-1.jpg" alt="Woman with face mask" className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105 opacity-100 group-hover:opacity-0"/>
-                            <video src="/assets/images/hero/type-1.mp4" autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-105 opacity-0 group-hover:opacity-100"></video>
+                            <img src="/assets/images/hero/card-1.jpg" alt="Woman with face mask" className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-0 ${inactiveCardIndex === 0 ? 'opacity-0 scale-105' : 'opacity-100'}`}/>
+                            <video src="/assets/images/hero/type-1.mp4" autoPlay loop muted playsInline className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-100 ${inactiveCardIndex === 0 ? 'opacity-100 scale-105' : 'opacity-0'}`}></video>
                             <div className="absolute inset-0 bg-gradient-to-t from-pink-500/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                         </div>
                         <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-400 to-pink-600 rounded-3xl blur opacity-0 group-hover:opacity-20 transition-opacity duration-500"></div>
                     </div>
                 </div>
                 
-                {/* Card 2 - Slides from center to left */}
+                {/* Card 2 - Slides from center to left (Index 1) */}
                 <div className={`group transform transition-all duration-1000 ease-out w-44 h-60 sm:w-52 sm:h-72 cursor-pointer ${
                   isAnimating 
                     ? 'rotate-[-8deg] -translate-y-2 translate-x-0 z-10 opacity-100' 
@@ -110,15 +180,15 @@ const HeroBanner = () => {
                 style={{ transitionDelay: isAnimating ? '600ms' : '0ms' }}>
                     <div className="relative w-full h-full rounded-3xl bg-gradient-to-br from-pink-100 to-white p-1 shadow-2xl hover:shadow-pink-300/60">
                         <div className="w-full h-full rounded-3xl overflow-hidden bg-white shadow-inner relative">
-                            <img src="/assets/images/hero/card-2.jpg" alt="Woman with face mask" className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105 opacity-100 group-hover:opacity-0"/>
-                            <video src="/assets/images/hero/type-2.mp4" autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-105 opacity-0 group-hover:opacity-100"></video>
-                            <div className="absolute inset-0 bg-gradient-to-t from-pink-400/25 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                           <img src="/assets/images/hero/card-2.jpg" alt="Woman with face mask" className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-0 ${inactiveCardIndex === 1 ? 'opacity-0 scale-105' : 'opacity-100'}`}/>
+                           <video src="/assets/images/hero/type-2.mp4" autoPlay loop muted playsInline className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-100 ${inactiveCardIndex === 1 ? 'opacity-100 scale-105' : 'opacity-0'}`}></video>
+                           <div className="absolute inset-0 bg-gradient-to-t from-pink-400/25 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                         </div>
                         <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-300 to-pink-500 rounded-3xl blur opacity-0 group-hover:opacity-25 transition-opacity duration-500"></div>
                     </div>
                 </div>
                 
-                {/* Card 3 - Center (Featured) - First to animate */}
+                {/* Card 3 - Center (Featured) - (Index 2) */}
                 <div className={`group transform transition-all duration-1800 ease-in-out w-48 h-64 sm:w-56 sm:h-76 cursor-pointer ${
                   isAnimating 
                     ? 'rotate-[2deg] -translate-y-6 translate-x-0 z-20 opacity-100' 
@@ -127,18 +197,17 @@ const HeroBanner = () => {
                 style={{ transitionDelay: isAnimating ? '200ms' : '0ms' }}>
                     <div className="relative w-full h-full rounded-3xl bg-gradient-to-br from-pink-200 to-pink-50 p-1.5 shadow-2xl hover:shadow-pink-400/70">
                         <div className="w-full h-full rounded-3xl overflow-hidden bg-white shadow-inner relative">
-                            <img src="/assets/images/hero/card-3.jpg" alt="Woman with face mask" className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105 opacity-100 group-hover:opacity-0"/>
-                            <video src="/assets/images/hero/type-3.mp4" autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-105 opacity-0 group-hover:opacity-100"></video>
+                            <img src="/assets/images/hero/card-3.jpg" alt="Woman with face mask" className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-0 ${showTeaser || inactiveCardIndex === 2 ? 'opacity-0 scale-105' : 'opacity-100'}`}/>
+                            <video src="/assets/images/hero/type-3.mp4" autoPlay loop muted playsInline className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-100 ${showTeaser || inactiveCardIndex === 2 ? 'opacity-100 scale-105' : 'opacity-0'}`}></video>
                             <div className="absolute inset-0 bg-gradient-to-t from-pink-500/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                         </div>
                         <div className="absolute -inset-1 bg-gradient-to-r from-pink-400 via-pink-500 to-pink-400 rounded-3xl blur opacity-0 group-hover:opacity-30 transition-opacity duration-500"></div>
-                        {/* Sparkle effect for center card */}
                         <div className="absolute top-2 right-2 w-3 h-3 bg-pink-400 rounded-full opacity-60 animate-ping"></div>
                         <div className="absolute bottom-4 left-3 w-2 h-2 bg-pink-300 rounded-full opacity-40 animate-pulse"></div>
                     </div>
                 </div>
                 
-                {/* Card 4 - Slides from center to right */}
+                {/* Card 4 - Slides from center to right (Index 3) */}
                 <div className={`group transform transition-all duration-1000 ease-out w-44 h-60 sm:w-52 sm:h-72 cursor-pointer ${
                   isAnimating 
                     ? 'rotate-[8deg] -translate-y-2 translate-x-0 z-10 opacity-100' 
@@ -147,15 +216,15 @@ const HeroBanner = () => {
                 style={{ transitionDelay: isAnimating ? '600ms' : '0ms' }}>
                     <div className="relative w-full h-full rounded-3xl bg-gradient-to-br from-pink-100 to-white p-1 shadow-2xl hover:shadow-pink-300/60">
                         <div className="w-full h-full rounded-3xl overflow-hidden bg-white shadow-inner relative">
-                            <img src="/assets/images/hero/card-4.jpg" alt="Woman with face mask" className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105 opacity-100 group-hover:opacity-0"/>
-                            <video src="/assets/images/hero/type-4.mp4" autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-105 opacity-0 group-hover:opacity-100"></video>
+                            <img src="/assets/images/hero/card-4.jpg" alt="Woman with face mask" className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-0 ${inactiveCardIndex === 3 ? 'opacity-0 scale-105' : 'opacity-100'}`}/>
+                            <video src="/assets/images/hero/type-4.mp4" autoPlay loop muted playsInline className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-100 ${inactiveCardIndex === 3 ? 'opacity-100 scale-105' : 'opacity-0'}`}></video>
                             <div className="absolute inset-0 bg-gradient-to-t from-pink-400/25 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                         </div>
                         <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-500 to-pink-300 rounded-3xl blur opacity-0 group-hover:opacity-25 transition-opacity duration-500"></div>
                     </div>
                 </div>
                 
-                {/* Card 5 - Slides from center to right */}
+                {/* Card 5 - Slides from center to right (Index 4) */}
                 <div className={`group transform transition-all duration-1000 ease-out w-44 h-60 sm:w-52 sm:h-72 cursor-pointer ${
                   isAnimating 
                     ? 'rotate-[18deg] translate-y-12 translate-x-0 z-0 opacity-100' 
@@ -164,8 +233,8 @@ const HeroBanner = () => {
                 style={{ transitionDelay: isAnimating ? '800ms' : '0ms' }}>
                     <div className="relative w-full h-full rounded-3xl bg-gradient-to-br from-pink-50 to-white p-1 shadow-2xl group-hover:shadow-pink-200/50 transition-all duration-500">
                         <div className="w-full h-full rounded-3xl overflow-hidden bg-white shadow-inner relative">
-                            <img src="/assets/images/hero/card-5.jpg" alt="Woman with face mask" className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105 opacity-100 group-hover:opacity-0"/>
-                            <video src="/assets/images/hero/type-5.mp4" autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-105 opacity-0 group-hover:opacity-100"></video>
+                            <img src="/assets/images/hero/card-5.jpg" alt="Woman with face mask" className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-0 ${inactiveCardIndex === 4 ? 'opacity-0 scale-105' : 'opacity-100'}`}/>
+                            <video src="/assets/images/hero/type-5.mp4" autoPlay loop muted playsInline className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-100 ${inactiveCardIndex === 4 ? 'opacity-100 scale-105' : 'opacity-0'}`}></video>
                             <div className="absolute inset-0 bg-gradient-to-t from-pink-500/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                         </div>
                         <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-600 to-pink-400 rounded-3xl blur opacity-0 group-hover:opacity-20 transition-opacity duration-500"></div>
@@ -174,8 +243,14 @@ const HeroBanner = () => {
             </div>
         </div>
 
+        {/* Foreground Clouds Layer */}
+        <div className="absolute inset-0 z-25 pointer-events-none overflow-hidden">
+          <img src="/assets/images/hero/cloud.png" alt="Decorative cloud" className="absolute bottom-1/4 -left-32 w-[28rem] h-[28rem] opacity-30 animate-pulse" style={{ animationDelay: '-1s', animationDuration: '11s' }} />
+          <img src="/assets/images/hero/cloud.png" alt="Decorative cloud" className="absolute bottom-10 -right-40 w-[36rem] h-[36rem] opacity-25 animate-pulse" style={{ animationDelay: '-3s', animationDuration: '12s' }}/>
+        </div>
+
         {/* Scroll Down Indicator */}
-        <div className={`relative z-10 text-center pb-4 flex-shrink-0 -mt-8 transform transition-all duration-1000 ease-out ${
+        <div className={`relative z-30 text-center pb-4 flex-shrink-0 -mt-8 transform transition-all duration-1000 ease-out ${
           isAnimating 
             ? 'translate-y-0 opacity-100' 
             : 'translate-y-6 opacity-0'

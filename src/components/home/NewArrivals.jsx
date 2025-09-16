@@ -14,6 +14,25 @@ const NewArrivals = () => {
     refreshProducts
   } = useProducts();
 
+  // Error message formatter
+  const formatErrorMessage = (error) => {
+    if (!error) return null;
+    const errorString = typeof error === 'string' ? error : error.message || error.toString();
+    const lowerError = errorString.toLowerCase();
+    
+    if (lowerError.includes('timeout') || lowerError.includes('exceeded')) {
+      return 'Connection timeout. Please try again.';
+    }
+    if (lowerError.includes('network') || lowerError.includes('fetch')) {
+      return 'Connection failed. Check your internet.';
+    }
+    if (lowerError.includes('server') || lowerError.includes('500')) {
+      return 'Server temporarily unavailable.';
+    }
+    
+    return 'Unable to load new arrivals. Please try again.';
+  };
+
   useEffect(() => {
     if (!productsList || productsList.length === 0) {
       setNewArrivals([]);
@@ -44,6 +63,9 @@ const NewArrivals = () => {
     navigate('/shop');
   }, [navigate]);
 
+  // Format error for display
+  const displayError = error ? formatErrorMessage(error) : null;
+
   if (loading && newArrivals.length === 0) {
     return (
       <section className="py-8 sm:py-12 lg:py-16">
@@ -68,16 +90,20 @@ const NewArrivals = () => {
     );
   }
 
-  if (error && newArrivals.length === 0) {
+  // Error state - Simple and clean
+  if (displayError && newArrivals.length === 0) {
     return (
       <section className="py-8 sm:py-12 lg:py-16">
         <div className="container mx-auto px-3 sm:px-4 md:px-6">
           <div className="text-center">
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-3 sm:mb-4">New Arrivals</h2>
-            <p className="text-gray-600 mb-4 text-sm sm:text-base px-4">{error}</p>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-6">New Arrivals</h2>
+            <div className="text-4xl mb-4">⚠️</div>
+            <p className="text-gray-600 mb-6 text-sm sm:text-base">
+              {displayError}
+            </p>
             <button
               onClick={handleRetry}
-              className="px-4 sm:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full hover:from-pink-600 hover:to-purple-600 transition-all duration-300 text-sm sm:text-base touch-manipulation"
+              className="px-6 py-3 bg-gradient-to-r from-pink-500 to-pink-500 text-white rounded-full hover:from-pink-600 hover:to-pink-600 transition-all duration-300 text-sm sm:text-base touch-manipulation"
             >
               Try Again
             </button>
@@ -109,7 +135,7 @@ const NewArrivals = () => {
             <p className="text-gray-600 mb-4 sm:mb-6 text-sm sm:text-base px-4">Check back soon for the latest products</p>
             <button 
               onClick={handleRetry}
-              className="px-4 sm:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full hover:from-pink-600 hover:to-purple-600 transition-all duration-300 text-sm sm:text-base touch-manipulation"
+              className="px-4 sm:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-pink-500 to-pink-500 text-white rounded-full hover:from-pink-600 hover:to-pink-600 transition-all duration-300 text-sm sm:text-base touch-manipulation"
             >
               Refresh Products
             </button>
@@ -147,9 +173,21 @@ const NewArrivals = () => {
             />
           ))}
         </div>
+
+        {/* Simple error indicator for partial failures */}
+        {displayError && newArrivals.length > 0 && (
+          <div className="text-center mt-6">
+            <button
+              onClick={handleRetry}
+              className="text-sm text-gray-500 hover:text-pink-600 transition-colors"
+            >
+              Refresh products
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );
 };
 
-export default NewArrivals;
+export default NewArrivals;   
