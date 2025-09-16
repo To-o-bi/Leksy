@@ -13,7 +13,7 @@ const ContactPage = () => {
     phone: '',
     subject: '',
     message: '',
-    countryCode: '+234' // Add missing countryCode
+    countryCode: '+234'
   });
   
   const [errors, setErrors] = useState({});
@@ -21,7 +21,6 @@ const ContactPage = () => {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
   
-  // Add refs to prevent duplicate submissions
   const submitTimeoutRef = useRef(null);
   const lastSubmissionRef = useRef(null);
 
@@ -60,20 +59,16 @@ const ContactPage = () => {
     if (submitError) setSubmitError('');
   };
 
-  // Handle form submission with improved error handling
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Prevent duplicate submissions
-    if (isSubmitting) {
-      console.log('Already submitting, ignoring duplicate request');
-      return;
-    }
+    if (isSubmitting) return;
 
     // Debounce rapid submissions (prevent submissions within 2 seconds)
     const now = Date.now();
     if (lastSubmissionRef.current && (now - lastSubmissionRef.current) < 2000) {
-      console.log('Submission too soon after last attempt, ignoring');
       return;
     }
     
@@ -89,8 +84,8 @@ const ContactPage = () => {
     }
 
     try {
-      // Format phone number - handle the formatted phone from ContactForm
-      let phone = formData.phone.replace(/\D/g, ''); // Remove all non-digits
+      // Format phone number
+      let phone = formData.phone.replace(/\D/g, '');
       
       // Add country code if needed
       if (phone.length === 11 && phone.startsWith('0')) {
@@ -100,7 +95,6 @@ const ContactPage = () => {
       } else if (phone.length === 11 && !phone.startsWith('0')) {
         phone = `+234${phone}`;
       } else {
-        // Use the country code from the form if phone doesn't include country code
         phone = `${formData.countryCode}${phone}`;
       }
 
@@ -112,8 +106,6 @@ const ContactPage = () => {
         subject: formData.subject.trim(),
         message: formData.message.trim()
       };
-
-      console.log('Submitting:', contactData);
 
       // Submit to API with timeout
       const response = await Promise.race([
@@ -139,8 +131,6 @@ const ContactPage = () => {
       }
       
     } catch (error) {
-      console.error('Submit error:', error);
-      
       let errorMessage = 'Failed to send message. Please try again.';
       
       if (error.message.includes('timeout')) {

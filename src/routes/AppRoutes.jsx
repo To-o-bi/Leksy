@@ -4,8 +4,39 @@ import PublicRoutes from './PublicRoutes';
 import ProtectedRoute from './ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
 
-// --- ADDED: ScrollToTop component ---
-// This component will automatically scroll the window to the top on every route change.
+// --- ADDED: ScrollRevealLayout component ---
+// This component initializes ScrollReveal and wraps our public pages.
+const ScrollRevealLayout = () => {
+  useEffect(() => {
+    // We check if the ScrollReveal library is available on the window object,
+    // as it should be loaded from the script tag in your index.html.
+    const ScrollReveal = window.ScrollReveal;
+
+    if (ScrollReveal) {
+        // Initialize ScrollReveal with some default options
+        const sr = ScrollReveal({
+          distance: '60px',
+          duration: 2500,
+          delay: 400,
+          reset: false, // Animation repeats on scroll up
+        });
+
+        // Define the reveal animations for common elements
+        sr.reveal('.reveal-bottom', { origin: 'bottom', interval: 200 });
+        sr.reveal('.reveal-left', { origin: 'left', interval: 200 });
+        sr.reveal('.reveal-right', { origin: 'right', interval: 200 });
+        sr.reveal('.reveal-top', { origin: 'top', interval: 200 });
+    } else {
+        console.error("ScrollReveal is not loaded. Please add the script to your public index.html file.");
+    }
+  }, []);
+
+  // The Outlet renders the child routes (e.g., HomePage, ShopPage)
+  return <Outlet />;
+};
+
+
+// --- ScrollToTop component ---
 const ScrollToTop = () => {
   const { pathname } = useLocation();
 
@@ -73,27 +104,28 @@ const LoginWrapper = () => {
 const AppRoutes = () => {
     return (
         <Suspense fallback={<LoadingFallback />}>
-            {/* --- ADDED: ScrollToTop component is placed here to monitor route changes --- */}
             <ScrollToTop />
             <Routes>
                 <Route path="admin/login" element={<LoginWrapper />} />
                 
-                <Route element={<PublicRoutes />}>
-                    <Route index element={<HomePage />} />
-                    <Route path="/shop" element={<ShopPage />} />
-                    <Route path="/product/:productId" element={<ProductDetailPage />} />
-                    <Route path="/cart" element={<CartPage />} />
-                    <Route path="/contact" element={<ContactPage />} />
-                    <Route path="/checkout" element={<CheckoutPage />} />
-                    <Route path="/checkout/checkout-success" element={<CheckoutSuccessPage />} />
-                    <Route path="/wishlist" element={<WishlistPage />} />
-                    <Route path="/consultation" element={<ConsultationPage />} />
-                    <Route path="/consultation/success" element={<ConsultationSuccessPage />} />
-                    <Route path="/policies/privacy" element={<PrivacyPolicyPage />} />
-                    <Route path="/policies/terms-and-conditions" element={<TermsAndConditionsPage />} />
-                    <Route path="/policies/shipping" element={<ShippingPolicyPage />} />
-                    {/* 404 page for public routes */}
-                    <Route path="/404" element={<NotFound />} />
+                {/* --- Public routes are now wrapped with ScrollRevealLayout --- */}
+                <Route element={<ScrollRevealLayout />}>
+                    <Route element={<PublicRoutes />}>
+                        <Route index element={<HomePage />} />
+                        <Route path="/shop" element={<ShopPage />} />
+                        <Route path="/product/:productId" element={<ProductDetailPage />} />
+                        <Route path="/cart" element={<CartPage />} />
+                        <Route path="/contact" element={<ContactPage />} />
+                        <Route path="/checkout" element={<CheckoutPage />} />
+                        <Route path="/checkout/checkout-success" element={<CheckoutSuccessPage />} />
+                        <Route path="/wishlist" element={<WishlistPage />} />
+                        <Route path="/consultation" element={<ConsultationPage />} />
+                        <Route path="/consultation/success" element={<ConsultationSuccessPage />} />
+                        <Route path="/policies/privacy" element={<PrivacyPolicyPage />} />
+                        <Route path="/policies/terms-and-conditions" element={<TermsAndConditionsPage />} />
+                        <Route path="/policies/shipping" element={<ShippingPolicyPage />} />
+                        <Route path="/404" element={<NotFound />} />
+                    </Route>
                 </Route>
                 
                 <Route path="/admin" element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
@@ -111,16 +143,14 @@ const AppRoutes = () => {
                     <Route path="notifications" element={<NotificationsPage />} />
                     <Route path="inbox" element={<InboxPage />} />
                     <Route path="bookings" element={<BookingsPage />} />
-                    <Route path="bookings/:id" element={<BookingsPage />} />      
+                    <Route path="bookings/:id" element={<BookingsPage />} />   
 
                     <Route path="newsletter" element={<NewsletterAdmin />} />
                     <Route path="delivery" element={<DeliveryFees />} />
                     
-                    {/* 404 page for admin routes */}
                     <Route path="*" element={<NotFound />} />
                 </Route>
 
-                {/* Catch-all route for any unmatched paths */}
                 <Route path="*" element={<NotFound />} />
             </Routes>
         </Suspense>

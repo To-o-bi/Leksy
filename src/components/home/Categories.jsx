@@ -4,12 +4,20 @@ import { useProducts } from '../../contexts/ProductContext';
 
 const Categories = () => {
   const containerRef = useRef(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentTranslate, setCurrentTranslate] = useState(0);
   const [itemsPerView, setItemsPerView] = useState(6);
-  const [showArrows, setShowArrows] = useState(false);
+  const [itemWidth, setItemWidth] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   
   // Get dynamic categories and loading state from the context
   const { categories, loading } = useProducts();
+
+  // Create duplicated categories for infinite loop
+  const duplicatedCategories = categories.length > 0 ? [
+    ...categories,
+    ...categories,
+    ...categories // Triple the categories for smooth infinite scrolling
+  ] : [];
 
   // Responsive breakpoints handler
   const updateLayout = useCallback(() => {
@@ -17,20 +25,21 @@ const Categories = () => {
     let newItemsPerView;
     
     if (width < 480) newItemsPerView = 1;
-    else if (width < 640) newItemsPerView = 2; // Fixed typo: was newItemsperView
+    else if (width < 640) newItemsPerView = 2;
     else if (width < 768) newItemsPerView = 3;
     else if (width < 1024) newItemsPerView = 4;
     else if (width < 1280) newItemsPerView = 5;
     else newItemsPerView = 6;
     
     setItemsPerView(newItemsPerView);
-    setShowArrows(categories.length > newItemsPerView);
     
-    const maxIndex = Math.max(0, categories.length - newItemsPerView);
-    if (currentIndex > maxIndex) {
-      setCurrentIndex(0);
+    // Calculate item width based on container and items per view
+    if (containerRef.current) {
+      const containerWidth = containerRef.current.offsetWidth;
+      const newItemWidth = containerWidth / newItemsPerView;
+      setItemWidth(newItemWidth);
     }
-  }, [currentIndex, categories.length]);
+  }, []);
 
   useEffect(() => {
     updateLayout();
@@ -38,36 +47,96 @@ const Categories = () => {
     return () => window.removeEventListener('resize', updateLayout);
   }, [updateLayout]);
 
-  // Navigation functions
-  const maxIndex = Math.max(0, categories.length - itemsPerView);
-  
-  const goToPrevious = useCallback(() => {
-    setCurrentIndex(prev => (prev > 0 ? prev - 1 : maxIndex));
-  }, [maxIndex]);
-
-  const goToNext = useCallback(() => {
-    setCurrentIndex(prev => (prev < maxIndex ? prev + 1 : 0));
-  }, [maxIndex]);
-
-  // Auto-slide functionality
+  // Initialize position to show the middle set of categories
   useEffect(() => {
-    if (!showArrows || categories.length <= itemsPerView) return;
-    const interval = setInterval(() => goToNext(), 3000);
-    return () => clearInterval(interval);
-  }, [goToNext, showArrows, categories.length, itemsPerView]);
+    if (categories.length > 0 && itemWidth > 0) {
+      const initialPosition = -(categories.length * itemWidth);
+      setCurrentTranslate(initialPosition);
+    }
+  }, [categories.length, itemWidth]);
 
-  const handleImageError = useCallback((e) => {
-    console.log('Image failed to load:', e.target.src); // Debug log
-    e.target.onerror = null;
-    e.target.src = '/assets/images/placeholder.jpg'; // Updated path
+  // Auto-scroll functionality
+  useEffect(() => {
+    if (categories.length === 0 || itemWidth === 0) return;
+    
+    const interval = setInterval(() => {
+      setCurrentTranslate(prev => {
+        const newTranslate = prev - itemWidth;
+        const maxTranslate = -(categories.length * 2 * itemWidth);
+        
+        // Reset to middle position when we've scrolled through two full sets
+        if (newTranslate <= maxTranslate) {
+          // Temporarily disable transition for instant reset
+          setTimeout(() => {
+            setIsTransitioning(false);
+            setCurrentTranslate(-(categories.length * itemWidth));
+            setTimeout(() => setIsTransitioning(true), 50);
+          }, 500); // Wait for current transition to complete
+          
+          return newTranslate;
+        }
+        
+        return newTranslate;
+      });
+    }, 3000); // Auto-scroll every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [categories.length, itemWidth]);
+
+  // Enable transitions by default
+  useEffect(() => {
+    setIsTransitioning(true);
   }, []);
 
-  // Debug: Log categories to see what we're getting
-  useEffect(() => {
-    if (categories.length > 0) {
-      console.log('Categories data:', categories);
-    }
-  }, [categories]);
+  const handleImageError = useCallback((e) => {
+    e.target.onerror = null;
+    e.target.src = '/assets/images/placeholder.jpg';
+  }, []);
+
+  // Navigation functions
+  const goToPrevious = useCallback(() => {
+    if (categories.length === 0 || itemWidth === 0) return;
+    
+    setCurrentTranslate(prev => {
+      const newTranslate = prev + itemWidth;
+      const minTranslate = -(categories.length * itemWidth);
+      
+      // If we've scrolled back to the beginning of middle set, jump to end of first set
+      if (newTranslate > minTranslate) {
+        setTimeout(() => {
+          setIsTransitioning(false);
+          setCurrentTranslate(-(categories.length * 2 * itemWidth) + itemWidth);
+          setTimeout(() => setIsTransitioning(true), 50);
+        }, 500);
+        
+        return newTranslate;
+      }
+      
+      return newTranslate;
+    });
+  }, [categories.length, itemWidth]);
+
+  const goToNext = useCallback(() => {
+    if (categories.length === 0 || itemWidth === 0) return;
+    
+    setCurrentTranslate(prev => {
+      const newTranslate = prev - itemWidth;
+      const maxTranslate = -(categories.length * 2 * itemWidth);
+      
+      // If we've reached the end of the second set, jump back to middle set
+      if (newTranslate <= maxTranslate) {
+        setTimeout(() => {
+          setIsTransitioning(false);
+          setCurrentTranslate(-(categories.length * itemWidth) - itemWidth);
+          setTimeout(() => setIsTransitioning(true), 50);
+        }, 500);
+        
+        return newTranslate;
+      }
+      
+      return newTranslate;
+    });
+  }, [categories.length, itemWidth]);
 
   // Loading Skeleton UI
   if (loading && categories.length === 0) {
@@ -94,13 +163,13 @@ const Categories = () => {
 
   // No Categories to show
   if (categories.length === 0) {
-      return (
-        <section className="py-12 md:py-16 bg-gray-50/30">
-          <div className="container mx-auto px-4 text-center">
-            <p className="text-gray-500">No categories found</p>
-          </div>
-        </section>
-      );
+    return (
+      <section className="py-12 md:py-16 bg-gray-50/30">
+        <div className="container mx-auto px-4 text-center">
+          <p className="text-gray-500">No categories found</p>
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -119,17 +188,17 @@ const Categories = () => {
         <div className="relative">
           <div ref={containerRef} className="overflow-hidden">
             <div 
-              className="flex transition-transform duration-500 ease-out"
+              className={`flex ${isTransitioning ? 'transition-transform duration-500 ease-out' : ''}`}
               style={{
-                transform: `translateX(-${(currentIndex * 100) / itemsPerView}%)`,
-                width: `${Math.max(100, (categories.length / itemsPerView) * 100)}%`
+                transform: `translateX(${currentTranslate}px)`,
+                width: `${duplicatedCategories.length * (100 / itemsPerView)}%`
               }}
             >
-              {categories.map((category) => (
+              {duplicatedCategories.map((category, index) => (
                 <div
-                  key={category.id}
+                  key={`${category.id}-${Math.floor(index / categories.length)}`}
                   className="flex-shrink-0 px-2"
-                  style={{ width: `${100 / Math.max(categories.length, itemsPerView)}%` }}
+                  style={{ width: `${100 / duplicatedCategories.length}%` }}
                 >
                   <Link 
                     to={category.path} 
@@ -157,12 +226,11 @@ const Categories = () => {
           </div>
 
           {/* Navigation Arrows */}
-          {showArrows && categories.length > itemsPerView && (
+          {categories.length > itemsPerView && (
             <>
               <button 
                 onClick={goToPrevious}
-                disabled={currentIndex === 0}
-                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white shadow-lg border flex items-center justify-center transition hover:scale-105 disabled:opacity-50"
+                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white shadow-lg border flex items-center justify-center transition hover:scale-105"
                 aria-label="Previous slide"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -171,8 +239,7 @@ const Categories = () => {
               </button>
               <button 
                 onClick={goToNext}
-                disabled={currentIndex >= maxIndex}
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white shadow-lg border flex items-center justify-center transition hover:scale-105 disabled:opacity-50"
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white shadow-lg border flex items-center justify-center transition hover:scale-105"
                 aria-label="Next slide"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

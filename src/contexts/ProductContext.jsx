@@ -53,7 +53,7 @@ const categoryVisuals = {
         image: '/assets/images/categories/eye.png', 
         bgColor: 'bg-gray-100', 
         hoverColor: 'hover:bg-gray-200',
-        imageSize: 'w-20 h-20' // slightly bigger
+        imageSize: '!w-20 !h-20' // slightly bigger
     },
     'beauty': { 
         image: '/assets/images/categories/beauty.png', 
