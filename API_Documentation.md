@@ -1101,7 +1101,7 @@ curl --location --request GET '{base_url}/api/admin/fetch-sales'
 {
 	"code": 200,
 	"message": "Sales fetch returned 1 results.",
-	"salse": {
+	"sales": {
 		stuff...
 	}
 }
