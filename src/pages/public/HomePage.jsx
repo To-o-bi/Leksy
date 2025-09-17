@@ -24,13 +24,10 @@ const HomePage = () => {
           {/* Hero Banner doesn't need animation as it's visible on load */}
           <HeroBanner />
           <div className="container mx-auto px-4 md:px-8 lg:px-2 max-w-8xl">
-            {/* 
-              IMPORTANT: Remove 'reveal-bottom' from Categories to prevent ScrollReveal conflicts
-              Categories has its own internal animations that might conflict with ScrollReveal
-            */}
+            
             <Categories />
             
-            {/* Keep reveal classes for other components that don't have complex internal animations */}
+            
             <div className="reveal-bottom">
                 <BestSellers />
             </div>

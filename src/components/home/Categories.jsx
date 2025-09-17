@@ -7,9 +7,9 @@ const Categories = () => {
   const [currentTranslate, setCurrentTranslate] = useState(0);
   const [itemsPerView, setItemsPerView] = useState(6);
   const [itemWidth, setItemWidth] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const autoScrollRef = useRef(null);
+  const isManualNavigationRef = useRef(false);
   
   // Get dynamic categories and loading state from the context
   const { categories, loading } = useProducts();
@@ -40,8 +40,14 @@ const Categories = () => {
       const containerWidth = containerRef.current.offsetWidth;
       const newItemWidth = containerWidth / newItemsPerView;
       setItemWidth(newItemWidth);
+      
+      // Reset position when layout changes
+      if (categories.length > 0 && isInitialized) {
+        const initialPosition = -(categories.length * newItemWidth);
+        setCurrentTranslate(initialPosition);
+      }
     }
-  }, []);
+  }, [categories.length, isInitialized]);
 
   // Clear auto-scroll interval
   const clearAutoScroll = useCallback(() => {
@@ -51,38 +57,52 @@ const Categories = () => {
     }
   }, []);
 
-  // Start auto-scroll
+  // Start auto-scroll with better error handling
   const startAutoScroll = useCallback(() => {
-    if (categories.length === 0 || itemWidth === 0) return;
+    // Don't start if conditions aren't met
+    if (categories.length === 0 || itemWidth === 0 || !isInitialized) {
+      return;
+    }
     
     clearAutoScroll(); // Clear any existing interval
     
     autoScrollRef.current = setInterval(() => {
+      // Check if manual navigation is in progress
+      if (isManualNavigationRef.current) {
+        return;
+      }
+      
       setCurrentTranslate(prev => {
         const newTranslate = prev - itemWidth;
         const maxTranslate = -(categories.length * 2 * itemWidth);
         
         // Reset to middle position when we've scrolled through two full sets
         if (newTranslate <= maxTranslate) {
-          // Instead of using setTimeout, return to middle position immediately
           return -(categories.length * itemWidth);
         }
         
         return newTranslate;
       });
     }, 3000);
-  }, [categories.length, itemWidth, clearAutoScroll]);
+  }, [categories.length, itemWidth, isInitialized, clearAutoScroll]);
 
+  // Handle resize events
   useEffect(() => {
     updateLayout();
-    window.addEventListener('resize', updateLayout);
+    
+    const handleResize = () => {
+      clearAutoScroll();
+      updateLayout();
+    };
+    
+    window.addEventListener('resize', handleResize);
     return () => {
-      window.removeEventListener('resize', updateLayout);
+      window.removeEventListener('resize', handleResize);
       clearAutoScroll();
     };
   }, [updateLayout, clearAutoScroll]);
 
-  // Initialize position
+  // Initialize position when ready
   useEffect(() => {
     if (categories.length > 0 && itemWidth > 0 && !isInitialized) {
       const initialPosition = -(categories.length * itemWidth);
@@ -91,14 +111,20 @@ const Categories = () => {
     }
   }, [categories.length, itemWidth, isInitialized]);
 
-  // Start auto-scroll when component is ready
+  // Start auto-scroll when everything is ready
   useEffect(() => {
-    if (isInitialized) {
-      startAutoScroll();
+    if (isInitialized && itemWidth > 0 && categories.length > 0) {
+      // Small delay to ensure everything is settled
+      const timer = setTimeout(() => {
+        startAutoScroll();
+      }, 100);
+      
+      return () => {
+        clearTimeout(timer);
+        clearAutoScroll();
+      };
     }
-    
-    return () => clearAutoScroll();
-  }, [isInitialized, startAutoScroll, clearAutoScroll]);
+  }, [isInitialized, itemWidth, categories.length, startAutoScroll, clearAutoScroll]);
 
   const handleImageError = useCallback((e) => {
     e.target.onerror = null;
@@ -107,9 +133,12 @@ const Categories = () => {
 
   // Navigation functions with improved logic
   const goToPrevious = useCallback(() => {
-    if (categories.length === 0 || itemWidth === 0) return;
+    if (categories.length === 0 || itemWidth === 0 || !isInitialized) return;
     
-    // Temporarily stop auto-scroll
+    // Set manual navigation flag
+    isManualNavigationRef.current = true;
+    
+    // Stop auto-scroll
     clearAutoScroll();
     
     setCurrentTranslate(prev => {
@@ -124,14 +153,20 @@ const Categories = () => {
       return newTranslate;
     });
     
-    // Restart auto-scroll after manual navigation
-    setTimeout(() => startAutoScroll(), 3000);
-  }, [categories.length, itemWidth, clearAutoScroll, startAutoScroll]);
+    // Restart auto-scroll after delay and clear manual flag
+    setTimeout(() => {
+      isManualNavigationRef.current = false;
+      startAutoScroll();
+    }, 4000); // Longer delay for manual interaction
+  }, [categories.length, itemWidth, isInitialized, clearAutoScroll, startAutoScroll]);
 
   const goToNext = useCallback(() => {
-    if (categories.length === 0 || itemWidth === 0) return;
+    if (categories.length === 0 || itemWidth === 0 || !isInitialized) return;
     
-    // Temporarily stop auto-scroll
+    // Set manual navigation flag
+    isManualNavigationRef.current = true;
+    
+    // Stop auto-scroll
     clearAutoScroll();
     
     setCurrentTranslate(prev => {
@@ -146,9 +181,23 @@ const Categories = () => {
       return newTranslate;
     });
     
-    // Restart auto-scroll after manual navigation
-    setTimeout(() => startAutoScroll(), 3000);
-  }, [categories.length, itemWidth, clearAutoScroll, startAutoScroll]);
+    // Restart auto-scroll after delay and clear manual flag
+    setTimeout(() => {
+      isManualNavigationRef.current = false;
+      startAutoScroll();
+    }, 4000); // Longer delay for manual interaction
+  }, [categories.length, itemWidth, isInitialized, clearAutoScroll, startAutoScroll]);
+
+  // Pause auto-scroll on hover
+  const handleMouseEnter = useCallback(() => {
+    clearAutoScroll();
+  }, [clearAutoScroll]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (!isManualNavigationRef.current && isInitialized) {
+      startAutoScroll();
+    }
+  }, [startAutoScroll, isInitialized]);
 
   // Loading Skeleton UI
   if (loading && categories.length === 0) {
@@ -197,10 +246,14 @@ const Categories = () => {
         </div>
         
         {/* Main Content */}
-        <div className="relative">
+        <div 
+          className="relative"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
           <div ref={containerRef} className="overflow-hidden">
             <div 
-              className={`flex ${isTransitioning ? 'transition-transform duration-500 ease-out' : ''}`}
+              className="flex transition-transform duration-500 ease-out"
               style={{
                 transform: `translateX(${currentTranslate}px)`,
                 width: `${duplicatedCategories.length * (100 / itemsPerView)}%`
@@ -238,11 +291,11 @@ const Categories = () => {
           </div>
 
           {/* Navigation Arrows */}
-          {categories.length > itemsPerView && (
+          {categories.length > itemsPerView && isInitialized && (
             <>
               <button 
                 onClick={goToPrevious}
-                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white shadow-lg border flex items-center justify-center transition hover:scale-105"
+                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white shadow-lg border flex items-center justify-center transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500"
                 aria-label="Previous slide"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,7 +304,7 @@ const Categories = () => {
               </button>
               <button 
                 onClick={goToNext}
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white shadow-lg border flex items-center justify-center transition hover:scale-105"
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white shadow-lg border flex items-center justify-center transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500"
                 aria-label="Next slide"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
