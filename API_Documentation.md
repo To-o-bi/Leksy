@@ -1101,9 +1101,25 @@ curl --location --request GET '{base_url}/api/admin/fetch-sales'
 {
 	"code": 200,
 	"message": "Sales fetch returned 1 results.",
-	"sales": {
-		stuff...
-	}
+	"sales": [
+		{
+			"product_id": "product_684d90b1e6aad",
+			"sale_quantity": 2,
+			"sale_date": "2025-07-05",
+			"name": "Abc",
+			"price": 9050,
+			"slashed_price": 10000,
+			"deal_end_date": "2025-07-18 01:46:15",
+			"deal_price": 8050,
+			"description": "KJS",
+			"available_qty": 30,
+			"images": "http://localhost/Leksy-Shop/api/images/products/product_684d90b1e6585684d90b1e658e.jpg,http://localhost/Leksy-Shop/api/images/products/product_684d90b1e69b0684d90b1e69b8.jpg",
+			"category": "sunscreens",
+			"concern_options": "",
+			"modified_at": "2025-06-14 16:09:37"
+		},
+		...
+	]
 }
 ```
 
