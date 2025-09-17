@@ -7,7 +7,9 @@ const Categories = () => {
   const [currentTranslate, setCurrentTranslate] = useState(0);
   const [itemsPerView, setItemsPerView] = useState(6);
   const [itemWidth, setItemWidth] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const autoScrollRef = useRef(null);
   
   // Get dynamic categories and loading state from the context
   const { categories, loading } = useProducts();
@@ -41,61 +43,74 @@ const Categories = () => {
     }
   }, []);
 
-  useEffect(() => {
-    updateLayout();
-    window.addEventListener('resize', updateLayout);
-    return () => window.removeEventListener('resize', updateLayout);
-  }, [updateLayout]);
-
-  // Initialize position to show the middle set of categories
-  useEffect(() => {
-    if (categories.length > 0 && itemWidth > 0) {
-      const initialPosition = -(categories.length * itemWidth);
-      setCurrentTranslate(initialPosition);
+  // Clear auto-scroll interval
+  const clearAutoScroll = useCallback(() => {
+    if (autoScrollRef.current) {
+      clearInterval(autoScrollRef.current);
+      autoScrollRef.current = null;
     }
-  }, [categories.length, itemWidth]);
+  }, []);
 
-  // Auto-scroll functionality
-  useEffect(() => {
+  // Start auto-scroll
+  const startAutoScroll = useCallback(() => {
     if (categories.length === 0 || itemWidth === 0) return;
     
-    const interval = setInterval(() => {
+    clearAutoScroll(); // Clear any existing interval
+    
+    autoScrollRef.current = setInterval(() => {
       setCurrentTranslate(prev => {
         const newTranslate = prev - itemWidth;
         const maxTranslate = -(categories.length * 2 * itemWidth);
         
         // Reset to middle position when we've scrolled through two full sets
         if (newTranslate <= maxTranslate) {
-          // Temporarily disable transition for instant reset
-          setTimeout(() => {
-            setIsTransitioning(false);
-            setCurrentTranslate(-(categories.length * itemWidth));
-            setTimeout(() => setIsTransitioning(true), 50);
-          }, 500); // Wait for current transition to complete
-          
-          return newTranslate;
+          // Instead of using setTimeout, return to middle position immediately
+          return -(categories.length * itemWidth);
         }
         
         return newTranslate;
       });
-    }, 3000); // Auto-scroll every 3 seconds
+    }, 3000);
+  }, [categories.length, itemWidth, clearAutoScroll]);
 
-    return () => clearInterval(interval);
-  }, [categories.length, itemWidth]);
-
-  // Enable transitions by default
   useEffect(() => {
-    setIsTransitioning(true);
-  }, []);
+    updateLayout();
+    window.addEventListener('resize', updateLayout);
+    return () => {
+      window.removeEventListener('resize', updateLayout);
+      clearAutoScroll();
+    };
+  }, [updateLayout, clearAutoScroll]);
+
+  // Initialize position
+  useEffect(() => {
+    if (categories.length > 0 && itemWidth > 0 && !isInitialized) {
+      const initialPosition = -(categories.length * itemWidth);
+      setCurrentTranslate(initialPosition);
+      setIsInitialized(true);
+    }
+  }, [categories.length, itemWidth, isInitialized]);
+
+  // Start auto-scroll when component is ready
+  useEffect(() => {
+    if (isInitialized) {
+      startAutoScroll();
+    }
+    
+    return () => clearAutoScroll();
+  }, [isInitialized, startAutoScroll, clearAutoScroll]);
 
   const handleImageError = useCallback((e) => {
     e.target.onerror = null;
     e.target.src = '/assets/images/placeholder.jpg';
   }, []);
 
-  // Navigation functions
+  // Navigation functions with improved logic
   const goToPrevious = useCallback(() => {
     if (categories.length === 0 || itemWidth === 0) return;
+    
+    // Temporarily stop auto-scroll
+    clearAutoScroll();
     
     setCurrentTranslate(prev => {
       const newTranslate = prev + itemWidth;
@@ -103,21 +118,21 @@ const Categories = () => {
       
       // If we've scrolled back to the beginning of middle set, jump to end of first set
       if (newTranslate > minTranslate) {
-        setTimeout(() => {
-          setIsTransitioning(false);
-          setCurrentTranslate(-(categories.length * 2 * itemWidth) + itemWidth);
-          setTimeout(() => setIsTransitioning(true), 50);
-        }, 500);
-        
-        return newTranslate;
+        return -(categories.length * 2 * itemWidth) + itemWidth;
       }
       
       return newTranslate;
     });
-  }, [categories.length, itemWidth]);
+    
+    // Restart auto-scroll after manual navigation
+    setTimeout(() => startAutoScroll(), 3000);
+  }, [categories.length, itemWidth, clearAutoScroll, startAutoScroll]);
 
   const goToNext = useCallback(() => {
     if (categories.length === 0 || itemWidth === 0) return;
+    
+    // Temporarily stop auto-scroll
+    clearAutoScroll();
     
     setCurrentTranslate(prev => {
       const newTranslate = prev - itemWidth;
@@ -125,18 +140,15 @@ const Categories = () => {
       
       // If we've reached the end of the second set, jump back to middle set
       if (newTranslate <= maxTranslate) {
-        setTimeout(() => {
-          setIsTransitioning(false);
-          setCurrentTranslate(-(categories.length * itemWidth) - itemWidth);
-          setTimeout(() => setIsTransitioning(true), 50);
-        }, 500);
-        
-        return newTranslate;
+        return -(categories.length * itemWidth);
       }
       
       return newTranslate;
     });
-  }, [categories.length, itemWidth]);
+    
+    // Restart auto-scroll after manual navigation
+    setTimeout(() => startAutoScroll(), 3000);
+  }, [categories.length, itemWidth, clearAutoScroll, startAutoScroll]);
 
   // Loading Skeleton UI
   if (loading && categories.length === 0) {

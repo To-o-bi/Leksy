@@ -206,7 +206,7 @@ const ContactPage = () => {
             <div className="bg-white shadow-lg rounded-lg overflow-hidden">
               <ImageCarousel />
             </div>
-            <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+            <div className="rounded-lg overflow-hidden">
               <ContactInfo />
             </div>
           </div>

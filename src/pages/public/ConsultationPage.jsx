@@ -18,7 +18,7 @@ const ConsultationPage = () => {
               backgroundImage: "url('public/assets/images/banners/fine.jpg')",
             }}
           ></div>
-          <div className="absolute inset-0 bg-gradient-to-r from-pink-500 to-purple-500 opacity-60"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-pink-500 to-pink-400 opacity-60"></div>
           
           {/* Floating Bubbles */}
           <div className="absolute inset-0">

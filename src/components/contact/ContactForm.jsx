@@ -101,7 +101,7 @@ const ContactForm = ({
           error={errors.phone}
           required
         >
-          <div className="flex">
+          <div className="flex w-full">
             <CountryCodeSelect
               value={values.countryCode || '+234'}
               onChange={onChange}
@@ -114,7 +114,7 @@ const ContactForm = ({
               value={values.phone}
               onChange={handlePhoneChange}
               placeholder="555-014-0983"
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors border-l-0"
+              className="flex-1 w-full px-4 py-3 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors border-l-0"
               error={errors.phone}
               maxLength={12}
               required

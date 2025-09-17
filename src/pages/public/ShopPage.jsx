@@ -26,12 +26,17 @@ const ShopPage = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [showMobileFilters, setShowMobileFilters] = useState(false);
     const [totalProductsCount, setTotalProductsCount] = useState(0);
+    const [imagesLoading, setImagesLoading] = useState(true);
+    const [loadedImages, setLoadedImages] = useState(new Set());
 
     const productsPerPage = 20;
 
     const fetchAndFilterProducts = useCallback(async (filters, search) => {
         setLoading(true);
         setError(null);
+        setImagesLoading(true);
+        setLoadedImages(new Set());
+        
         try {
             const result = await fetchProducts({
                 category: filters.category,
@@ -72,7 +77,41 @@ const ShopPage = () => {
         setTotalPages(total > 0 ? total : 1);
         const startIndex = (currentPage - 1) * productsPerPage;
         const endIndex = startIndex + productsPerPage;
-        setProducts(allProducts.slice(startIndex, endIndex));
+        const currentProducts = allProducts.slice(startIndex, endIndex);
+        setProducts(currentProducts);
+        
+        // Reset image loading state when products change
+        if (currentProducts.length > 0) {
+            setImagesLoading(true);
+            setLoadedImages(new Set());
+            
+            // Preload images for current page products
+            const imagePromises = currentProducts.map((product) => {
+                return new Promise((resolve) => {
+                    if (product.image) {
+                        const img = new Image();
+                        img.onload = () => {
+                            setLoadedImages(prev => new Set([...prev, product.id]));
+                            resolve();
+                        };
+                        img.onerror = () => resolve(); // Still resolve on error to not block loading
+                        img.src = product.image;
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+            
+            // Set images as loaded when all are done (or timeout after 3 seconds)
+            Promise.allSettled([
+                ...imagePromises,
+                new Promise(resolve => setTimeout(resolve, 3000))
+            ]).then(() => {
+                setImagesLoading(false);
+            });
+        } else {
+            setImagesLoading(false);
+        }
     }, [allProducts, currentPage, totalProductsCount, productsPerPage]);
 
     const handleSearchChange = useCallback((e) => {
@@ -92,6 +131,69 @@ const ShopPage = () => {
         setSelectedFilters({ category: '', concerns: [] });
         setSearchQuery('');
     }, []);
+
+    // Product Grid with Skeleton Loading
+    const ProductGridWithLoading = () => {
+        if (loading && products.length === 0) {
+            return <ProductGridSkeleton />;
+        }
+
+        if (products.length === 0 && !loading && !error) {
+            return (
+                <div className="text-center py-12">
+                    <div className="text-5xl mb-4">😕</div>
+                    <h3 className="text-xl font-medium text-gray-800 mb-2">No products found</h3>
+                    <p className="text-gray-600 mb-6">
+                        {hasActiveFilters ? 'Try adjusting your filters or search criteria' : 'No products available at the moment'}
+                    </p>
+                    {hasActiveFilters && (
+                        <button 
+                            onClick={clearAllFilters} 
+                            className="px-6 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600 transition-colors"
+                        >
+                            Clear all filters
+                        </button>
+                    )}
+                </div>
+            );
+        }
+
+        return (
+            <div className="relative">
+                {imagesLoading && (
+                    <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-md">
+                        <div className="text-center">
+                            <Loader />
+                            <p className="mt-2 text-sm text-gray-600">Loading images...</p>
+                        </div>
+                    </div>
+                )}
+                <ProductGrid 
+                    products={products} 
+                    loadedImages={loadedImages}
+                    showSkeletons={imagesLoading}
+                />
+            </div>
+        );
+    };
+
+    // Skeleton loading component for product grid
+    const ProductGridSkeleton = () => {
+        return (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+                {Array.from({ length: productsPerPage }).map((_, index) => (
+                    <div key={index} className="bg-white rounded-lg shadow-sm border animate-pulse">
+                        <div className="aspect-square bg-gray-200 rounded-t-lg"></div>
+                        <div className="p-3">
+                            <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                            <div className="h-3 bg-gray-200 rounded mb-2 w-3/4"></div>
+                            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    };
     
     if (loading && products.length === 0) {
         return (
@@ -125,7 +227,7 @@ const ShopPage = () => {
                                 placeholder="Search products..."
                                 value={searchQuery}
                                 onChange={handleSearchChange}
-                                className="w-full md:w-64 pl-8 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-300"
+                                className="w-full md:w-64 pl-8 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-300 transition-colors"
                             />
                             <svg className="w-4 h-4 absolute left-2.5 top-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -143,17 +245,24 @@ const ShopPage = () => {
                                     compact={true}
                                 />
                             </div>
-                            <button className="md:hidden flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200" onClick={() => setShowMobileFilters(!showMobileFilters)}>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                            <button 
+                                className="md:hidden flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors" 
+                                onClick={() => setShowMobileFilters(!showMobileFilters)}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                                </svg>
                                 Filters
                             </button>
                         </div>
                     </div>
+                    
                     {showMobileFilters && (
                         <div className="md:hidden bg-gray-50 p-4 rounded-md mb-4">
                             <ProductFilters selectedFilters={selectedFilters} onFilterChange={handleFilterChange} compact={true} />
                         </div>
                     )}
+                    
                     {hasActiveFilters && (
                         <div className="bg-gray-50 p-4 rounded-md mb-6 flex flex-col md:flex-row items-start md:items-center justify-between">
                             <div className="flex flex-wrap gap-2 items-center mb-3 md:mb-0">
@@ -161,8 +270,13 @@ const ShopPage = () => {
                                 {selectedFilters.category && (
                                     <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-pink-100 text-pink-800">
                                         {getCategoryDisplayName(selectedFilters.category)}
-                                        <button onClick={() => handleFilterChange({ category: '' })} className="ml-2 focus:outline-none hover:text-pink-900">
-                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                        <button 
+                                            onClick={() => handleFilterChange({ category: '' })} 
+                                            className="ml-2 focus:outline-none hover:text-pink-900 transition-colors"
+                                        >
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
                                         </button>
                                     </span>
                                 )}
@@ -172,45 +286,58 @@ const ShopPage = () => {
                                         <button onClick={() => {
                                             const updatedConcerns = selectedFilters.concerns.filter(c => c !== concern);
                                             handleFilterChange({ concerns: updatedConcerns });
-                                        }} className="ml-2 focus:outline-none hover:text-pink-900">
-                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                        }} className="ml-2 focus:outline-none hover:text-pink-900 transition-colors">
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
                                         </button>
                                     </span>
                                 ))}
                                 {searchQuery.trim() && (
                                     <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-pink-100 text-pink-800">
                                         Search: "{searchQuery}"
-                                        <button onClick={() => setSearchQuery('')} className="ml-2 focus:outline-none hover:text-pink-900">
-                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                        <button 
+                                            onClick={() => setSearchQuery('')} 
+                                            className="ml-2 focus:outline-none hover:text-pink-900 transition-colors"
+                                        >
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
                                         </button>
                                     </span>
                                 )}
                             </div>
-                            <button onClick={clearAllFilters} className="text-sm text-pink-600 hover:text-pink-800 font-medium flex items-center transition-colors">
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            <button 
+                                onClick={clearAllFilters} 
+                                className="text-sm text-pink-600 hover:text-pink-800 font-medium flex items-center transition-colors"
+                            >
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
                                 Clear all filters
                             </button>
                         </div>
                     )}
                 </div>
                 
-                {loading && <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center z-10 rounded-md"><Loader /></div>}
-                
-                <ProductGrid products={products} />
-                
-                {products.length === 0 && !loading && !error && (
-                    <div className="text-center py-12">
-                        <div className="text-5xl mb-4">😕</div>
-                        <h3 className="text-xl font-medium text-gray-800 mb-2">No products found</h3>
-                        <p className="text-gray-600 mb-6">{hasActiveFilters ? 'Try adjusting your filters or search criteria' : 'No products available at the moment'}</p>
-                        {hasActiveFilters && <button onClick={clearAllFilters} className="px-6 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600">Clear all filters</button>}
+                {error && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+                        {error}
                     </div>
                 )}
                 
+                <ProductGridWithLoading />
+                
                 {totalPages > 1 && products.length > 0 && (
                     <div className="mt-8 mb-12">
-                        <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
-                        <div className="text-center mt-4 text-sm text-gray-500">Page {currentPage} of {totalPages} • Showing {products.length} products • {totalProductsCount} total</div>
+                        <Pagination 
+                            currentPage={currentPage} 
+                            totalPages={totalPages} 
+                            onPageChange={handlePageChange} 
+                        />
+                        <div className="text-center mt-4 text-sm text-gray-500">
+                            Page {currentPage} of {totalPages} • Showing {products.length} products • {totalProductsCount} total
+                        </div>
                     </div>
                 )}
             </div>

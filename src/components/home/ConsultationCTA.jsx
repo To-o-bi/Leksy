@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const ConsultationCTA = () => {
   const [mediaLoaded, setMediaLoaded] = useState(false);
   const [mediaError, setMediaError] = useState(false);
+  const navigate = useNavigate();
   
   // GIF URL 
   const gifUrl = "/assets/video/skincare-1.gif";
@@ -21,9 +23,8 @@ const ConsultationCTA = () => {
   };
 
   const handleConsultationClick = () => {
-    // Navigate to consultation page - replace with your routing logic
-    console.log('Navigate to consultation page');
-    // navigate('/consultation');
+    // Navigate to consultation page
+    navigate('/consultation');
   };
 
   return (

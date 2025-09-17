@@ -69,14 +69,15 @@ const ContactInfo = () => {
   return (
     <div className="grid grid-cols-1 gap-4 flex-grow">
       {contactItems.map(item => (
-        <ContactInfoCard
-          key={item.id}
-          icon={item.icon}
-          title={item.title}
-          content={item.content}
-          href={item.href}
-          isAddress={item.isAddress}
-        />
+        <div key={item.id} className="border border-gray-200 rounded-lg">
+          <ContactInfoCard
+            icon={item.icon}
+            title={item.title}
+            content={item.content}
+            href={item.href}
+            isAddress={item.isAddress}
+          />
+        </div>
       ))}
     </div>
   );
