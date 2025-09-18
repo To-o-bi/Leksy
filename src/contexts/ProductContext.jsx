@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { productService } from '../api';
+import { productService, salesService } from '../api/services'; // Assuming salesService is in the same api directory
 
 const ProductContext = createContext();
 
@@ -82,6 +82,12 @@ export const ProductProvider = ({ children }) => {
     const [lastFetch, setLastFetch] = useState(null);
     const [cache, setCache] = useState(new Map());
 
+    // --- Best Seller State ---
+    const [salesData, setSalesData] = useState([]);
+    const [bestSellers, setBestSellers] = useState([]);
+    const [loadingSales, setLoadingSales] = useState(false);
+    const [salesError, setSalesError] = useState(null);
+
     const categories = useMemo(() => {
         if (products.length === 0) return [];
         
@@ -92,7 +98,6 @@ export const ProductProvider = ({ children }) => {
         }, {});
         
         return Object.entries(categoryCounts).map(([name, count], index) => {
-            // Use toLowerCase() for matching and provide fallback
             const normalizedName = name.toLowerCase();
             const visuals = categoryVisuals[normalizedName] || categoryVisuals.default;
             
@@ -168,6 +173,77 @@ export const ProductProvider = ({ children }) => {
             setLoading(false);
         }
     }, [products, cache]);
+    
+    // --- Best Seller Logic ---
+
+    const fetchSalesData = useCallback(async () => {
+        setLoadingSales(true);
+        setSalesError(null);
+        try {
+            const response = await salesService.fetchSales();
+            if (response && response.code === 200 && response.sales) {
+                setSalesData(response.sales);
+                return response.sales;
+            } else {
+                throw new Error(response?.message || 'Invalid sales data response');
+            }
+        } catch (err) {
+            setSalesError(err.message || 'Failed to fetch sales data');
+        } finally {
+            setLoadingSales(false);
+        }
+    }, []);
+
+    const calculateBestSellers = useCallback((options = {}) => {
+        const { days = 30, limit = 10 } = options;
+        if (salesData.length === 0 || products.length === 0) {
+            setBestSellers([]);
+            return;
+        }
+
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(endDate.getDate() - days);
+
+        const salesInPeriod = salesData.filter(sale => {
+            const saleDate = new Date(sale.day_of_sale);
+            return saleDate >= startDate && saleDate <= endDate;
+        });
+        
+        const productSales = salesInPeriod.reduce((acc, sale) => {
+             try {
+                // The 'products_sold' is a JSON string, so it needs to be parsed.
+                const productsSold = JSON.parse(sale.products_sold);
+                if (Array.isArray(productsSold)) {
+                    productsSold.forEach(item => {
+                        const productId = item.product_id;
+                        const quantity = parseInt(item.ordered_quantity, 10) || 0;
+                        if (productId && quantity > 0) {
+                             acc[productId] = (acc[productId] || 0) + quantity;
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Could not parse products_sold from sale:", sale, e);
+            }
+            return acc;
+        }, {});
+
+        const sortedProducts = Object.entries(productSales)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, limit)
+            .map(([productId, quantitySold]) => {
+                const productDetails = products.find(p => p.product_id === productId);
+                return {
+                    ...productDetails,
+                    quantitySold
+                };
+            }).filter(p => p.product_id); // Filter out any that didn't find details
+
+        setBestSellers(sortedProducts);
+
+    }, [salesData, products]);
+
 
     const refreshProducts = useCallback(() => {
         return fetchAllProducts({}, true);
@@ -175,7 +251,8 @@ export const ProductProvider = ({ children }) => {
 
     useEffect(() => {
         fetchAllProducts();
-    }, [fetchAllProducts]);
+        fetchSalesData();
+    }, [fetchAllProducts, fetchSalesData]);
 
     const contextValue = useMemo(() => ({
         products,
@@ -188,6 +265,13 @@ export const ProductProvider = ({ children }) => {
         clearError,
         productCount: products.length,
         hasProducts: products.length > 0,
+        // --- Best Seller Exports ---
+        salesData,
+        bestSellers,
+        loadingSales,
+        salesError,
+        calculateBestSellers,
+        fetchSalesData,
     }), [
         products,
         loading,
@@ -196,7 +280,13 @@ export const ProductProvider = ({ children }) => {
         fetchAllProducts,
         getProductById,
         refreshProducts,
-        clearError
+        clearError,
+        salesData,
+        bestSellers,
+        loadingSales,
+        salesError,
+        calculateBestSellers,
+        fetchSalesData
     ]);
 
     return (
@@ -205,3 +295,4 @@ export const ProductProvider = ({ children }) => {
         </ProductContext.Provider>
     );
 };
+

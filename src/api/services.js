@@ -572,3 +572,14 @@ export const newsletterService = {
     }
   }
 };
+
+
+// --- NEW Sales Service ---
+export const salesService = {
+  async fetchSales() {
+    // Assuming your ENDPOINTS config has a FETCH_SALES key
+    // like: FETCH_SALES: '/admin/fetch-sales'
+    const response = await api.get(ENDPOINTS.FETCH_SALES);
+    return response.data;
+  }
+};
