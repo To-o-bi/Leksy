@@ -55,7 +55,7 @@ const BestSellers = () => {
         if (!loadingSales && !loading && salesData.length > 0 && products.length > 0) {
             setIsCalculating(true);
             try {
-                const bestSellers = calculateBestSellers({ days: 30, limit: 4 });
+                const bestSellers = calculateBestSellers({ days: 30, limit: 8 });
                 console.log('%c[BestSellers] Calculated Best Sellers:', 'color: #E91E63; font-weight: bold;', bestSellers);
                 setBestSellingProducts(bestSellers);
             } catch (error) {
@@ -95,8 +95,8 @@ const BestSellers = () => {
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {isLoading ? (
-                        // Show skeleton loaders while loading
-                        Array.from({ length: 4 }).map((_, index) => (
+                        // Show skeleton loaders while loading - now 8 instead of 4
+                        Array.from({ length: 8 }).map((_, index) => (
                             <SkeletonLoader key={`skeleton-${index}`} />
                         ))
                     ) : hasError ? (
