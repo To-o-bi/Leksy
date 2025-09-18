@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useCart } from '../../hooks/useCart';
 import { useNavigate } from 'react-router-dom';
 import { useWishlist } from '../../contexts/WishlistContext';
@@ -26,11 +26,11 @@ const ProductDetail = ({ product, loading = false }) => {
     const navigate = useNavigate();
     const [quantity, setQuantity] = useState(1);
     const [selectedImage, setSelectedImage] = useState(0);
+    const [componentReady, setComponentReady] = useState(false);
 
     const { toggleWishlistItem, isInWishlist } = useWishlist();
     const { warning } = useMessage();
 
-    // Memoize the normalized product data for performance and consistency
     const normalizedProduct = useMemo(() => {
         if (!product) return null;
         
@@ -52,6 +52,38 @@ const ProductDetail = ({ product, loading = false }) => {
             discount: discount
         };
     }, [product]);
+
+    // Effect to handle component readiness and transition end
+    useEffect(() => {
+        if (normalizedProduct && !loading) {
+            // Small delay to ensure DOM is fully rendered
+            const timer = setTimeout(() => {
+                setComponentReady(true);
+                // endTransition(); // End the loading overlay - commented out as endTransition is not defined
+            }, 200);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [normalizedProduct, loading]); // Removed endTransition from dependencies
+
+    // Handle images loading for better UX
+    useEffect(() => {
+        if (normalizedProduct?.images?.length > 0 && componentReady) {
+            const imagePromises = normalizedProduct.images.map(imageSrc => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = resolve;
+                    img.onerror = resolve; // Still resolve on error
+                    img.src = imageSrc;
+                });
+            });
+
+            Promise.all(imagePromises).then(() => {
+                // All images loaded - component is truly ready
+                // endTransition(); // Commented out as endTransition is not defined
+            });
+        }
+    }, [normalizedProduct, componentReady]); // Removed endTransition from dependencies
 
     // Memoize the wishlist status check
     const isProductInWishlist = useMemo(() => {

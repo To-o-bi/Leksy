@@ -27,20 +27,14 @@ export const RouteTransitionProvider = ({ children }) => {
     if (isTransitioning) {
       const timer = setTimeout(() => {
         setIsTransitioning(false);
-      }, 2000); // Max 2 seconds
+      }, 10000); // Increased to 10 seconds for slower connections
       
       return () => clearTimeout(timer);
     }
   }, [isTransitioning]);
 
-  // End transition when route changes (backup)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsTransitioning(false);
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, [location.pathname]);
+  // Don't auto-end transition on location change - let the component control it
+  // This was causing the premature dismissal
 
   return (
     <RouteTransitionContext.Provider value={{ isTransitioning, startTransition, endTransition }}>
@@ -82,12 +76,10 @@ export const useProductNavigation = () => {
   const navigateToProduct = (navigate, productId, product = null) => {
     startTransition();
     
-    // Small delay to show the loading state
-    setTimeout(() => {
-      navigate(`/product/${productId}`, {
-        state: product ? { product } : undefined
-      });
-    }, 300);
+    // Navigate immediately - let ProductDetail control when loading ends
+    navigate(`/product/${productId}`, {
+      state: product ? { product } : undefined
+    });
   };
   
   return { navigateToProduct };

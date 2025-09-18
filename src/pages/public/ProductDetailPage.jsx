@@ -1,26 +1,65 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { productService } from '../../api/services';
 import ProductDetail from '../../components/product/ProductDetail';
 import RelatedProducts from '../../components/product/RelatedProducts';
 import Loader from '../../components/common/Loader';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import { getCategoryDisplayName } from '../../utils/api';
-import Meta from '../../components/common/Meta'; // ADDED META IMPORT
+import Meta from '../../components/common/Meta';
+import { useRouteTransition } from '../../routes/RouteTransitionLoader';
 
 const ProductDetailPage = () => {
     const { productId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const [loading, setLoading] = useState(true);
-    const [product, setProduct] = useState(null);
+    const [product, setProduct] = useState(location.state?.product || null);
     const [error, setError] = useState(null);
     const [relatedProducts, setRelatedProducts] = useState([]);
+    const [componentReady, setComponentReady] = useState(false);
+    const { endTransition } = useRouteTransition();
 
     useEffect(() => {
         const fetchProductDetails = async () => {
+            // If we have product data from navigation state, use it and skip API call
+            if (location.state?.product) {
+                setProduct(location.state.product);
+                setLoading(false);
+                setComponentReady(true);
+                
+                // Still fetch related products
+                try {
+                    const category = location.state.product.category || location.state.product.category_name;
+                    if (category && category !== 'Uncategorized') {
+                        const relatedData = await productService.fetchProducts({
+                            categories: [category],
+                            limit: 5
+                        });
+                        
+                        if (relatedData.products) {
+                            const related = relatedData.products
+                                .filter(p => {
+                                    const pId = p.id || p._id || p.product_id;
+                                    return pId && pId !== productId;
+                                })
+                                .slice(0, 4);
+                                
+                            setRelatedProducts(related);
+                        }
+                    }
+                } catch (relatedErr) {
+                    console.error("Error fetching related products:", relatedErr);
+                    setRelatedProducts([]);
+                }
+                return;
+            }
+
+            // Otherwise fetch from API
             if (!productId) {
                 setError("Product ID is missing");
                 setLoading(false);
+                endTransition(); // End loading overlay on error
                 return;
             }
 
@@ -33,11 +72,13 @@ const ProductDetailPage = () => {
                 if (!apiResponse || !apiResponse.product) {
                     setError("Product not found");
                     setLoading(false);
+                    endTransition(); // End loading overlay on error
                     return;
                 }
 
                 const productData = apiResponse.product;
                 setProduct(productData);
+                setComponentReady(true);
                 
                 // Fetch related products based on the product's category
                 try {
@@ -45,17 +86,15 @@ const ProductDetailPage = () => {
                     if (category && category !== 'Uncategorized') {
                         const relatedData = await productService.fetchProducts({
                             categories: [category],
-                            limit: 5 // Fetch one extra to filter out the current product
+                            limit: 5
                         });
                         
                         if (relatedData.products) {
                             const related = relatedData.products
-                                // Ensure the current product is not in the related list
                                 .filter(p => {
                                     const pId = p.id || p._id || p.product_id;
                                     return pId && pId !== productId;
                                 })
-                                // Limit to 4 related products
                                 .slice(0, 4);
                                 
                             setRelatedProducts(related);
@@ -63,26 +102,47 @@ const ProductDetailPage = () => {
                     }
                 } catch (relatedErr) {
                     console.error("Error fetching related products:", relatedErr);
-                    setRelatedProducts([]); // Reset on error
+                    setRelatedProducts([]);
                 }
             } catch (err) {
                 console.error("Error fetching product details:", err);
                 setError(`Failed to load product details: ${err.message}`);
+                endTransition(); // End loading overlay on error
             } finally {
                 setLoading(false);
             }
         };
 
         fetchProductDetails();
-        window.scrollTo(0, 0); // Scroll to top on new product load
-    }, [productId]);
+    }, [productId, location.state, navigate, endTransition]);
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <Loader />
-            </div>
-        );
+    // Handle component readiness and end transition when everything is loaded
+    useEffect(() => {
+        if (product && !loading && componentReady) {
+            // Wait for DOM to render and images to start loading
+            const timer = setTimeout(() => {
+                // Check if main product image exists and wait for it to load
+                if (product.images && product.images.length > 0) {
+                    const mainImage = new Image();
+                    mainImage.onload = () => {
+                        endTransition(); // End loading overlay when main image is ready
+                    };
+                    mainImage.onerror = () => {
+                        endTransition(); // End even if image fails to load
+                    };
+                    mainImage.src = product.images[0]?.url || product.images[0];
+                } else {
+                    endTransition(); // End if no images
+                }
+            }, 100);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [product, loading, componentReady, endTransition]);
+
+    // Don't show the old loading screen - let the transition overlay handle it
+    if (loading && !product) {
+        return null; // Let the route transition overlay show instead
     }
 
     if (error) {
@@ -103,6 +163,10 @@ const ProductDetailPage = () => {
         );
     }
 
+    if (!product) {
+        return null; // Let the transition overlay handle loading
+    }
+
     const categoryName = product?.category || product?.category_name;
     const breadcrumbItems = [
         { label: 'Home', path: '/' },
@@ -117,15 +181,13 @@ const ProductDetailPage = () => {
     return (
         <>
             {/* DYNAMIC META TAGS FOR THE PRODUCT */}
-            {product && (
-                <Meta 
-                    title={`${product.name} - Leksy Cosmetics`}
-                    description={product.description?.substring(0, 155) || `Discover ${product.name}, a premium product from Leksy Cosmetics.`}
-                    keywords={`buy ${product.name}, ${product.category}, leksy cosmetics, skincare`}
-                    image={product.images && product.images[0]?.url}
-                    url={`/product/${productId}`}
-                />
-            )}
+            <Meta 
+                title={`${product.name} - Leksy Cosmetics`}
+                description={product.description?.substring(0, 155) || `Discover ${product.name}, a premium product from Leksy Cosmetics.`}
+                keywords={`buy ${product.name}, ${product.category}, leksy cosmetics, skincare`}
+                image={product.images && product.images[0]?.url}
+                url={`/product/${productId}`}
+            />
 
             <div className="min-h-screen bg-white">
                 <div className="container mx-auto px-4 py-4 sm:py-6">
@@ -133,10 +195,10 @@ const ProductDetailPage = () => {
                 </div>
                 
                 <div className="container mx-auto px-4 pb-8">
-                    {product && <ProductDetail product={product} />}
+                    <ProductDetail product={product} loading={loading} />
                 </div>
                 
-                {/* The RelatedProducts component is now linked and will display here */}
+                {/* Related products */}
                 {relatedProducts.length > 0 && (
                     <RelatedProducts products={relatedProducts} />
                 )}
@@ -146,4 +208,3 @@ const ProductDetailPage = () => {
 };
 
 export default ProductDetailPage;
-
