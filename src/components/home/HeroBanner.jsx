@@ -39,18 +39,40 @@ const HeroBanner = () => {
         delay: 900,
         duration: 800 
       });
+
+      // Animate background images after all other elements
+      sr.reveal('.hero-bg-main', { 
+        origin: 'top', 
+        delay: 1200,
+        duration: 1000 
+      });
+      
+      sr.reveal('.hero-bg-left', { 
+        origin: 'top', 
+        delay: 1400,
+        duration: 1000 
+      });
     }
   }, []);
 
   return (
     <section className="relative h-screen bg-white overflow-hidden flex flex-col font-sans">
       
-      {/* Background Blur Image */}
+      {/* Background Blur Images */}
       <div className="absolute inset-0 z-0">
+        {/* Main/Right blur image */}
         <img 
           src="/assets/images/hero/blur-1.png" 
           alt="" 
-          className="w-full h-full object-cover"
+          className="hero-bg-main w-full h-full object-cover"
+          loading="lazy" 
+        />
+        
+        {/* Left blur image */}
+        <img 
+          src="/assets/images/hero/blur-1.png" 
+          alt="" 
+          className="hero-bg-left absolute top-0 left-0 w-1/2 h-full object-cover opacity-70"
           loading="lazy" 
         />
       </div>
