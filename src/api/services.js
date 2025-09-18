@@ -574,12 +574,35 @@ export const newsletterService = {
 };
 
 
-// --- NEW Sales Service ---
+// Sales Service - Fixed Implementation
 export const salesService = {
-  async fetchSales() {
-    // Assuming your ENDPOINTS config has a FETCH_SALES key
-    // like: FETCH_SALES: '/admin/fetch-sales'
-    const response = await api.get(ENDPOINTS.FETCH_SALES);
+  async fetchSales(filters = {}) {
+    const params = {};
+    
+    // Add any filters if needed
+    if (filters.startDate) params.start_date = filters.startDate;
+    if (filters.endDate) params.end_date = filters.endDate;
+    if (filters.limit) params.limit = filters.limit;
+    if (filters.status) params.status = filters.status;
+
+    const response = await api.get('/fetch-sales', params);
+    return response.data;
+  },
+
+  async fetchSaleById(saleId) {
+    if (!saleId) throw new Error('Sale ID is required');
+    const response = await api.get('/fetch-sale', { sale_id: saleId });
+    return response.data;
+  },
+
+  async updateSaleStatus(saleId, status) {
+    if (!saleId || !status) throw new Error('Sale ID and status are required');
+    
+    const formData = new FormData();
+    formData.append('sale_id', saleId);
+    formData.append('status', status);
+    
+    const response = await api.postFormData('/update-sale-status', formData);
     return response.data;
   }
 };

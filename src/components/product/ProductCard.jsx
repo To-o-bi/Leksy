@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { useCart } from '../../hooks/useCart';
 import { formatter } from '../../utils/formatter';
-import ProductDetail from './ProductDetail'; // Assuming ProductDetail is in the same folder
+import { useProductNavigation } from '../../routes/RouteTransitionLoader';
+import ProductDetail from './ProductDetail';
 
 // Utility function to decode HTML entities, preventing XSS
 const decodeHtmlEntities = (text) => {
@@ -17,6 +18,8 @@ const ProductCard = ({ product }) => {
   const { isInWishlist, toggleWishlistItem } = useWishlist();
   const { addToCart } = useCart();
   const [showQuickView, setShowQuickView] = useState(false);
+  const navigate = useNavigate();
+  const { navigateToProduct } = useProductNavigation();
   
   // Normalize product data to handle inconsistencies from the API
   const normalizedProduct = useMemo(() => {
@@ -60,6 +63,10 @@ const ProductCard = ({ product }) => {
     e.preventDefault();
     e.stopPropagation();
     setShowQuickView(true);
+  };
+
+  const handleProductClick = () => {
+    navigateToProduct(navigate, normalizedProduct.id, normalizedProduct);
   };
 
   if (!normalizedProduct) {
@@ -107,14 +114,19 @@ const ProductCard = ({ product }) => {
             </button>
           </div>
           
-          <Link to={`/product/${normalizedProduct.id}`} className="block absolute inset-0">
+          {/* Clickable Product Image - Now uses transition navigation */}
+          <button 
+            onClick={handleProductClick}
+            className="absolute inset-0 w-full h-full focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-inset"
+            aria-label={`View ${normalizedProduct.name}`}
+          >
             <img 
               src={normalizedProduct.image} 
               alt={normalizedProduct.name} 
               className="absolute top-0 left-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               loading="lazy"
             />
-          </Link>
+          </button>
           
           {/* Add to Cart on Hover */}
           <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-3 bg-gradient-to-t from-black/20 to-transparent opacity-0 transform translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
@@ -130,11 +142,15 @@ const ProductCard = ({ product }) => {
         </div>
         
         <div className="p-3 sm:p-4">
-          <Link to={`/product/${normalizedProduct.id}`} className="block">
+          {/* Clickable Product Name - Now uses transition navigation */}
+          <button 
+            onClick={handleProductClick}
+            className="block w-full text-left focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 rounded-sm"
+          >
             <h3 className="text-gray-700 font-medium text-sm sm:text-sm leading-tight hover:text-pink-500 transition-colors line-clamp-2 h-10 sm:h-10">
               {normalizedProduct.name}
             </h3>
-          </Link>
+          </button>
           
           <div className="flex items-center justify-between mt-2 flex-wrap gap-1">
             <div className="flex flex-col">
