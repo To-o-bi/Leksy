@@ -1094,7 +1094,7 @@ curl --location --request POST '{base_url}/api/admin/mark-all-as-read?target={a_
 ## Fetch Sales
 
 ```CURL
-curl --location --request GET '{base_url}/api/admin/fetch-sales'
+curl --location --request GET '{base_url}/api/fetch-sales'
 ```
 
 ```JSON
