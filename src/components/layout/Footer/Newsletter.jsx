@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import logo from '/assets/images/icons/leksy-logo.png';
-import { newsletterService } from '../../../api/services';
+import { newsletterService } from '../../../api/NewsletterService';
 
 const Newsletter = () => {
   const [email, setEmail] = useState('');

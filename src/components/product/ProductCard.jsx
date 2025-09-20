@@ -47,6 +47,37 @@ const ProductCard = ({ product }) => {
     return normalizedProduct ? isInWishlist(normalizedProduct.id) : false;
   }, [normalizedProduct, isInWishlist]);
 
+  // Check if product should show NEW badge
+  const shouldShowNewBadge = useMemo(() => {
+    if (!normalizedProduct) return false;
+    
+    // Show badge if explicitly marked (from NewArrivals component)
+    if (normalizedProduct.showNewBadge) return true;
+    
+    // Show badge if marked as new
+    if (normalizedProduct.isNew) return true;
+    
+    // Show badge if product was created within last 30 days
+    if (normalizedProduct.created_at || normalizedProduct.date_added) {
+      const productDate = new Date(normalizedProduct.created_at || normalizedProduct.date_added);
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      return productDate > thirtyDaysAgo;
+    }
+    
+    return false;
+  }, [normalizedProduct]);
+
+  // Check if product should show BEST SELLER badge
+  const shouldShowBestSellerBadge = useMemo(() => {
+    return normalizedProduct?.showBestSellerBadge || false;
+  }, [normalizedProduct]);
+
+  // Check if product should show TRENDING badge
+  const shouldShowTrendingBadge = useMemo(() => {
+    return normalizedProduct?.showTrendingBadge || false;
+  }, [normalizedProduct]);
+
   const handleWishlistToggle = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -85,19 +116,86 @@ const ProductCard = ({ product }) => {
     return null; // Don't show anything if stock is ample
   };
 
+  // Render appropriate badge based on priority: Best Seller > Trending > New > Discount
+  const renderTopBadge = () => {
+    if (shouldShowBestSellerBadge) {
+      return (
+        <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-20 bg-gradient-to-r from-pink-500 to-pink-600 text-white text-xs font-bold px-2 sm:px-2.5 py-1 rounded-full shadow-lg flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+          </svg>
+          BEST SELLER
+        </div>
+      );
+    }
+    
+    if (shouldShowTrendingBadge) {
+      return (
+        <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-20 bg-gradient-to-r from-green-500 to-green-600 text-white text-xs font-bold px-2 sm:px-2.5 py-1 rounded-full shadow-lg flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          </svg>
+          TRENDING
+        </div>
+      );
+    }
+    
+    if (shouldShowNewBadge) {
+      return (
+        <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-20 bg-gradient-to-r from-green-500 to-green-600 text-white text-xs font-bold px-2 sm:px-2.5 py-1 rounded-full shadow-lg flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          NEW
+        </div>
+      );
+    }
+    
+    return null;
+  };
+
+  // Render additional badges (quantity sold, discount)
+  const renderAdditionalBadges = () => {
+    const badges = [];
+    
+    // Show quantity sold for best sellers and trending
+    if (normalizedProduct.quantitySold && (shouldShowBestSellerBadge || shouldShowTrendingBadge)) {
+      badges.push(
+        <div key="quantity" className="bg-gradient-to-r from-orange-500 to-orange-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
+          🔥 {normalizedProduct.quantitySold} sold
+        </div>
+      );
+    }
+    
+    // Show discount badge
+    if (normalizedProduct.discount > 0) {
+      badges.push(
+        <div key="discount" className="bg-red-600 text-white text-xs font-bold px-2 sm:px-2.5 py-1 rounded-sm">
+          -{normalizedProduct.discount}%
+        </div>
+      );
+    }
+    
+    return badges.length > 0 ? (
+      <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-10 flex flex-col gap-1">
+        {badges}
+      </div>
+    ) : null;
+  };
+
   return (
     <>
       <div className="group relative bg-white rounded-lg border border-gray-200 overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1 w-full max-w-sm mx-auto sm:max-w-none">
         <div className="relative overflow-hidden pt-[100%]">
-          {/* Discount Badge */}
-          {normalizedProduct.discount > 0 && (
-            <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-10 bg-red-600 text-white text-xs font-bold px-2 sm:px-2.5 py-1 rounded-sm">
-              -{normalizedProduct.discount}%
-            </div>
-          )}
+          {/* Top Badge (Best Seller, Trending, or New) */}
+          {renderTopBadge()}
+
+          {/* Additional Badges (Quantity Sold, Discount) */}
+          {renderAdditionalBadges()}
           
           {/* Action Buttons - Always visible on mobile, hover on desktop */}
-          <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-10 flex flex-col space-y-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300">
+          <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-10 flex flex-col space-y-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300" 
+               style={{ marginTop: (normalizedProduct.quantitySold || normalizedProduct.discount) ? '60px' : '0' }}>
              <button 
               onClick={handleWishlistToggle} 
               aria-label="Toggle Wishlist" 
@@ -154,7 +252,9 @@ const ProductCard = ({ product }) => {
           
           <div className="flex items-center justify-between mt-2 flex-wrap gap-1">
             <div className="flex flex-col">
-              <p className="text-gray-900 font-bold text-base sm:text-lg">{formatter.formatCurrency(normalizedProduct.price)}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-gray-900 font-bold text-base sm:text-lg">{formatter.formatCurrency(normalizedProduct.price)}</p>
+              </div>
               {normalizedProduct.originalPrice && (
                 <p className="text-gray-500 text-xs line-through">{formatter.formatCurrency(normalizedProduct.originalPrice)}</p>
               )}

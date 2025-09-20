@@ -4,7 +4,7 @@ import Meta from '../../components/common/Meta';
 import HeroBanner from '../../components/home/HeroBanner';
 import Categories from '../../components/home/Categories';
 import BestSellers from '../../components/home/BestSellers';
-// import TrendingNow from '../../components/home/TrendingNow';
+import TrendingNow from '../../components/home/TrendingNow';
 import NewArrivals from '../../components/home/NewArrivals';
 import ShopByConcern from '../../components/home/ShopByConcern';
 import BrandLogoSlider from '../../components/home/BrandLogoSlider';
@@ -29,7 +29,7 @@ const HomePage = () => {
             <Categories />
             
             <div className="reveal-bottom">
-               {/* <TrendingNow /> */}
+               <TrendingNow />
             </div>
 
             <div className="reveal-bottom">

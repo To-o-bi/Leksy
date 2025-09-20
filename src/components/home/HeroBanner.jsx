@@ -66,14 +66,16 @@ const HeroBanner = () => {
           alt="" 
           className="hero-bg-main w-full h-full object-cover"
           loading="lazy" 
+          style={{ visibility: 'hidden' }}
         />
         
         {/* Left blur image */}
         <img 
           src="/assets/images/hero/blur-1.png" 
           alt="" 
-          className="hero-bg-left absolute top-0 left-0 w-1/2 h-full object-cover opacity-70"
+          className="hero-bg-left absolute top-0 left-0 w-1/2 h-full object-cover"
           loading="lazy" 
+          style={{ visibility: 'hidden', opacity: 0.7 }}
         />
       </div>
 

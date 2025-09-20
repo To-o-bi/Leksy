@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useProducts } from '../../contexts/ProductContext';
-import { useCart } from '../../hooks/useCart'; 
-import { ShoppingCart } from 'lucide-react';
+import { TrendingUp, AlertCircle } from 'lucide-react';
+import ProductCard from '../../components/product/ProductCard';
+
 
 const SkeletonLoader = () => (
     <div className="bg-white p-4 rounded-lg shadow-md animate-pulse">
@@ -11,79 +12,109 @@ const SkeletonLoader = () => (
     </div>
 );
 
+const ErrorMessage = ({ message, onRetry }) => (
+    <div className="col-span-full">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+            <AlertCircle className="mx-auto h-12 w-12 text-red-400 mb-4" />
+            <h3 className="text-lg font-medium text-red-800 mb-2">Unable to Load Trending Products</h3>
+            <p className="text-red-600 mb-4">{message}</p>
+            {onRetry && (
+                <button 
+                    onClick={onRetry}
+                    className="bg-red-100 hover:bg-red-200 text-red-800 px-4 py-2 rounded-lg transition-colors"
+                >
+                    Try Again
+                </button>
+            )}
+        </div>
+    </div>
+);
+
 const TrendingNow = () => {
-    const { calculateBestSellers, salesData, loadingSales, products } = useProducts();
-    const { addToCart } = useCart();
+    const { 
+        calculateBestSellers, 
+        salesData, 
+        loadingSales, 
+        products, 
+        loading,
+        errorSales,
+        refreshSales
+    } = useProducts();
+    
     const [trendingProducts, setTrendingProducts] = useState([]);
+    const [isCalculating, setIsCalculating] = useState(false);
 
     useEffect(() => {
-        if (salesData.length > 0 && products.length > 0) {
-            const trending = calculateBestSellers({ days: 7, limit: 4 });
-            setTrendingProducts(trending);
+        if (!loadingSales && !loading && salesData.length > 0 && products.length > 0) {
+            setIsCalculating(true);
+            try {
+                // Get trending products for the last 7 days (shorter period for "trending")
+                const trending = calculateBestSellers({ days: 7, limit: 4 });
+                // Add trending indicator to products
+                const productsWithIndicator = trending.map(product => ({
+                    ...product,
+                    showTrendingBadge: true,
+                    quantitySold: product.quantitySold
+                }));
+                setTrendingProducts(productsWithIndicator);
+            } catch (error) {
+                // Log error for debugging but don't expose to user
+                if (process.env.NODE_ENV === 'development') {
+                    console.error('Error calculating trending products:', error);
+                }
+                setTrendingProducts([]);
+            } finally {
+                setIsCalculating(false);
+            }
+        } else if (!loadingSales && !loading && (salesData.length === 0 || products.length === 0)) {
+            setTrendingProducts([]);
         }
-    }, [salesData, products, calculateBestSellers]);
+    }, [salesData, products, calculateBestSellers, loadingSales, loading]);
 
-    const formatPrice = (price) => {
-        if (!price) return '₦0.00';
-        return '₦' + parseFloat(price).toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-    };
+    const isLoading = loadingSales || loading || isCalculating;
+    const hasError = errorSales;
+    const hasNoData = !isLoading && !hasError && trendingProducts.length === 0;
+    
+    // Hide the entire section if there are no sales data at all
+    const shouldHideSection = !isLoading && !hasError && salesData.length === 0;
+
+    // Don't render anything if we should hide the section
+    if (shouldHideSection) {
+        return null;
+    }
 
     return (
         <section className="bg-white py-12 md:py-16">
             <div className="container mx-auto px-4">
                 <div className="text-center mb-8">
-                    <h2 className="text-3xl font-bold text-gray-800">Trending Now</h2>
-                    <p className="text-gray-600 mt-2">Check out what's hot this week.</p>
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                        <TrendingUp className="h-8 w-8 text-green-600" />
+                        <h2 className="text-3xl font-bold text-gray-800">Trending Now</h2>
+                    </div>
+                    <p className="text-gray-600">Hot picks flying off the shelves this week.</p>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {loadingSales && trendingProducts.length === 0 ? (
-                        Array.from({ length: 4 }).map((_, index) => <SkeletonLoader key={index} />)
-                    ) : trendingProducts.length > 0 ? (
-                        trendingProducts.map(product => (
-                            <div key={product.product_id} className="bg-white rounded-lg shadow-md overflow-hidden group transform hover:-translate-y-1 transition-transform duration-300">
-                                <a href={`/product/${product.product_id}`} className="block">
-                                    <div className="relative">
-                                        <img
-                                            src={product.images?.[0] || 'https://placehold.co/400x400/F3F4F6/6B7280?text=Product'}
-                                            alt={product.name}
-                                            className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-105"
-                                        />
-                                        <div className="absolute top-2 right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                                            Sold: {product.quantitySold}
-                                        </div>
-                                    </div>
-                                    <div className="p-4">
-                                        <h3 className="text-md font-semibold text-gray-800 truncate" title={product.name}>
-                                            {product.name}
-                                        </h3>
-                                        <p className="text-sm text-gray-500 capitalize">{product.category}</p>
-                                        <div className="mt-3 flex items-center justify-between">
-                                            <span className="text-lg font-bold text-green-600">{formatPrice(product.price)}</span>
-                                            {product.slashed_price && (
-                                                <span className="text-sm text-gray-400 line-through">{formatPrice(product.slashed_price)}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </a>
-                                <div className="p-4 pt-0">
-                                     <button 
-                                        onClick={() => addToCart(product)}
-                                        className="w-full bg-gray-800 text-white py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-green-600 transition-colors"
-                                     >
-                                        <ShoppingCart size={16} />
-                                        Add to Cart
-                                    </button>
-                                </div>
-                            </div>
+                    {isLoading ? (
+                        Array.from({ length: 4 }).map((_, index) => (
+                            <SkeletonLoader key={`trending-skeleton-${index}`} />
                         ))
+                    ) : hasError ? (
+                        <ErrorMessage 
+                            message={errorSales}
+                            onRetry={refreshSales}
+                        />
                     ) : (
-                        <div className="col-span-full text-center py-12">
-                             <p className="text-gray-500">No trending products found for this week.</p>
-                        </div>
+                        // The calculateBestSellers function already has fallback logic
+                        // It will show all-time best sellers if no recent sales found
+                        // If trendingProducts is empty here, it means no sales data exists at all
+                        // and the section will be hidden by the shouldHideSection check above
+                        trendingProducts.map(product => (
+                            <ProductCard 
+                                key={product.product_id || product.id} 
+                                product={product} 
+                            />
+                        ))
                     )}
                 </div>
             </div>
@@ -92,5 +123,3 @@ const TrendingNow = () => {
 };
 
 export default TrendingNow;
-
-
