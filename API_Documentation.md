@@ -940,7 +940,7 @@ EMPTY response
 
 
 
-# NEWSLETTER SUBSCRIBERS
+# NEWSLETTERS
 
 ## Add A Subscriber
 
@@ -988,6 +988,26 @@ curl --location --request GET '{base_url}/api/admin/fetch-newsletter-subscribers
 		},
 		...
 	],
+	"token": "68641f6750a7c"
+}
+```
+
+
+## Send a Newsletter (Sends to ALL Subscribers)
+
+```CURL
+curl --location --request GET '{base_url}/api/admin/send-newsletters?title={title}&message={message}&images={accepted_image_files|can_be:multiple|max-each:3mb|optional}&image_type={banner/flier|optional|default:banner}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```
+[POST] accepted_image_files = {jpg|png|jpeg|webp|svg|avif|gif}
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Newsletters sent successfully to all subscribers!",
 	"token": "68641f6750a7c"
 }
 ```
