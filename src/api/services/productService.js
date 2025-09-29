@@ -196,6 +196,7 @@ export const getProductCategories = () => {
     'bathe and body',
     'sunscreens',
     'toners',
+    'perfume',
     'face cleansers'
   ];
 };

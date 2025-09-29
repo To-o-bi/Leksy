@@ -15,6 +15,7 @@ export const useProducts = () => {
 const categoryVisuals = {
     'serum': { image: '/assets/images/categories/serum.png', bgColor: 'bg-pink-100', hoverColor: 'hover:bg-pink-200', imageSize: 'w-16 h-16' },
     'moisturizer': { image: '/assets/images/categories/moisturizer.png', bgColor: 'bg-amber-50', hoverColor: 'hover:bg-amber-100', imageSize: 'w-16 h-16' },
+    'perfume': { image: '/assets/images/categories/perfume.png', bgColor: 'bg-amber-50', hoverColor: 'hover:bg-amber-100', imageSize: 'w-16 h-16' },
     'body-and-bath': { image: '/assets/images/categories/body.png', bgColor: 'bg-pink-100', hoverColor: 'hover:bg-pink-200', imageSize: 'w-24 h-24' },
     'sunscreen': { image: '/assets/images/categories/sunscreen.png', bgColor: 'bg-purple-100', hoverColor: 'hover:bg-purple-200', imageSize: 'w-16 h-16' },
     'toner': { image: '/assets/images/categories/toner.png', bgColor: 'bg-blue-100', hoverColor: 'hover:bg-blue-200', imageSize: 'w-16 h-16' },
@@ -23,37 +24,6 @@ const categoryVisuals = {
     'beauty': { image: '/assets/images/categories/beauty.png', bgColor: 'bg-red-100', hoverColor: 'hover:bg-red-200', imageSize: 'w-20 h-20' },
     'mask': { image: '/assets/images/categories/mask.png', bgColor: 'bg-amber-50', hoverColor: 'hover:bg-amber-100', imageSize: '!w-20 !h-20' },
     'default': { image: '/placeholder.jpg', bgColor: 'bg-gray-100', hoverColor: 'hover:bg-gray-200', imageSize: 'w-16 h-16' }
-};
-
-// Utility function to safely log in development mode
-const devLog = (message, data = null, color = '#2196F3') => {
-    if (process.env.NODE_ENV === 'development' && console) {
-        if (data !== null) {
-            console.log(`%c${message}`, `color: ${color}; font-weight: bold;`, data);
-        } else {
-            console.log(`%c${message}`, `color: ${color}; font-weight: bold;`);
-        }
-    }
-};
-
-const devWarn = (message, data = null) => {
-    if (process.env.NODE_ENV === 'development' && console) {
-        if (data !== null) {
-            console.warn(message, data);
-        } else {
-            console.warn(message);
-        }
-    }
-};
-
-const devError = (message, error = null) => {
-    if (process.env.NODE_ENV === 'development' && console) {
-        if (error !== null) {
-            console.error(message, error);
-        } else {
-            console.error(message);
-        }
-    }
 };
 
 export const ProductProvider = ({ children }) => {
@@ -101,7 +71,6 @@ export const ProductProvider = ({ children }) => {
             if (response && response.code === 200 && response.products) {
                 setProducts(response.products);
                 setLastFetch(Date.now());
-                devLog('Products fetched successfully', { count: response.products.length });
                 return response.products;
             } else {
                 throw new Error(response?.message || 'Invalid response format');
@@ -109,7 +78,6 @@ export const ProductProvider = ({ children }) => {
         } catch (err) {
             const errorMessage = err.message || 'Failed to load products';
             setError(errorMessage);
-            devError('Failed to fetch products:', err);
             return products.length > 0 ? products : [];
         } finally {
             setLoading(false);
@@ -121,7 +89,6 @@ export const ProductProvider = ({ children }) => {
         setErrorSales(null);
         try {
             const response = await salesService.fetchSales();
-            devLog('Sales API Response received', response);
             
             if (response && response.code === 200) {
                 let salesArray = [];
@@ -133,7 +100,6 @@ export const ProductProvider = ({ children }) => {
                     }
                 }
                 
-                devLog('Sales data processed', { count: salesArray.length });
                 setSalesData(salesArray);
             } else {
                 throw new Error(response?.message || 'Invalid sales response format');
@@ -141,7 +107,6 @@ export const ProductProvider = ({ children }) => {
         } catch (err) {
             const errorMessage = err.message || 'Failed to load sales data';
             setErrorSales(errorMessage);
-            devError('Sales fetch error:', err);
             setSalesData([]);
         } finally {
             setLoadingSales(false);
@@ -157,7 +122,6 @@ export const ProductProvider = ({ children }) => {
             const cacheAge = Date.now() - cached.timestamp;
             const fiveMinutes = 5 * 60 * 1000;
             if (cacheAge < fiveMinutes) {
-                devLog('Product returned from cache', { productId });
                 return cached.product;
             }
         }
@@ -165,7 +129,6 @@ export const ProductProvider = ({ children }) => {
         // Check existing products array
         const cachedProduct = products.find(p => p.product_id === productId);
         if (cachedProduct) {
-            devLog('Product found in existing products', { productId });
             return cachedProduct;
         }
         
@@ -176,7 +139,6 @@ export const ProductProvider = ({ children }) => {
             if (response && response.code === 200 && response.product) {
                 const product = response.product;
                 setCache(prev => new Map(prev).set(productId, { product, timestamp: Date.now() }));
-                devLog('Product fetched and cached', { productId });
                 return product;
             } else {
                 throw new Error(response?.message || 'Product not found');
@@ -184,7 +146,6 @@ export const ProductProvider = ({ children }) => {
         } catch (err) {
             const errorMessage = err.message || 'Failed to load product details';
             setError(errorMessage);
-            devError('Failed to fetch product by ID:', err);
             return null;
         } finally {
             setLoading(false);
@@ -192,27 +153,18 @@ export const ProductProvider = ({ children }) => {
     }, [products, cache]);
 
     const refreshProducts = useCallback(() => {
-        devLog('Refreshing products...');
         return fetchAllProducts({}, true);
     }, [fetchAllProducts]);
 
-    // Enhanced calculateBestSellers function with cleaner logging
+    // Calculate best sellers function
     const calculateBestSellers = useCallback((options = {}) => {
         const { days = 30, limit = 8 } = options;
 
-        devLog('Calculating best sellers', {
-            salesDataLength: salesData.length,
-            productsLength: products.length,
-            options
-        });
-
         if (!salesData || salesData.length === 0) {
-            devWarn('No sales data available for best sellers calculation');
             return [];
         }
 
         if (!products || products.length === 0) {
-            devWarn('No products data available for best sellers calculation');
             return [];
         }
 
@@ -225,7 +177,6 @@ export const ProductProvider = ({ children }) => {
             const recentSales = salesData.filter(sale => {
                 const dateStr = sale.created_at || sale.sale_date || sale.date || sale.created_date;
                 if (!dateStr) {
-                    devWarn('Sale missing date field', sale.id);
                     return false;
                 }
                 
@@ -233,24 +184,11 @@ export const ProductProvider = ({ children }) => {
                 const isValidDate = !isNaN(saleDate.getTime());
                 const isRecent = saleDate >= timeLimit;
                 
-                if (!isValidDate) {
-                    devWarn('Invalid date in sale', { saleId: sale.id, dateStr });
-                }
-                
                 return isValidDate && isRecent;
-            });
-
-            devLog('Recent sales filtered', {
-                totalSales: salesData.length,
-                recentSales: recentSales.length,
-                daysBack: days
             });
 
             // Use all sales as fallback if no recent sales
             const salesToProcess = recentSales.length > 0 ? recentSales : salesData;
-            if (recentSales.length === 0 && salesData.length > 0) {
-                devLog('Using all sales as fallback (no recent sales found)');
-            }
 
             // Calculate product sales quantities
             const productSales = salesToProcess.reduce((acc, sale) => {
@@ -273,7 +211,6 @@ export const ProductProvider = ({ children }) => {
                         try {
                             cartItems = JSON.parse(sale.cart_obj);
                         } catch (parseError) {
-                            devWarn('JSON parse failed for cart_obj', { saleId: sale.id });
                             return acc;
                         }
                     } else if (Array.isArray(sale.cart_obj)) {
@@ -304,21 +241,14 @@ export const ProductProvider = ({ children }) => {
                             
                             if (productId && quantity > 0) {
                                 acc[productId] = (acc[productId] || 0) + quantity;
-                            } else {
-                                devWarn('Invalid cart item data', { saleId: sale.id, item });
                             }
                         });
                     }
                 } catch (parseError) {
-                    devWarn('Error processing sale', { saleId: sale.id, error: parseError.message });
+                    // Silent error handling
                 }
                 return acc;
             }, {});
-
-            devLog('Product sales calculated', { 
-                uniqueProducts: Object.keys(productSales).length,
-                topProduct: Object.keys(productSales)[0]
-            });
 
             // Sort and limit products
             const sortedProducts = Object.entries(productSales)
@@ -335,22 +265,14 @@ export const ProductProvider = ({ children }) => {
                     const productDetails = products.find(p => p.product_id === soldProduct.product_id);
                     if (productDetails) {
                         return { ...productDetails, ...soldProduct };
-                    } else {
-                        devWarn('Product not found for best seller', soldProduct.product_id);
-                        return null;
                     }
+                    return null;
                 })
                 .filter(Boolean);
-
-            devLog('Best sellers calculated successfully', { 
-                count: mergedBestSellers.length,
-                topSeller: mergedBestSellers[0]?.name
-            });
             
             return mergedBestSellers;
 
         } catch (error) {
-            devError('Error in calculateBestSellers:', error);
             return [];
         }
     }, [salesData, products]);

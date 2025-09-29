@@ -129,14 +129,15 @@ export const fetchProducts = async (options = {}) => {
 };
 
 export const getCategories = () => {
-    return ['serum', 'cleanser', 'toner', 'mask', 'sunscreen', 'moisturizer', 'body-and-bath', 'eye-cream', 'beauty'];
+    return ['serum', 'cleanser', 'toner', 'mask', 'sunscreen', 'moisturizer', 'body-and-bath', 'eye-cream', 'beauty', 'perfume'];
 };
 
 export const getCategoryDisplayName = (category) => {
     const categoryDisplayNames = {
         'serum': 'Serums', 'cleanser': 'Cleansers', 'toner': 'Toners',
         'mask': 'Masks', 'sunscreen': 'Sunscreens', 'moisturizer': 'Moisturizers',
-        'body-and-bath': 'Body and Bath', 'eye-cream': 'Eye Creams', 'beauty': 'Beauty'
+        'body-and-bath': 'Body and Bath', 'eye-cream': 'Eye Creams', 'beauty': 'Beauty',
+        'perfume': 'Perfumes'
     };
     return categoryDisplayNames[category] || category;
 };

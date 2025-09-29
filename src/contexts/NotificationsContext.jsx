@@ -38,12 +38,11 @@ export const NotificationsProvider = ({ children }) => {
         throw new Error(response.data?.message || 'Failed to fetch notifications');
       }
     } catch (err) {
-      console.error('Error fetching notifications:', err);
       setError(err.response?.data?.message || err.message || 'An error occurred');
     } finally {
       setLoading(false);
     }
-  }, []); // Added dependencies for logging
+  }, []);
 
   const markAsRead = useCallback(async (id) => {
     const targetNotification = notifications.find(n => n.id === id);
@@ -63,7 +62,6 @@ export const NotificationsProvider = ({ children }) => {
       // Upon success, re-fetch to fully sync state.
       await fetchData('mark-as-read-success');
     } catch (err) {
-      console.error('Failed to mark notification as read:', err);
       // On error, revert by re-fetching the correct state.
       await fetchData('mark-as-read-error');
     }
@@ -83,7 +81,6 @@ export const NotificationsProvider = ({ children }) => {
       // Upon success, re-fetch to fully sync state.
       await fetchData('mark-all-as-read-success');
     } catch (err) {
-      console.error('Failed to mark all notifications as read:', err);
       // On error, revert by re-fetching the correct state.
       await fetchData('mark-all-as-read-error');
     }
@@ -111,8 +108,6 @@ export const NotificationsProvider = ({ children }) => {
       }
     };
   }, [fetchData]);
-
-  // Removed the additional state monitoring effect
 
   const value = {
     notifications,

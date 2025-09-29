@@ -12,11 +12,9 @@ export const authService = {
       throw new Error('Username and password are required');
     }
 
-    // Clear any existing auth data
     this.clearAuth();
 
     const loginMethods = [
-      // Form-encoded data
       () => {
         const formData = new URLSearchParams();
         formData.append('username', username.trim());
@@ -25,9 +23,7 @@ export const authService = {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         });
       },
-      // Query parameters
       () => api.post(`/admin/login?username=${encodeURIComponent(username.trim())}&password=${encodeURIComponent(password)}`),
-      // JSON body
       () => api.post('/admin/login', { username: username.trim(), password })
     ];
 
@@ -55,7 +51,6 @@ export const authService = {
       throw new Error('No authentication token received');
     }
 
-    // Store token and user data using the API client
     api.setToken(response.data.token);
     
     let userData = null;
@@ -64,7 +59,6 @@ export const authService = {
     } else if (response.data.admin) {
       userData = response.data.admin;
     } else {
-      // Create a basic user object if none exists
       userData = { 
         role: 'admin', 
         username: response.data.username || 'admin',
@@ -85,7 +79,7 @@ export const authService = {
         await api.post('/admin/logout');
       }
     } catch (error) {
-      console.warn('Logout API call failed:', error);
+      // Silent fail for logout API call
     } finally {
       this.clearAuth();
     }
@@ -117,7 +111,7 @@ export const authService = {
   }
 };
 
-// Product Service
+// Enhanced Product Service with Debug Logging
 export const productService = {
   async fetchProducts(filters = {}) {
     const params = {};
@@ -133,7 +127,24 @@ export const productService = {
 
   async fetchProduct(productId) {
     if (!productId) throw new Error('Product ID is required');
+    
+    console.log('🔍 Fetching product with ID:', productId);
+    
     const response = await api.get(ENDPOINTS.FETCH_PRODUCT, { product_id: productId });
+    
+    // Debug: Log the raw response
+    console.log('📥 Raw fetchProduct response:', response);
+    console.log('📥 Response data:', response.data);
+    
+    if (response.data && response.data.product) {
+      console.log('🔍 Product concern_options from API:', {
+        raw: response.data.product.concern_options,
+        type: typeof response.data.product.concern_options,
+        isArray: Array.isArray(response.data.product.concern_options),
+        stringified: JSON.stringify(response.data.product.concern_options)
+      });
+    }
+    
     return response.data;
   },
 
@@ -147,33 +158,129 @@ export const productService = {
   async updateProduct(productId, productData) {
     if (!productId) throw new Error('Product ID is required');
     
+    console.log('🚀 Starting updateProduct with:', {
+      productId,
+      productData: JSON.stringify(productData, null, 2)
+    });
+    
     const formData = new FormData();
     formData.append('product_id', productId);
 
-    // Basic fields
     const fields = ['name', 'price', 'description', 'available_qty', 'category', 'slashed_price'];
     fields.forEach(field => {
       if (productData[field] !== undefined && productData[field] !== null) {
-        formData.append(field, productData[field].toString().trim());
+        const value = productData[field].toString().trim();
+        formData.append(field, value);
+        console.log(`📝 Added field ${field}:`, value);
       }
     });
     
-    if (productData.concern_options) {
-      const concerns = Array.isArray(productData.concern_options) 
-        ? productData.concern_options.join(',') 
-        : productData.concern_options.toString();
-      formData.append('concern_options', concerns);
+    // CRITICAL: Enhanced concern_options handling with extensive debugging
+    console.log('🎯 Processing concern_options:', {
+      original: productData.concern_options,
+      type: typeof productData.concern_options,
+      isArray: Array.isArray(productData.concern_options),
+      length: productData.concern_options?.length,
+      isDefined: productData.concern_options !== undefined,
+      isNull: productData.concern_options === null,
+      stringified: JSON.stringify(productData.concern_options)
+    });
+    
+    if (productData.concern_options !== undefined) {
+      let concernsToSend = '';
+      
+      if (Array.isArray(productData.concern_options)) {
+        // If it's an array (including empty array), join with commas
+        concernsToSend = productData.concern_options.join(',');
+        console.log('✅ Processed as array - joined result:', concernsToSend);
+      } else if (productData.concern_options) {
+        // If it's a string or other value, convert to string
+        concernsToSend = productData.concern_options.toString();
+        console.log('✅ Processed as string:', concernsToSend);
+      } else {
+        // Explicitly handle null/undefined/false cases
+        concernsToSend = '';
+        console.log('✅ Processed as empty (null/undefined/false)');
+      }
+      
+      // Always append, even if empty string (this tells backend to clear concerns)
+      formData.append('concern_options', concernsToSend);
+      console.log('📤 Final concern_options being sent:', {
+        value: concernsToSend,
+        length: concernsToSend.length,
+        isEmpty: concernsToSend === '',
+        type: typeof concernsToSend
+      });
+    } else {
+      console.log('⚠️ concern_options is undefined - not sending to backend');
     }
 
     if (productData.removed_images?.length) {
-      formData.append('removed_images', productData.removed_images.join(','));
+      const removedImagesStr = productData.removed_images.join(',');
+      formData.append('removed_images', removedImagesStr);
+      console.log('🗑️ Removed images:', removedImagesStr);
     }
 
     if (productData.images?.length) {
-      productData.images.forEach(image => formData.append('images[]', image));
+      console.log('🖼️ Adding new images:', productData.images.length);
+      productData.images.forEach((image, index) => {
+        formData.append('images[]', image);
+        console.log(`📷 Image ${index + 1}:`, image.name || 'Unknown filename', `(${image.size} bytes)`);
+      });
     }
 
+    // Debug: Log all FormData entries
+    console.log('📋 Complete FormData being sent:');
+    for (let [key, value] of formData.entries()) {
+      if (key === 'images[]') {
+        console.log(`${key}: [File: ${value.name || 'unknown'}, ${value.size || 'unknown size'} bytes]`);
+      } else {
+        console.log(`${key}:`, value);
+      }
+    }
+
+    console.log('🌐 Making API request to updateProduct...');
     const response = await api.postFormData(ENDPOINTS.UPDATE_PRODUCT, formData);
+    
+    // Enhanced response debugging
+    console.log('📥 Raw updateProduct response:', response);
+    console.log('📥 Response status:', response.status);
+    console.log('📥 Response headers:', response.headers);
+    console.log('📥 Response data:', response.data);
+    
+    // Try to parse if it's a string with HTML
+    let parsedResponse = response.data;
+    if (typeof response.data === 'string') {
+      console.log('🔍 Response is string, attempting to parse...');
+      
+      // Check for HTML response (common backend error)
+      if (response.data.includes('<!DOCTYPE') || response.data.includes('<html')) {
+        console.error('❌ Received HTML response instead of JSON - this indicates a backend error');
+        console.log('📄 HTML Response preview:', response.data.substring(0, 500) + '...');
+      }
+      
+      // Try to extract JSON from string response
+      try {
+        const jsonMatch = response.data.match(/\{.*\}$/);
+        if (jsonMatch) {
+          parsedResponse = JSON.parse(jsonMatch[0]);
+          console.log('✅ Extracted JSON from string response:', parsedResponse);
+        }
+      } catch (e) {
+        console.error('❌ Failed to parse JSON from string response:', e);
+      }
+    }
+    
+    // Log final parsed response
+    console.log('📋 Final parsed response:', {
+      code: parsedResponse?.code,
+      message: parsedResponse?.message,
+      success: parsedResponse?.success,
+      data: parsedResponse?.data,
+      product: parsedResponse?.product,
+      fullResponse: parsedResponse
+    });
+    
     return response.data;
   },
 
@@ -208,34 +315,28 @@ export const productService = {
       throw new Error('Valid quantity is required');
     }
 
-    if (!productData.concern_options?.length) {
-      throw new Error('At least one concern option is required');
-    }
-
     return true;
   },
 
   _buildProductFormData(productData) {
     const formData = new FormData();
     
-    // Basic required fields
     const fields = ['name', 'price', 'description', 'quantity', 'category'];
     fields.forEach(field => {
       formData.append(field, productData[field].toString().trim());
     });
 
-    // Concern options
-    const concerns = Array.isArray(productData.concern_options) 
-      ? productData.concern_options.join(',') 
-      : productData.concern_options.toString();
-    formData.append('concern_options', concerns);
+    if (productData.concern_options && productData.concern_options.length > 0) {
+      const concerns = Array.isArray(productData.concern_options) 
+        ? productData.concern_options.join(',') 
+        : productData.concern_options.toString();
+      formData.append('concern_options', concerns);
+    }
 
-    // Optional slashed price
     if (productData.slashed_price) {
       formData.append('slashed_price', productData.slashed_price.toString());
     }
 
-    // Images
     if (productData.images?.length) {
       productData.images.forEach(image => formData.append('images[]', image));
     }
@@ -244,10 +345,9 @@ export const productService = {
   }
 };
 
-// Improved Contact Service with better error handling
+// Contact Service
 export const contactService = {
   async submit(contactData) {
-    // Validate required fields
     const required = ['name', 'email', 'phone', 'subject', 'message'];
     required.forEach(field => {
       if (!contactData[field]?.trim()) {
@@ -255,7 +355,6 @@ export const contactService = {
       }
     });
 
-    // Additional email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(contactData.email)) {
       throw new Error('Invalid email format');
@@ -267,24 +366,13 @@ export const contactService = {
         formData.append(field, contactData[field].trim());
       });
 
-      // Add timestamp to help with duplicate detection
       formData.append('timestamp', new Date().toISOString());
-
-      console.log('Sending request to:', ENDPOINTS.SUBMIT_CONTACT);
       
       const response = await api.postFormData(ENDPOINTS.SUBMIT_CONTACT, formData);
-      
-      // Log the response for debugging
-      console.log('API Response:', response);
-      
       return response.data;
       
     } catch (error) {
-      console.error('Contact service error:', error);
-      
-      // Improve error messages based on common scenarios
       if (error.response) {
-        // Server responded with error status
         const status = error.response.status;
         const message = error.response.data?.message || 'Server error';
         
@@ -298,27 +386,20 @@ export const contactService = {
           throw new Error(`Request failed: ${message}`);
         }
       } else if (error.request) {
-        // Request was made but no response received
         throw new Error('No response from server. Check your internet connection.');
       } else {
-        // Something else happened
         throw new Error(error.message || 'An unexpected error occurred');
       }
     }
   },
 
   async fetchSubmissions(filters = {}) {
-    try {
-      const response = await api.get(ENDPOINTS.FETCH_CONTACT_SUBMISSIONS, filters);
-      return response.data;
-    } catch (error) {
-      console.error('Fetch submissions error:', error);
-      throw error;
-    }
+    const response = await api.get(ENDPOINTS.FETCH_CONTACT_SUBMISSIONS, filters);
+    return response.data;
   }
 };
 
-// Order Service - Updated
+// Order Service
 export const orderService = {
   async initiateCheckout(checkoutData) {
     this._validateCheckoutData(checkoutData);
@@ -331,17 +412,14 @@ export const orderService = {
       cart: JSON.stringify(checkoutData.cart)
     };
 
-    // Add additional_phone if provided
     if (checkoutData.additional_phone?.trim()) {
       params.additional_phone = checkoutData.additional_phone.trim();
     }
 
-    // Add additional_details if provided
     if (checkoutData.additional_details?.trim()) {
       params.additional_details = checkoutData.additional_details.trim();
     }
 
-    // Add LGA if provided (for Lagos state)
     if (checkoutData.lga?.trim()) {
       params.lga = checkoutData.lga.trim();
     }
@@ -352,10 +430,7 @@ export const orderService = {
       params.street_address = checkoutData.street_address.trim();
     }
 
-    // Handle bus-park delivery method
     if (checkoutData.delivery_method === 'bus-park') {
-      // Bus park delivery typically doesn't require address details
-      // but might require state for delivery fee calculation
       if (checkoutData.state?.trim()) {
         params.state = checkoutData.state.trim();
       }
@@ -398,14 +473,11 @@ export const orderService = {
       throw new Error(`Invalid delivery status. Must be one of: ${validStatuses.join(', ')}`);
     }
 
-    // Create a FormData object and append the data
     const formData = new FormData();
     formData.append('order_id', orderId);
     formData.append('new_delivery_status', newStatus);
 
-    // Send the request using the confirmed FormData method
     const response = await api.post('/admin/change-delivery-status', formData);
-    
     return response.data;
   },
 
@@ -425,7 +497,6 @@ export const orderService = {
       });
     }
 
-    // Validate additional_phone format if provided
     if (checkoutData.additional_phone && !/^\d{10,15}$/.test(checkoutData.additional_phone.replace(/\D/g, ''))) {
       throw new Error('Additional phone must be a valid phone number');
     }
@@ -475,21 +546,18 @@ export const consultationService = {
       }
     });
 
-    // Handle skin concerns
     if (consultationData.skin_concerns) {
       cleanData.skin_concerns = Array.isArray(consultationData.skin_concerns) 
         ? consultationData.skin_concerns.filter(c => c && c.trim()).join(',')
         : consultationData.skin_concerns.toString().trim();
     }
 
-    // Optional fields
     ['current_skincare_products', 'additional_details'].forEach(field => {
       if (consultationData[field]?.trim()) {
         cleanData[field] = consultationData[field].toString().trim();
       }
     });
 
-    // Success redirect
     if (consultationData.success_redirect) {
       cleanData.success_redirect = consultationData.success_redirect;
     } else if (isBrowser()) {
@@ -500,13 +568,11 @@ export const consultationService = {
   }
 };
 
-
-// Sales Service - Fixed Implementation
+// Sales Service
 export const salesService = {
   async fetchSales(filters = {}) {
     const params = {};
     
-    // Add any filters if needed
     if (filters.startDate) params.start_date = filters.startDate;
     if (filters.endDate) params.end_date = filters.endDate;
     if (filters.limit) params.limit = filters.limit;

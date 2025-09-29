@@ -35,6 +35,7 @@ const AddProductPage = () => {
         { value: "moisturizer", label: "Moisturizers" },
         { value: "body-and-bath", label: "Body and Bath" },
         { value: "eye-cream", label: "Eye Creams" },
+        { value: "perfume", label: "Perfumes" },
         { value: "beauty", label: "Beauty" }
     ];
 
@@ -63,14 +64,13 @@ const AddProductPage = () => {
 
     const validateForm = () => {
         const newErrors = {};
-        const { name, price, slashed_price, category, quantity, description, concern_options, images } = formData;
+        const { name, price, slashed_price, category, quantity, description, images } = formData;
 
         if (!name.trim()) newErrors.name = "Product name is required";
         if (!price || price <= 0) newErrors.price = "Price must be greater than 0";
         if (!category) newErrors.category = "Category is required";
         if (quantity === '' || quantity < 0) newErrors.quantity = "Quantity must be 0 or greater";
         if (!description.trim()) newErrors.description = "Description is required";
-        if (concern_options.length === 0) newErrors.concern_options = "At least one skin concern is required";
         if (images.length === 0) newErrors.images = "At least one product image is required";
 
         if (slashed_price && Number(slashed_price) <= Number(price)) {
@@ -83,12 +83,15 @@ const AddProductPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
         if (!validateForm()) {
             setNotification({ type: 'error', message: 'Please correct the errors and try again.' });
             return;
         }
+        
         setIsSubmitting(true);
         setNotification(null);
+        
         try {
             const productData = {
                 name: formData.name.trim(),
@@ -102,15 +105,50 @@ const AddProductPage = () => {
             };
 
             const result = await productService.addProduct(productData);
+
             if (result && result.code === 200) {
                 setNotification({ type: 'success', message: `Product "${formData.name}" added successfully!` });
                 setTimeout(() => navigate('/admin/products/stock'), 2000);
             } else {
-                throw new Error(result?.message || 'Failed to add product');
+                throw new Error(result?.message || `API returned code: ${result?.code || 'unknown'}`);
             }
         } catch (error) {
             let errorMessage = error.message || 'Failed to add product. Please try again.';
-            if (error.message.includes('Authentication')) errorMessage = 'Please log in again to continue.';
+            
+            if (error.response) {
+                const status = error.response.status;
+                const responseData = error.response.data;
+                
+                switch (status) {
+                    case 400:
+                        errorMessage = `Bad Request: ${responseData?.message || 'Invalid data sent to server'}`;
+                        break;
+                    case 401:
+                        errorMessage = 'Authentication required. Please log in again.';
+                        break;
+                    case 403:
+                        errorMessage = 'You do not have permission to add products.';
+                        break;
+                    case 413:
+                        errorMessage = 'File too large. Please use smaller images.';
+                        break;
+                    case 422:
+                        errorMessage = `Validation Error: ${responseData?.message || 'Server validation failed'}`;
+                        break;
+                    case 500:
+                        errorMessage = 'Internal server error. Please try again later.';
+                        break;
+                    default:
+                        errorMessage = `Server Error (${status}): ${responseData?.message || error.message}`;
+                }
+            } else if (error.code === 'NETWORK_ERROR') {
+                errorMessage = 'Network error. Please check your internet connection.';
+            } else if (error.message.includes('timeout')) {
+                errorMessage = 'Request timed out. Please try again.';
+            } else if (error.message.includes('Authentication')) {
+                errorMessage = 'Please log in again to continue.';
+            }
+            
             setNotification({ type: 'error', message: errorMessage });
         } finally {
             setIsSubmitting(false);
@@ -122,11 +160,21 @@ const AddProductPage = () => {
             setNotification({ type: 'error', message: 'Maximum 5 images allowed' });
             return;
         }
+        
         const newPreviewImages = [...previewImages];
         const newImages = [...formData.images];
 
         Array.from(files).forEach(file => {
-            if (!file.type.startsWith('image/') || file.size > 2 * 1024 * 1024) return;
+            if (!file.type.startsWith('image/')) {
+                setNotification({ type: 'error', message: `${file.name} is not a valid image file` });
+                return;
+            }
+            
+            if (file.size > 2 * 1024 * 1024) {
+                setNotification({ type: 'error', message: `${file.name} is too large (max 2MB)` });
+                return;
+            }
+            
             const reader = new FileReader();
             reader.onload = (e) => {
                 newPreviewImages.push({ url: e.target.result, file: file });
@@ -441,7 +489,8 @@ const AddProductPage = () => {
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Skin Concerns*</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Skin Concerns (Optional)</label>
+                                        <p className="text-xs text-gray-500 mb-3">Select applicable skin concerns. Leave empty for products like perfumes or items without specific skin concerns.</p>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             {concernOptions.map(concern => (
                                                 <label 
@@ -480,12 +529,6 @@ const AddProductPage = () => {
                                                 </label>
                                             ))}
                                         </div>
-                                        {errors.concern_options && (
-                                            <p className="mt-2 text-red-500 text-sm flex items-center">
-                                                <AlertCircle size={16} className="mr-1" />
-                                                {errors.concern_options}
-                                            </p>
-                                        )}
                                     </div>
 
                                     <div>
