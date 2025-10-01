@@ -8,7 +8,8 @@ const Card = React.memo(({
   isAnimating, 
   activeCardIndex,
   className,
-  style
+  style,
+  isMobile
 }) => {
   const shouldShowVideo = activeCardIndex === index;
   
@@ -51,8 +52,13 @@ const HeroCards = () => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [activeCardIndex, setActiveCardIndex] = useState(null);
   const [hasCompletedCycle, setHasCompletedCycle] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
 
   const sequentialTimerRef = useRef(null);
+  const autoPlayRef = useRef(null);
 
   const cardData = [
     { image: "/assets/images/hero/card-1.jpg", video: "/assets/images/hero/type-1.mp4" },
@@ -62,9 +68,28 @@ const HeroCards = () => {
     { image: "/assets/images/hero/card-5.jpg", video: "/assets/images/hero/type-5.mp4" }
   ];
 
+  // Check if mobile/tablet
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024); // lg breakpoint
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Auto-play for mobile carousel
+  useEffect(() => {
+    if (isMobile && centerCardAnimated) {
+      autoPlayRef.current = setInterval(() => {
+        setCurrentSlide((prev) => (prev + 1) % cardData.length);
+      }, 4000);
+    }
+    return () => clearInterval(autoPlayRef.current);
+  }, [isMobile, centerCardAnimated, cardData.length]);
+
   const playSequentialCards = useCallback(() => {
-    // Don't start if we've already completed a full cycle
-    if (hasCompletedCycle) return;
+    if (hasCompletedCycle || isMobile) return;
     
     let currentIndex = 0;
     
@@ -81,14 +106,13 @@ const HeroCards = () => {
           }, 500);
         }, 3000);
       } else {
-        // Mark as completed after first full cycle
         setHasCompletedCycle(true);
         setActiveCardIndex(null);
       }
     };
     
     playNext();
-  }, [cardData.length, hasCompletedCycle]);
+  }, [cardData.length, hasCompletedCycle, isMobile]);
 
   useEffect(() => {
     const centerCardTimer = setTimeout(() => {
@@ -110,6 +134,38 @@ const HeroCards = () => {
       clearTimeout(sequentialTimerRef.current);
     };
   }, [playSequentialCards]);
+
+  // Touch handlers for swipe
+  const handleTouchStart = (e) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+
+    if (isLeftSwipe) {
+      setCurrentSlide((prev) => (prev + 1) % cardData.length);
+    }
+    if (isRightSwipe) {
+      setCurrentSlide((prev) => (prev - 1 + cardData.length) % cardData.length);
+    }
+
+    setTouchStart(0);
+    setTouchEnd(0);
+  };
+
+  const goToSlide = (index) => {
+    setCurrentSlide(index);
+    clearInterval(autoPlayRef.current);
+  };
 
   const cardConfigs = [
     {
@@ -154,9 +210,80 @@ const HeroCards = () => {
     }
   ];
 
+  if (isMobile) {
+    return (
+      <div className="flex-grow relative flex items-center justify-center px-4">
+        <div 
+          className="relative w-full max-w-sm mx-auto overflow-hidden"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Carousel Container */}
+          <div className="relative h-80">
+            {cardData.map((card, index) => (
+              <div
+                key={index}
+                className={`absolute inset-0 transition-all duration-700 ease-out ${
+                  index === currentSlide 
+                    ? 'opacity-100 translate-x-0 scale-100 z-10' 
+                    : index < currentSlide 
+                    ? 'opacity-0 -translate-x-full scale-95 z-0' 
+                    : 'opacity-0 translate-x-full scale-95 z-0'
+                }`}
+              >
+                <Card
+                  index={index}
+                  cardImage={card.image}
+                  cardVideo={card.video}
+                  centerCardAnimated={centerCardAnimated}
+                  isAnimating={false}
+                  activeCardIndex={currentSlide === index ? index : null}
+                  className="w-full h-full"
+                  style={{}}
+                  isMobile={true}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Navigation Dots */}
+          <div className="flex justify-center gap-2 mt-6">
+            {cardData.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => goToSlide(index)}
+                className={`transition-all duration-300 rounded-full ${
+                  index === currentSlide 
+                    ? 'w-8 h-2 bg-pink-500' 
+                    : 'w-2 h-2 bg-pink-200 hover:bg-pink-300'
+                }`}
+                aria-label={`Go to slide ${index + 1}`}
+              />
+            ))}
+          </div>
+
+          {/* Swipe Hint */}
+          {centerCardAnimated && currentSlide === 0 && (
+            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-gray-400 text-sm flex items-center gap-2 animate-pulse">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+              </svg>
+              <span>Swipe to explore</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop view (original fanned layout)
   return (
     <div className="flex-grow relative flex items-start justify-center pt-2">
-      <div className="flex items-center justify-center space-x-[-1.5rem] sm:space-x-[-1rem]">
+      <div className="flex items-center justify-center space-x-[-1.5rem] xl:space-x-[-1rem]">
         {cardData.map((card, index) => (
           <Card
             key={index}
@@ -168,6 +295,7 @@ const HeroCards = () => {
             activeCardIndex={activeCardIndex}
             className={cardConfigs[index].className}
             style={cardConfigs[index].style}
+            isMobile={false}
           />
         ))}
       </div>

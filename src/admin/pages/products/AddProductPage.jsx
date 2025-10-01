@@ -11,7 +11,6 @@ const AddProductPage = () => {
     const [formData, setFormData] = useState({
         name: '', 
         price: '', 
-        slashed_price: '', 
         category: '', 
         quantity: '',
         description: '', 
@@ -64,7 +63,7 @@ const AddProductPage = () => {
 
     const validateForm = () => {
         const newErrors = {};
-        const { name, price, slashed_price, category, quantity, description, images } = formData;
+        const { name, price, category, quantity, description, images } = formData;
 
         if (!name.trim()) newErrors.name = "Product name is required";
         if (!price || price <= 0) newErrors.price = "Price must be greater than 0";
@@ -72,10 +71,6 @@ const AddProductPage = () => {
         if (quantity === '' || quantity < 0) newErrors.quantity = "Quantity must be 0 or greater";
         if (!description.trim()) newErrors.description = "Description is required";
         if (images.length === 0) newErrors.images = "At least one product image is required";
-
-        if (slashed_price && Number(slashed_price) <= Number(price)) {
-            newErrors.slashed_price = "Slashed price should be greater than current price";
-        }
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -100,8 +95,7 @@ const AddProductPage = () => {
                 quantity: parseInt(formData.quantity, 10),
                 category: formData.category,
                 concern_options: formData.concern_options,
-                images: formData.images,
-                slashed_price: formData.slashed_price ? parseFloat(formData.slashed_price) : null
+                images: formData.images
             };
 
             const result = await productService.addProduct(productData);
@@ -385,57 +379,30 @@ const AddProductPage = () => {
                                         )}
                                     </div>
 
-                                    <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-                                        <div className="w-full sm:w-1/2">
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Current Price*</label>
-                                            <div className="relative">
-                                                <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                                                    <span className="text-gray-700 font-bold">₦</span>
-                                                </div>
-                                                <input 
-                                                    type="number" 
-                                                    name="price" 
-                                                    value={formData.price} 
-                                                    onChange={handleInputChange} 
-                                                    disabled={isSubmitting} 
-                                                    min="0" 
-                                                    step="0.01" 
-                                                    className={`w-full border ${errors.price ? 'border-red-500' : 'border-gray-300'} rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`} 
-                                                    placeholder="0.00" 
-                                                />
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Price*</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                                                <span className="text-gray-700 font-bold">₦</span>
                                             </div>
-                                            {errors.price && (
-                                                <p className="mt-1 text-red-500 text-sm flex items-center">
-                                                    <AlertCircle size={16} className="mr-1" />
-                                                    {errors.price}
-                                                </p>
-                                            )}
+                                            <input 
+                                                type="number" 
+                                                name="price" 
+                                                value={formData.price} 
+                                                onChange={handleInputChange} 
+                                                disabled={isSubmitting} 
+                                                min="0" 
+                                                step="0.01" 
+                                                className={`w-full border ${errors.price ? 'border-red-500' : 'border-gray-300'} rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`} 
+                                                placeholder="0.00" 
+                                            />
                                         </div>
-                                        <div className="w-full sm:w-1/2">
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Slashed Price (Optional)</label>
-                                            <div className="relative">
-                                                <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                                                    <span className="text-gray-700 font-bold">₦</span>
-                                                </div>
-                                                <input 
-                                                    type="number" 
-                                                    name="slashed_price" 
-                                                    value={formData.slashed_price} 
-                                                    onChange={handleInputChange} 
-                                                    disabled={isSubmitting} 
-                                                    min="0" 
-                                                    step="0.01" 
-                                                    className={`w-full border ${errors.slashed_price ? 'border-red-500' : 'border-gray-300'} rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500`} 
-                                                    placeholder="0.00" 
-                                                />
-                                            </div>
-                                            {errors.slashed_price && (
-                                                <p className="mt-1 text-red-500 text-sm flex items-center">
-                                                    <AlertCircle size={16} className="mr-1" />
-                                                    {errors.slashed_price}
-                                                </p>
-                                            )}
-                                        </div>
+                                        {errors.price && (
+                                            <p className="mt-1 text-red-500 text-sm flex items-center">
+                                                <AlertCircle size={16} className="mr-1" />
+                                                {errors.price}
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">

@@ -25,24 +25,39 @@ const AllOrders = () => {
 
   const ORDERS_PER_PAGE = 9;
 
-  // Check for highlighted order in URL params on component mount
+// Check for highlighted order in URL params - runs after orders are loaded
   useEffect(() => {
     const orderId = searchParams.get('orderId');
     const shouldHighlight = searchParams.get('highlight') === 'true';
 
-    if (orderId && shouldHighlight) {
+    if (orderId && shouldHighlight && orders.length > 0 && !loading) {
       setHighlightedOrderId(orderId);
 
-      const timer = setTimeout(() => {
+      // Scroll to the order after a brief delay to ensure DOM is ready
+      const scrollTimer = setTimeout(() => {
+        const orderElement = document.getElementById(`order-${orderId}`);
+        if (orderElement) {
+          orderElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest'
+          });
+        }
+      }, 500);
+
+      const highlightTimer = setTimeout(() => {
         setHighlightedOrderId(null);
         searchParams.delete('orderId');
         searchParams.delete('highlight');
         setSearchParams(searchParams, { replace: true });
       }, 5000);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(scrollTimer);
+        clearTimeout(highlightTimer);
+      };
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, orders, loading]);
 
   // Memoized configurations
   const ORDER_STATUS_OPTIONS = useMemo(() => [

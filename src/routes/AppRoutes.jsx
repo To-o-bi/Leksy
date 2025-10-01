@@ -1,123 +1,198 @@
-import { lazy, Suspense, useEffect } from 'react';
+import React, { lazy, Suspense, useEffect, memo, useState } from 'react';
 import { Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
 import PublicRoutes from './PublicRoutes';
 import ProtectedRoute from './ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
+import { RouteTransitionProvider } from './RouteTransitionLoader';
 
-// ScrollToTop component
-const ScrollToTop = () => {
+// Import critical pages directly (no lazy loading)
+import ProductDetailPage from '../pages/public/ProductDetailPage';
+
+const ScrollRevealLayout = memo(() => {
+  useEffect(() => {
+    const ScrollReveal = window.ScrollReveal;
+
+    if (ScrollReveal) {
+      const sr = ScrollReveal({
+        distance: '60px',
+        duration: 2500,
+        delay: 400,
+        reset: false,
+      });
+
+      sr.reveal('.reveal-bottom', { origin: 'bottom', interval: 200 });
+      sr.reveal('.reveal-left', { origin: 'left', interval: 200 });
+      sr.reveal('.reveal-right', { origin: 'right', interval: 200 });
+      sr.reveal('.reveal-top', { origin: 'top', interval: 200 });
+    }
+  }, []);
+
+  return <Outlet />;
+});
+
+ScrollRevealLayout.displayName = 'ScrollRevealLayout';
+
+const ScrollToTop = memo(() => {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    window.scrollTo(0, 0);
+    // Delay scroll to top for product pages to prevent footer flash
+    if (pathname.includes('/product/')) {
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+      }, 100);
+    } else {
+      window.scrollTo(0, 0);
+    }
   }, [pathname]);
 
   return null;
-};
+});
 
-// Loading fallback for lazy-loaded components
-const LoadingFallback = () => (
-    <div className="flex items-center justify-center h-screen bg-gray-100">
-        <div className="bg-white p-8 rounded-lg shadow-md">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-500 mx-auto"></div>
-            <p className="text-center text-gray-600 mt-4">Loading...</p>
-        </div>
+ScrollToTop.displayName = 'ScrollToTop';
+
+const LoadingFallback = memo(() => (
+  <div className="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded-lg shadow-lg">
+      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-pink-500 mx-auto" />
+      <p className="text-center text-gray-600 mt-3 text-sm">Loading...</p>
     </div>
-);
+  </div>
+));
 
-// Lazy-loaded components
-const LoginPage = lazy(() => import('../pages/public/LoginPage'));
-const HomePage = lazy(() => import('../pages/public/HomePage'));
-const ShopPage = lazy(() => import('../pages/public/ShopPage'));
-const ProductDetailPage = lazy(() => import('../pages/public/ProductDetailPage'));
-const CartPage = lazy(() => import('../pages/public/CartPage'));
-const ContactPage = lazy(() => import('../pages/public/ContactPage'));
-const CheckoutPage = lazy(() => import('../pages/public/CheckoutPage'));
-const WishlistPage = lazy(() => import('../pages/public/WishlistPage'));
-const ConsultationPage = lazy(() => import('../pages/public/ConsultationPage'));
-const ConsultationSuccessPage = lazy(() => import('../components/consultation/ConsultationSuccess'));
-const CheckoutSuccessPage = lazy(() => import('../pages/public/CheckoutSuccessPage'));
-const PrivacyPolicyPage = lazy(() => import('../pages/public/PolicyPages/PrivacyPolicyPage'));
-const TermsAndConditionsPage = lazy(() => import('../pages/public/PolicyPages/TermsAndConditionsPage'));
-const ShippingPolicyPage = lazy(() => import('../pages/public/PolicyPages/ShippingPolicyPage'));
-const NotFound = lazy(() => import('../pages/public/NotFound'));
+LoadingFallback.displayName = 'LoadingFallback';
 
-// Admin pages
-const DashboardPage = lazy(() => import('../admin/pages/DashboardPage'));
-const OrdersPage = lazy(() => import('../admin/pages/OrdersPage'));
-const ProductStock = lazy(() => import('../admin/pages/products/ProductStock'));
-const AddProductPage = lazy(() => import('../admin/pages/products/AddProductPage'));
-const EditProductPage = lazy(() => import('../admin/pages/products/EditProductPage'));
-const NotificationsPage = lazy(() => import('../admin/pages/Notifications'));
-const InboxPage = lazy(() => import('../admin/pages/InboxPage'));
-const BookingsPage = lazy(() => import('../admin/pages/BookingsPage'));
-const NewsletterAdmin = lazy(() => import('../admin/pages/NewsletterAdmin'));
-const DeliveryFees = lazy(() => import('../admin/pages/DeliveryFees'));
-
-// LoginWrapper component
-const LoginWrapper = () => {
-    const { isAuthenticated, isLoading } = useAuth();
-    const location = useLocation();
-    
-    if (isLoading) return <LoadingFallback />;
-    if (isAuthenticated) {
-        const from = location.state?.from?.pathname || "/admin/dashboard";
-        return <Navigate to={from} replace />;
-    }
-    return <LoginPage />;
+// Lazy load non-critical pages
+const publicPages = {
+  LoginPage: lazy(() => import('../pages/public/LoginPage')),
+  HomePage: lazy(() => import('../pages/public/HomePage')),
+  ShopPage: lazy(() => import('../pages/public/ShopPage')),
+  CartPage: lazy(() => import('../pages/public/CartPage')),
+  ContactPage: lazy(() => import('../pages/public/ContactPage')),
+  CheckoutPage: lazy(() => import('../pages/public/CheckoutPage')),
+  WishlistPage: lazy(() => import('../pages/public/WishlistPage')),
+  ConsultationPage: lazy(() => import('../pages/public/ConsultationPage')),
+  ConsultationSuccessPage: lazy(() => import('../components/consultation/ConsultationSuccess')),
+  CheckoutSuccessPage: lazy(() => import('../pages/public/CheckoutSuccessPage')),
+  PrivacyPolicyPage: lazy(() => import('../pages/public/PolicyPages/PrivacyPolicyPage')),
+  TermsAndConditionsPage: lazy(() => import('../pages/public/PolicyPages/TermsAndConditionsPage')),
+  ShippingPolicyPage: lazy(() => import('../pages/public/PolicyPages/ShippingPolicyPage')),
+  NotFound: lazy(() => import('../pages/public/NotFound'))
 };
+
+const adminPages = {
+  DashboardPage: lazy(() => import('../admin/pages/DashboardPage')),
+  OrdersPage: lazy(() => import('../admin/pages/OrdersPage')),
+  ProductStock: lazy(() => import('../admin/pages/products/ProductStock')),
+  AddProductPage: lazy(() => import('../admin/pages/products/AddProductPage')),
+  EditProductPage: lazy(() => import('../admin/pages/products/EditProductPage')),
+  NotificationsPage: lazy(() => import('../admin/pages/Notifications')),
+  InboxPage: lazy(() => import('../admin/pages/InboxPage')),
+  BookingsPage: lazy(() => import('../admin/pages/BookingsPage')),
+  NewsletterAdmin: lazy(() => import('../admin/pages/NewsletterAdmin')),
+  DeliveryFees: lazy(() => import('../admin/pages/DeliveryFees'))
+};
+
+const LoginWrapper = memo(() => {
+  const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
+  
+  if (isLoading) return <LoadingFallback />;
+  
+  if (isAuthenticated) {
+    const from = location.state?.from?.pathname || "/admin/dashboard";
+    return <Navigate to={from} replace />;
+  }
+  
+  return <publicPages.LoginPage />;
+});
+
+LoginWrapper.displayName = 'LoginWrapper';
 
 const AppRoutes = () => {
-    return (
-        <Suspense fallback={<LoadingFallback />}>
-            <ScrollToTop />
-            <Routes>
-                {/* Keep admin login route accessible */}
-                <Route path="admin/login" element={<LoginWrapper />} />
-                
-                {/* REDIRECT ALL PUBLIC ROUTES TO ADMIN DASHBOARD */}
-                <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="/shop" element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="/product/:productId" element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="/cart" element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="/contact" element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="/checkout" element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="/checkout/checkout-success" element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="/wishlist" element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="/consultation" element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="/consultation/success" element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="/policies/privacy" element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="/policies/terms-and-conditions" element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="/policies/shipping" element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="/404" element={<Navigate to="/admin/dashboard" replace />} />
-                
-                {/* Admin routes remain unchanged and protected */}
-                <Route path="/admin" element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
-                    <Route index element={<Navigate to="dashboard" replace />} />
-                    <Route path="dashboard" element={<DashboardPage />} />
-                    <Route path="orders" element={<OrdersPage />} />
-                    
-                    <Route path="products">
-                        <Route index element={<Navigate to="stock" replace />} />
-                        <Route path="stock" element={<ProductStock />} />
-                        <Route path="add" element={<AddProductPage />} />
-                        <Route path="edit/:id" element={<EditProductPage />} />
-                    </Route>
-                    
-                    <Route path="notifications" element={<NotificationsPage />} />
-                    <Route path="inbox" element={<InboxPage />} />
-                    <Route path="bookings" element={<BookingsPage />} />
-                    <Route path="bookings/:id" element={<BookingsPage />} />      
-                    <Route path="newsletter" element={<NewsletterAdmin />} />
-                    <Route path="delivery" element={<DeliveryFees />} />
-                    <Route path="*" element={<NotFound />} />
-                </Route>
+  const [routeChanging, setRouteChanging] = useState(false);
+  const location = useLocation();
 
-                {/* Catch-all route redirects to admin dashboard */}
-                <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
-            </Routes>
-        </Suspense>
-    );
+  // Handle route transitions
+  useEffect(() => {
+    setRouteChanging(true);
+    const timer = setTimeout(() => setRouteChanging(false), 150);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
+
+  // Preload critical components on app startup
+  useEffect(() => {
+    // Preload important pages that users frequently navigate to
+    const preloadPages = () => {
+      import('../pages/public/CartPage');
+      import('../pages/public/CheckoutPage');
+      import('../pages/public/ShopPage');
+    };
+    
+    // Delay preloading to not interfere with initial load
+    setTimeout(preloadPages, 2000);
+  }, []);
+
+  return (
+    <RouteTransitionProvider>
+      {/* Route transition indicator */}
+      {routeChanging && (
+        <div className="fixed top-0 left-0 right-0 h-1 bg-pink-500 z-50 animate-pulse" />
+      )}
+      
+      <Suspense fallback={<LoadingFallback />}>
+        <ScrollToTop />
+        <Routes>
+          <Route path="admin/login" element={<LoginWrapper />} />
+          
+          <Route element={<ScrollRevealLayout />}>
+            <Route element={<PublicRoutes />}>
+              <Route index element={<publicPages.HomePage />} />
+              <Route path="/shop" element={<publicPages.ShopPage />} />
+              
+              {/* ProductDetail - No lazy loading for instant navigation */}
+              <Route path="/product/:productId" element={<ProductDetailPage />} />
+              
+              <Route path="/cart" element={<publicPages.CartPage />} />
+              <Route path="/contact" element={<publicPages.ContactPage />} />
+              <Route path="/checkout" element={<publicPages.CheckoutPage />} />
+              <Route path="/checkout/checkout-success" element={<publicPages.CheckoutSuccessPage />} />
+              <Route path="/wishlist" element={<publicPages.WishlistPage />} />
+              <Route path="/consultation" element={<publicPages.ConsultationPage />} />
+              <Route path="/consultation/success" element={<publicPages.ConsultationSuccessPage />} />
+              <Route path="/policies/privacy" element={<publicPages.PrivacyPolicyPage />} />
+              <Route path="/policies/terms-and-conditions" element={<publicPages.TermsAndConditionsPage />} />
+              <Route path="/policies/shipping" element={<publicPages.ShippingPolicyPage />} />
+              <Route path="/404" element={<publicPages.NotFound />} />
+            </Route>
+          </Route>
+          
+          <Route path="/admin" element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<adminPages.DashboardPage />} />
+            <Route path="orders" element={<adminPages.OrdersPage />} />
+            
+            <Route path="products">
+              <Route index element={<Navigate to="stock" replace />} />
+              <Route path="stock" element={<adminPages.ProductStock />} />
+              <Route path="add" element={<adminPages.AddProductPage />} />
+              <Route path="edit/:id" element={<adminPages.EditProductPage />} />
+            </Route>
+            
+            <Route path="notifications" element={<adminPages.NotificationsPage />} />
+            <Route path="inbox" element={<adminPages.InboxPage />} />
+            <Route path="bookings" element={<adminPages.BookingsPage />} />
+            <Route path="bookings/:id" element={<adminPages.BookingsPage />} />   
+            <Route path="newsletter" element={<adminPages.NewsletterAdmin />} />
+            <Route path="delivery" element={<adminPages.DeliveryFees />} />
+            <Route path="*" element={<publicPages.NotFound />} />
+          </Route>
+
+          <Route path="*" element={<publicPages.NotFound />} />
+        </Routes>
+      </Suspense>
+    </RouteTransitionProvider>
+  );
 };
 
-export default AppRoutes;
+export default memo(AppRoutes);

@@ -255,17 +255,37 @@ const BookingsPage = () => {
   useEffect(() => { fetchBookings(); }, []);
   useEffect(() => { filterAndSortBookings(); }, [bookings, activeTab, searchTerm]);
 
+  // Check for highlighted booking in URL params - runs after bookings are loaded
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const bookingId = params.get('bookingId') || params.get('highlight');
-    if (bookingId) {
+    
+    if (bookingId && bookings.length > 0 && !loading) {
       setTargetedBookingId(bookingId);
-      setTimeout(() => {
+      
+      // Scroll to the booking after a brief delay to ensure DOM is ready
+      const scrollTimer = setTimeout(() => {
+        const bookingElement = document.getElementById(`booking-${bookingId}`);
+        if (bookingElement) {
+          bookingElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest'
+          });
+        }
+      }, 500);
+
+      const highlightTimer = setTimeout(() => {
         setTargetedBookingId(null);
         window.history.replaceState({}, '', window.location.pathname);
       }, 5000);
+
+      return () => {
+        clearTimeout(scrollTimer);
+        clearTimeout(highlightTimer);
+      };
     }
-  }, [location.search]);
+  }, [location.search, bookings, loading]);
 
   // --- RENDER LOGIC & VARS ---
   const totalPages = Math.ceil(filteredBookings.length / bookingsPerPage);
@@ -339,7 +359,11 @@ const BookingsPage = () => {
           {/* Bookings List (Cards on mobile, table rows on desktop) */}
           <div className="space-y-4 md:space-y-0">
             {currentBookings.length > 0 ? currentBookings.map((booking) => (
-              <div key={booking.id} className={`md:grid md:grid-cols-[1fr,1.5fr,2fr,1.5fr,1.5fr,1.5fr,1fr] md:gap-4 md:items-center transition-colors rounded-lg md:rounded-none p-4 md:p-0 border md:border-0 md:border-t border-gray-200 hover:bg-gray-50 ${targetedBookingId === booking.id || targetedBookingId === booking.uniqueId ? 'bg-pink-50' : ''}`}>
+              <div 
+                key={booking.id} 
+                id={`booking-${booking.id}`}
+                className={`md:grid md:grid-cols-[1fr,1.5fr,2fr,1.5fr,1.5fr,1.5fr,1fr] md:gap-4 md:items-center transition-colors rounded-lg md:rounded-none p-4 md:p-0 border md:border-0 md:border-t border-gray-200 hover:bg-gray-50 ${targetedBookingId === booking.id || targetedBookingId === booking.uniqueId ? 'bg-pink-50 animate-pulse' : ''}`}
+              >
                 
                 {/* Mobile labels are hidden on medium screens and up (md:hidden) */}
                 <div className="flex justify-between items-center md:block py-1 md:py-4">

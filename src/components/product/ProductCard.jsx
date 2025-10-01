@@ -28,18 +28,14 @@ const ProductCard = ({ product }) => {
     if (!productId) return null;
 
     const price = parseFloat(product.price) || 0;
-    const originalPrice = product.slashed_price ? parseFloat(product.slashed_price) : undefined;
 
     return {
       ...product, // Spread original product data
       id: productId,
       name: decodeHtmlEntities(product.name || 'Unknown Product'),
       price: price,
-      originalPrice: originalPrice,
       image: product.images?.[0] || 'https://placehold.co/300x300/f7f7f7/ccc?text=Product',
       stock: parseInt(product.available_qty, 10) || 0,
-      discount: originalPrice && price ? 
-        Math.round(((originalPrice - price) / originalPrice) * 100) : 0,
     };
   }, [product]);
 
@@ -116,7 +112,7 @@ const ProductCard = ({ product }) => {
     return null; // Don't show anything if stock is ample
   };
 
-  // Render appropriate badge based on priority: Best Seller > Trending > New > Discount
+  // Render appropriate badge based on priority: Best Seller > Trending > New
   const renderTopBadge = () => {
     if (shouldShowBestSellerBadge) {
       return (
@@ -154,7 +150,7 @@ const ProductCard = ({ product }) => {
     return null;
   };
 
-  // Render additional badges (quantity sold, discount)
+  // Render additional badges (quantity sold only)
   const renderAdditionalBadges = () => {
     const badges = [];
     
@@ -163,15 +159,6 @@ const ProductCard = ({ product }) => {
       badges.push(
         <div key="quantity" className="bg-gradient-to-r from-orange-500 to-orange-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
           🔥 {normalizedProduct.quantitySold} sold
-        </div>
-      );
-    }
-    
-    // Show discount badge
-    if (normalizedProduct.discount > 0) {
-      badges.push(
-        <div key="discount" className="bg-red-600 text-white text-xs font-bold px-2 sm:px-2.5 py-1 rounded-sm">
-          -{normalizedProduct.discount}%
         </div>
       );
     }
@@ -190,12 +177,12 @@ const ProductCard = ({ product }) => {
           {/* Top Badge (Best Seller, Trending, or New) */}
           {renderTopBadge()}
 
-          {/* Additional Badges (Quantity Sold, Discount) */}
+          {/* Additional Badges (Quantity Sold) */}
           {renderAdditionalBadges()}
           
           {/* Action Buttons - Always visible on mobile, hover on desktop */}
           <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-10 flex flex-col space-y-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300" 
-               style={{ marginTop: (normalizedProduct.quantitySold || normalizedProduct.discount) ? '60px' : '0' }}>
+               style={{ marginTop: normalizedProduct.quantitySold ? '60px' : '0' }}>
              <button 
               onClick={handleWishlistToggle} 
               aria-label="Toggle Wishlist" 
@@ -252,12 +239,7 @@ const ProductCard = ({ product }) => {
           
           <div className="flex items-center justify-between mt-2 flex-wrap gap-1">
             <div className="flex flex-col">
-              <div className="flex items-center gap-2">
-                <p className="text-gray-900 font-bold text-base sm:text-lg">{formatter.formatCurrency(normalizedProduct.price)}</p>
-              </div>
-              {normalizedProduct.originalPrice && (
-                <p className="text-gray-500 text-xs line-through">{formatter.formatCurrency(normalizedProduct.originalPrice)}</p>
-              )}
+              <p className="text-gray-900 font-bold text-base sm:text-lg">{formatter.formatCurrency(normalizedProduct.price)}</p>
             </div>
             <div className="flex-shrink-0">
               {renderStockStatus()}

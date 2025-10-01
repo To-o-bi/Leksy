@@ -15,7 +15,11 @@ const ProductStockPage = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [activeProduct, setActiveProduct] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Search states
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
   // Targeting state
   const [targetedProductId, setTargetedProductId] = useState(null);
@@ -34,7 +38,7 @@ const ProductStockPage = () => {
     }
     let currentText = text;
     let previousText = '';
-    let i = 0; // Safety break
+    let i = 0;
     while (currentText !== previousText && i < 5) {
       previousText = currentText;
       try {
@@ -53,6 +57,15 @@ const ProductStockPage = () => {
     }
     return currentText;
   };
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -79,20 +92,37 @@ const ProductStockPage = () => {
     fetchProducts();
   }, [fetchProducts]);
   
-  // Effect to reset page number when search query changes
+  // Effect to reset page number when search query or category changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [debouncedSearchQuery, selectedCategory]);
+
+  // Get unique categories from products
+  const categories = useMemo(() => {
+    const uniqueCategories = [...new Set(products.map(p => p.category))].sort();
+    return uniqueCategories;
+  }, [products]);
 
   const filteredProducts = useMemo(() => {
-    if (!searchQuery) {
-      return products;
+    let filtered = [...products];
+
+    // Category filter
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(product => product.category === selectedCategory);
     }
-    return products.filter(product =>
-      decodeHtmlEntities(product.name).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [products, searchQuery]);
+
+    // Text search filter
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
+      filtered = filtered.filter(product => {
+        const name = decodeHtmlEntities(product.name).toLowerCase();
+        const category = product.category.toLowerCase();
+        return name.includes(query) || category.includes(query);
+      });
+    }
+
+    return filtered;
+  }, [products, debouncedSearchQuery, selectedCategory]);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
@@ -301,27 +331,66 @@ const ProductStockPage = () => {
         </div>
       </div>
       
-      {/* --- Search Input --- */}
-      <div className="mb-4 relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-        <input
-          type="text"
-          placeholder="Search by product name or category..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full p-2 pl-10 pr-10 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-            aria-label="Clear search"
+      {/* Search and Category Filter */}
+      <div className="mb-4 flex flex-col sm:flex-row gap-3">
+        {/* Search Input */}
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+          <input
+            type="text"
+            placeholder="Search by product name or category..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full p-2 pl-10 pr-10 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Clear search"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+
+        {/* Category Dropdown */}
+        <div className="sm:w-48">
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
           >
-            <X size={18} />
-          </button>
-        )}
+            <option value="all">All Categories</option>
+            {categories.map(category => (
+              <option key={category} value={category}>
+                {category.charAt(0).toUpperCase() + category.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
+      {/* Results Info */}
+      {(searchQuery || selectedCategory !== 'all') && (
+        <div className="mb-4 text-sm text-gray-600 flex items-center justify-between">
+          <span>
+            Showing {filteredProducts.length} of {products.length} products
+            {filteredProducts.length !== products.length && ' (filtered)'}
+          </span>
+          {(searchQuery || selectedCategory !== 'all') && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedCategory('all');
+              }}
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Mobile Card View */}
       <div className="block sm:hidden">
@@ -330,7 +399,18 @@ const ProductStockPage = () => {
         ) : filteredProducts.length === 0 ? (
           <div className="text-center p-8">
             <ShoppingBag size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">{searchQuery ? 'No products match your search.' : 'No products found'}</p>
+            <p className="text-gray-500">{searchQuery || selectedCategory !== 'all' ? 'No products match your search.' : 'No products found'}</p>
+            {(searchQuery || selectedCategory !== 'all') && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('all');
+                }}
+                className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Clear Filters
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -438,7 +518,18 @@ const ProductStockPage = () => {
                 <tr>
                   <td colSpan={isSelectionMode ? 7 : 6} className="text-center p-8">
                     <ShoppingBag size={48} className="mx-auto text-gray-300 mb-4" />
-                    <p className="text-gray-500">{searchQuery ? 'No products match your search.' : 'No products found'}</p>
+                    <p className="text-gray-500">{searchQuery || selectedCategory !== 'all' ? 'No products match your search.' : 'No products found'}</p>
+                    {(searchQuery || selectedCategory !== 'all') && (
+                      <button
+                        onClick={() => {
+                          setSearchQuery('');
+                          setSelectedCategory('all');
+                        }}
+                        className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (

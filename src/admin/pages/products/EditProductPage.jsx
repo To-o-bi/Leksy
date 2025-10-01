@@ -13,29 +13,15 @@ const FALLBACK_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaH
 const formatCategoryName = (category) => category.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
 const parseApiResponse = (response) => {
-    console.log('🔍 Parsing API response:', response);
-    console.log('🔍 Response type:', typeof response);
-    
     if (typeof response === 'string' && response.includes('<br />')) {
-        console.log('📝 Response contains HTML break tags, attempting to extract JSON...');
         try { 
             const jsonMatch = response.match(/\{.*\}$/); 
-            if (jsonMatch) {
-                const parsed = JSON.parse(jsonMatch[0]);
-                console.log('✅ Successfully extracted JSON from HTML response:', parsed);
-                return parsed;
-            }
-            if (response.includes('"code":200')) {
-                console.log('✅ Found success indicator in HTML response');
-                return { code: 200, message: 'Product updated successfully!' };
-            }
+            if (jsonMatch) return JSON.parse(jsonMatch[0]);
+            if (response.includes('"code":200')) return { code: 200, message: 'Product updated successfully!' };
         } catch (e) { 
-            console.error('❌ Failed to parse JSON from HTML response:', e);
             return response; 
         }
     }
-    
-    console.log('📋 Returning original response (no parsing needed)');
     return response;
 };
 
@@ -230,18 +216,10 @@ const EditProductPage = () => {
             images: newImages.length > 0 || removedImages.length > 0
         };
 
-        console.log('🔍 Change detection:', changes);
-        console.log('📊 Current vs Original concern_options:', {
-            current: formData.concern_options,
-            original: originalData.concern_options,
-            changed: changes.concern_options
-        });
-
         return Object.values(changes).some(Boolean);
     }, [formData, originalData, newImages, removedImages]);
 
     const handleError = useCallback((error, defaultMessage) => {
-        console.error('❌ Error occurred:', error);
         if (error.message?.includes('Authentication')) { 
             setSubmitError('Please log in again to continue.'); 
             setTimeout(() => navigate('/admin/login'), 2000); 
@@ -254,86 +232,52 @@ const EditProductPage = () => {
 
     useEffect(() => {
         const fetchProductData = async () => {
-            console.log('🚀 Starting fetchProductData for ID:', id);
-            
             if (!id) { 
-                console.error('❌ No product ID provided');
                 setProductNotFound(true); 
                 setLoading(false); 
                 return; 
             }
             
             try {
-                console.log('📡 Calling productService.fetchProduct...');
                 const response = await productService.fetchProduct(id);
                 
-                console.log('📥 Raw fetchProduct response in component:', response);
-                console.log('📥 Response structure:', {
-                    hasResponse: !!response,
-                    code: response?.code,
-                    hasProduct: !!response?.product,
-                    productKeys: response?.product ? Object.keys(response.product) : 'N/A'
-                });
-                
                 if (!response || response.code !== 200 || !response.product) { 
-                    console.error('❌ Invalid response structure:', { response, code: response?.code, hasProduct: !!response?.product });
                     setProductNotFound(true); 
                     setLoading(false); 
                     return; 
                 }
                 
                 const productData = response.product;
-                console.log('📋 Raw product data:', productData);
-                console.log('📋 Product concern_options (raw):', {
-                    value: productData.concern_options,
-                    type: typeof productData.concern_options,
-                    isArray: Array.isArray(productData.concern_options),
-                    length: productData.concern_options?.length,
-                    stringified: JSON.stringify(productData.concern_options)
-                });
-
                 const decodedName = decodeHtmlEntities(productData.name || '');
                 const decodedDescription = decodeHtmlEntities(productData.description || '');
 
-                // ENHANCED CONCERN OPTIONS PROCESSING WITH DEBUG
                 let fetchedConcerns = [];
-                console.log('🔄 Processing concern_options...');
-                
                 if (typeof productData.concern_options === 'string') { 
-                    console.log('📝 concern_options is string:', productData.concern_options);
-                    
-                    // Handle empty string case
-                    if (productData.concern_options.trim() === '') {
-                        console.log('✅ Empty string detected - setting to empty array');
+                    // Handle empty string, "others", or whitespace
+                    const trimmed = productData.concern_options.trim().toLowerCase();
+                    if (trimmed === '' || trimmed === 'others') {
                         fetchedConcerns = [];
                     } else {
                         try { 
                             const parsed = JSON.parse(productData.concern_options); 
                             if (Array.isArray(parsed)) {
-                                fetchedConcerns = parsed;
-                                console.log('✅ Parsed JSON array:', fetchedConcerns);
+                                // Filter out "others" from parsed array
+                                fetchedConcerns = parsed.filter(c => c && c.toLowerCase() !== 'others');
                             } else {
-                                console.log('⚠️ Parsed JSON but not array:', parsed);
                                 fetchedConcerns = [];
                             }
                         } catch (parseError) { 
-                            console.log('⚠️ JSON parse failed, trying comma split:', parseError.message);
-                            fetchedConcerns = productData.concern_options.split(',').map(c => c.trim()).filter(Boolean); 
-                            console.log('✅ Comma split result:', fetchedConcerns);
+                            fetchedConcerns = productData.concern_options.split(',').map(c => c.trim()).filter(c => c && c.toLowerCase() !== 'others'); 
                         } 
                     }
                 } else if (Array.isArray(productData.concern_options)) { 
-                    fetchedConcerns = productData.concern_options; 
-                    console.log('✅ Already array:', fetchedConcerns);
+                    // Filter out "others" from array
+                    fetchedConcerns = productData.concern_options.filter(c => c && c.toLowerCase() !== 'others'); 
                 } else if (productData.concern_options === null || productData.concern_options === undefined) {
                     fetchedConcerns = [];
-                    console.log('✅ Null/undefined detected - setting to empty array');
                 } else {
-                    console.log('⚠️ Unexpected concern_options type:', typeof productData.concern_options, productData.concern_options);
                     fetchedConcerns = [];
                 }
-
-                console.log('🎯 Final processed concerns:', fetchedConcerns);
 
                 const fullOriginalData = { 
                     ...productData, 
@@ -341,9 +285,6 @@ const EditProductPage = () => {
                     description: decodedDescription,
                     concern_options: fetchedConcerns
                 };
-                
-                console.log('💾 Setting originalData:', fullOriginalData);
-                console.log('💾 originalData concern_options:', fullOriginalData.concern_options);
                 
                 setOriginalData(fullOriginalData);
 
@@ -357,19 +298,12 @@ const EditProductPage = () => {
                     concern_options: fetchedConcerns
                 };
                 
-                console.log('📝 Setting formData:', newFormData);
-                console.log('📝 formData concern_options:', newFormData.concern_options);
-                
                 setFormData(newFormData);
 
                 const productImages = Array.isArray(productData.images) ? productData.images : [];
-                console.log('🖼️ Setting existing images:', productImages);
                 setExistingImages(productImages);
                 
-                console.log('✅ Component initialization complete');
-                
             } catch (error) { 
-                console.error('❌ Error in fetchProductData:', error);
                 handleError(error, 'Failed to load product data.'); 
             } finally { 
                 setLoading(false); 
@@ -380,16 +314,12 @@ const EditProductPage = () => {
 
     const handleChange = useCallback((e) => { 
         const { name, value } = e.target; 
-        console.log(`📝 Form field changed: ${name} = ${value}`);
         setFormData(prev => ({ ...prev, [name]: value })); 
         if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' })); 
         if (submitError) setSubmitError(''); 
     }, [errors, submitError]);
 
     const handleConcernToggle = useCallback((concernValue) => { 
-        console.log('🎯 Toggling concern:', concernValue);
-        console.log('🎯 Current concerns before toggle:', formData.concern_options);
-        
         setFormData(prev => { 
             const currentConcerns = prev.concern_options || []; 
             const isCurrentlySelected = currentConcerns.includes(concernValue);
@@ -397,15 +327,12 @@ const EditProductPage = () => {
                 ? currentConcerns.filter(c => c !== concernValue) 
                 : [...currentConcerns, concernValue]; 
                 
-            console.log('🎯 Updated concerns after toggle:', updatedConcerns);
-            console.log('🎯 Toggle action:', isCurrentlySelected ? 'REMOVED' : 'ADDED');
-            
             return { ...prev, concern_options: updatedConcerns }; 
         }); 
         
         if (errors.concern_options) setErrors(prev => ({ ...prev, concern_options: '' })); 
         if (submitError) setSubmitError(''); 
-    }, [formData.concern_options, errors.concern_options, submitError]);
+    }, [errors.concern_options, submitError]);
 
     const handleImageChange = useCallback((e) => {
         if (existingImages.length + newImages.length + e.target.files.length > IMAGE_CONFIG.maxCount) { 
@@ -456,9 +383,6 @@ const EditProductPage = () => {
         if (quantity === '' || isNaN(quantity) || parseInt(quantity, 10) < 0) newErrors.quantity = 'Please enter a valid quantity';
         if (!category) newErrors.category = 'Please select a category';
         
-        // Skin concerns are optional
-        
-        // Only validate slashed price if it has a value
         if (slashed_price && slashed_price.toString().trim() !== '') {
             const slashedPriceNum = parseFloat(slashed_price);
             const currentPriceNum = parseFloat(price);
@@ -480,20 +404,12 @@ const EditProductPage = () => {
     const handleSubmit = useCallback(async (e) => {
         e.preventDefault();
         
-        console.log('🚀 Form submission started');
-        console.log('📋 Current formData:', formData);
-        console.log('📋 Original data:', originalData);
-        console.log('🎯 Current concern_options:', formData.concern_options);
-        console.log('🎯 Original concern_options:', originalData?.concern_options);
-        
         if (!validateForm()) { 
-            console.error('❌ Form validation failed');
             setSubmitError('Please correct the errors and try again.'); 
             return; 
         }
         
         if (!hasChanges()) { 
-            console.warn('⚠️ No changes detected');
             setSubmitError('No changes detected.'); 
             return; 
         }
@@ -506,94 +422,45 @@ const EditProductPage = () => {
             const productData = {}; 
             const areArraysEqual = (a, b) => (a || []).sort().join() === (b || []).sort().join();
 
-            console.log('🔍 Analyzing changes...');
-
             if (formData.name !== originalData.name) {
                 productData.name = formData.name.trim();
-                console.log('📝 Name changed:', originalData.name, '->', productData.name);
             }
             if (parseFloat(formData.price) !== originalData.price) {
                 productData.price = parseFloat(formData.price);
-                console.log('💰 Price changed:', originalData.price, '->', productData.price);
             }
             if (formData.description !== originalData.description) {
                 productData.description = formData.description.trim();
-                console.log('📄 Description changed');
             }
             if (parseInt(formData.quantity, 10) !== originalData.available_qty) {
                 productData.available_qty = parseInt(formData.quantity, 10);
-                console.log('📦 Quantity changed:', originalData.available_qty, '->', productData.available_qty);
             }
             if (formData.category !== originalData.category) {
                 productData.category = formData.category;
-                console.log('🏷️ Category changed:', originalData.category, '->', productData.category);
             }
 
-            // CRITICAL: Enhanced concern options change detection
-            const concernsChanged = !areArraysEqual(formData.concern_options, originalData.concern_options);
-            console.log('🎯 Concern options analysis:', {
-                current: formData.concern_options,
-                original: originalData.concern_options,
-                currentSorted: (formData.concern_options || []).sort().join(),
-                originalSorted: (originalData.concern_options || []).sort().join(),
-                changed: concernsChanged
-            });
-            
-            if (concernsChanged) {
-                productData.concern_options = formData.concern_options;
-                console.log('🎯 Concern options changed!');
-                console.log('🎯 From:', originalData.concern_options);
-                console.log('🎯 To:', formData.concern_options);
-                console.log('🎯 Will send to backend:', productData.concern_options);
-            } else {
-                console.log('🎯 No concern options changes detected');
-            }
+            // Always send concern_options to ensure backend updates it properly
+            // Send "others" if no concerns selected, otherwise send the array
+            productData.concern_options = formData.concern_options.length === 0 
+                ? "others" 
+                : formData.concern_options;
 
             const newSlashed = formData.slashed_price ? parseFloat(formData.slashed_price) : null;
             if (newSlashed !== (originalData.slashed_price || null)) {
                 productData.slashed_price = newSlashed;
-                console.log('💸 Slashed price changed:', originalData.slashed_price, '->', productData.slashed_price);
             }
 
             if (newImages.length > 0) {
                 productData.images = newImages;
-                console.log('🖼️ New images added:', newImages.length);
             }
             if (removedImages.length > 0) {
                 productData.removed_images = removedImages;
-                console.log('🗑️ Images removed:', removedImages.length);
             }
 
-            console.log('📤 Final productData being sent to API:', productData);
-
             const response = await productService.updateProduct(id, productData); 
-            
-            console.log('📥 Update response received:', response);
-            
             const parsed = parseApiResponse(response);
-            console.log('📋 Parsed response:', parsed);
             
             if (parsed && (parsed.code === 200 || parsed.code === '200')) { 
-                console.log('✅ Update successful!');
                 setSubmitSuccess(true); 
-                
-                // IMPORTANT: After successful update, re-fetch the product to verify the changes
-                console.log('🔄 Re-fetching product to verify update...');
-                try {
-                    const verificationResponse = await productService.fetchProduct(id);
-                    console.log('✅ Verification fetch response:', verificationResponse);
-                    if (verificationResponse?.product?.concern_options !== undefined) {
-                        console.log('🔍 Backend returned concern_options after update:', {
-                            value: verificationResponse.product.concern_options,
-                            type: typeof verificationResponse.product.concern_options,
-                            expected: formData.concern_options,
-                            matches: JSON.stringify(verificationResponse.product.concern_options) === JSON.stringify(formData.concern_options)
-                        });
-                    }
-                } catch (verificationError) {
-                    console.error('⚠️ Failed to verify update:', verificationError);
-                }
-                
                 setTimeout(() => navigate('/admin/products/stock', { 
                     state: { 
                         notification: { 
@@ -606,7 +473,6 @@ const EditProductPage = () => {
                 throw new Error(parsed?.message || 'Failed to update product'); 
             }
         } catch (error) { 
-            console.error('❌ Submit error:', error);
             handleError(error, 'An error occurred while updating.'); 
         } finally { 
             setSubmitting(false); 
@@ -744,14 +610,6 @@ const EditProductPage = () => {
                                     <p className="text-xs text-gray-500 mb-3">
                                         Select applicable skin concerns. Leave empty for products like perfumes or items without specific skin concerns.
                                     </p>
-                                    
-                                    {/* DEBUG INFO DISPLAY */}
-                                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs">
-                                        <strong>DEBUG INFO:</strong><br/>
-                                        Current: {JSON.stringify(formData.concern_options)}<br/>
-                                        Original: {JSON.stringify(originalData?.concern_options)}<br/>
-                                        Has Changes: {hasChanges().toString()}
-                                    </div>
                                     
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {CONCERN_OPTIONS.map(c => { 

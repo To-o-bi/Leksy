@@ -35,21 +35,49 @@ const ProductDetail = ({ product, loading = false }) => {
         if (!product) return null;
         
         const price = parseFloat(product.price) || 0;
-        const originalPrice = product.slashed_price ? parseFloat(product.slashed_price) : null;
-        const discount = originalPrice ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0;
+        const category = (product.category || '').toLowerCase();
+        
+        // Get concern_options and handle various formats
+        let rawBenefits = product.concern_options || [];
+        
+        // If it's a string, try to parse it
+        if (typeof rawBenefits === 'string') {
+            // Handle "others" string case
+            if (rawBenefits.toLowerCase().trim() === 'others' || rawBenefits.trim() === '') {
+                rawBenefits = [];
+            } else {
+                try {
+                    rawBenefits = JSON.parse(rawBenefits);
+                } catch (e) {
+                    rawBenefits = rawBenefits.split(',').map(b => b.trim()).filter(Boolean);
+                }
+            }
+        }
+        
+        // Filter out "others" from the array
+        let benefits = Array.isArray(rawBenefits) 
+            ? rawBenefits.filter(b => b && b.toLowerCase() !== 'others')
+            : [];
+        
+        // Add category-specific benefits if no valid concerns exist
+        if (benefits.length === 0) {
+            if (category === 'perfume') {
+                benefits = ['Luxurious Fragrance'];
+            } else if (category === 'beauty') {
+                benefits = ['Enhances Natural Beauty'];
+            }
+        }
 
         return {
             ...product,
             product_id: product.product_id || product.id,
             name: decodeHtmlEntities(product.name || 'Unknown Product'),
             price: price,
-            originalPrice: originalPrice,
             description: decodeHtmlEntities(product.description || ''),
             images: product.images?.length > 0 ? product.images : ['https://placehold.co/600x600/f7f7f7/ccc?text=Product'],
             category: decodeHtmlEntities(product.category || 'Uncategorized'),
             stock: parseInt(product.available_qty, 10) || 0,
-            benefits: product.concern_options || [],
-            discount: discount
+            benefits: benefits,
         };
     }, [product]);
 
@@ -59,12 +87,11 @@ const ProductDetail = ({ product, loading = false }) => {
             // Small delay to ensure DOM is fully rendered
             const timer = setTimeout(() => {
                 setComponentReady(true);
-                // endTransition(); // End the loading overlay - commented out as endTransition is not defined
             }, 200);
             
             return () => clearTimeout(timer);
         }
-    }, [normalizedProduct, loading]); // Removed endTransition from dependencies
+    }, [normalizedProduct, loading]);
 
     // Handle images loading for better UX
     useEffect(() => {
@@ -80,10 +107,9 @@ const ProductDetail = ({ product, loading = false }) => {
 
             Promise.all(imagePromises).then(() => {
                 // All images loaded - component is truly ready
-                // endTransition(); // Commented out as endTransition is not defined
             });
         }
-    }, [normalizedProduct, componentReady]); // Removed endTransition from dependencies
+    }, [normalizedProduct, componentReady]);
 
     // Memoize the wishlist status check
     const isProductInWishlist = useMemo(() => {
@@ -223,7 +249,6 @@ const ProductDetail = ({ product, loading = false }) => {
                             </div>
                             <div className="flex items-baseline space-x-3">
                                 <div className="w-24 h-8 bg-gray-200 rounded animate-pulse"></div>
-                                <div className="w-20 h-6 bg-gray-200 rounded animate-pulse"></div>
                             </div>
                             <div className="w-32 h-4 bg-gray-200 rounded animate-pulse"></div>
                             <div className="space-y-2">
@@ -289,11 +314,6 @@ const ProductDetail = ({ product, loading = false }) => {
                                     className="w-full h-auto object-contain transition-transform duration-300 hover:scale-105"
                                     loading="lazy"
                                 />
-                                {normalizedProduct.discount > 0 && (
-                                    <div className="absolute top-4 left-4 bg-red-500 text-white text-sm font-bold px-3 py-1.5 rounded-lg shadow-md">
-                                        -{normalizedProduct.discount}%
-                                    </div>
-                                )}
                             </div>
                             {/* Share Button */}
                             <button 
@@ -360,11 +380,6 @@ const ProductDetail = ({ product, loading = false }) => {
                             <span className="text-3xl sm:text-4xl font-semibold text-pink-600">
                                 {formatter.formatCurrency(normalizedProduct.price)}
                             </span>
-                            {normalizedProduct.originalPrice && (
-                                <span className="text-xl text-gray-400 line-through font-medium">
-                                    {formatter.formatCurrency(normalizedProduct.originalPrice)}
-                                </span>
-                            )}
                         </div>
 
                         {/* Stock Status */}
