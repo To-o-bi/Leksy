@@ -42,10 +42,16 @@ const ShopByConcern = () => {
       const isMobileView = window.innerWidth < 768; // md breakpoint
       setIsMobile(isMobileView);
 
-      if (window.innerWidth < 640) setCardWidth(250); // sm
-      else if (window.innerWidth < 768) setCardWidth(280); // md
-      else if (window.innerWidth < 1024) setCardWidth(300); // lg
-      else setCardWidth(350);
+      if (window.innerWidth < 640) {
+        // Full width minus container padding for mobile
+        setCardWidth(window.innerWidth - 32); // 32px for px-4 on both sides
+      } else if (window.innerWidth < 768) {
+        setCardWidth(280); // md
+      } else if (window.innerWidth < 1024) {
+        setCardWidth(300); // lg
+      } else {
+        setCardWidth(350);
+      }
     };
 
     updateCarouselProperties();
@@ -126,7 +132,7 @@ const ShopByConcern = () => {
     <section className="py-8 sm:py-12 md:py-16 bg-gray-50 overflow-hidden" ref={containerRef}>
       <motion.div className="container mx-auto px-4" initial="hidden" animate={controls} variants={containerVariants}>
         <motion.div className="text-center mb-4 sm:mb-6" variants={{ hidden: { opacity: 0, y: -20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6 } } }}>
-          <h2 className="text-2xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2">Shop by Concern</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Shop by Concern</h2>
           <div className="flex justify-center items-center mt-3 mb-4 sm:mt-4 sm:mb-6 md:mb-8">
             <div className="w-3 sm:w-4 h-1 bg-pink-200 rounded"></div>
             <div className="w-6 sm:w-8 h-1 bg-pink-500 rounded mx-1"></div>
@@ -138,8 +144,8 @@ const ShopByConcern = () => {
         </motion.div>
 
         <div className="w-full overflow-hidden relative">
-          <div className="absolute top-0 left-0 h-full w-12 sm:w-16 md:w-24 bg-gradient-to-r from-gray-50 to-transparent z-10 pointer-events-none"></div>
-          <div className="absolute top-0 right-0 h-full w-12 sm:w-16 md:w-24 bg-gradient-to-l from-gray-50 to-transparent z-10 pointer-events-none"></div>
+          <div className="absolute top-0 left-0 h-full w-6 sm:w-8 md:w-12 bg-gradient-to-r from-gray-50 to-transparent z-10 pointer-events-none"></div>
+          <div className="absolute top-0 right-0 h-full w-6 sm:w-8 md:w-12 bg-gradient-to-l from-gray-50 to-transparent z-10 pointer-events-none"></div>
 
           {/* --- Hide navigation buttons on mobile/tablet --- */}
           {!isMobile && (

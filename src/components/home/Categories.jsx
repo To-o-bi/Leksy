@@ -258,7 +258,7 @@ const Categories = () => {
     <section className="py-8 sm:py-10 md:py-12 lg:py-16 bg-gray-50/30">
       <div className="container mx-auto px-3 sm:px-4 md:px-6">
         <div className="text-center mb-6 sm:mb-8 md:mb-10 lg:mb-12">
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 text-gray-900">Categories</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-2 text-gray-900">Categories</h2>
           <div className="flex justify-center items-center mt-3 sm:mt-4">
             <div className="w-3 h-1 bg-pink-200 rounded"></div>
             <div className="w-6 sm:w-8 h-1 bg-gradient-to-r from-pink-500 to-pink-500 rounded mx-1"></div>

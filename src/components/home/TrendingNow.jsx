@@ -50,13 +50,8 @@ const TrendingNow = () => {
             try {
                 // Get trending products for the last 7 days (shorter period for "trending")
                 const trending = calculateBestSellers({ days: 7, limit: 4 });
-                // Add trending indicator to products
-                const productsWithIndicator = trending.map(product => ({
-                    ...product,
-                    showTrendingBadge: true,
-                    quantitySold: product.quantitySold
-                }));
-                setTrendingProducts(productsWithIndicator);
+                // No badges needed - clean minimal look
+                setTrendingProducts(trending);
             } catch (error) {
                 // Log error for debugging but don't expose to user
                 if (process.env.NODE_ENV === 'development') {
@@ -85,16 +80,18 @@ const TrendingNow = () => {
 
     return (
         <section className="bg-white py-12 md:py-16">
-            <div className="container mx-auto px-4">
-                <div className="text-center mb-8">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                        <TrendingUp className="h-8 w-8 text-green-600" />
-                        <h2 className="text-3xl font-bold text-gray-800">Trending Now</h2>
+            <div className="container mx-auto px-1 sm:px-6 lg:px-8">
+                <div className="text-center mb-10 md:mb-12">
+                    <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Trending Now</h2>
+                    <div className="flex justify-center items-center mt-3 sm:mt-4">
+                        <div className="w-3 h-1 bg-pink-200 rounded"></div>
+                        <div className="w-6 sm:w-8 h-1 bg-gradient-to-r from-pink-500 to-pink-500 rounded mx-1"></div>
+                        <div className="w-3 h-1 bg-pink-200 rounded"></div>
                     </div>
-                    <p className="text-gray-600">Hot picks flying off the shelves this week.</p>
+                    <p className="text-gray-600 text-sm md:text-base mt-3">Discover what everyone's loving right now</p>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
                     {isLoading ? (
                         Array.from({ length: 4 }).map((_, index) => (
                             <SkeletonLoader key={`trending-skeleton-${index}`} />

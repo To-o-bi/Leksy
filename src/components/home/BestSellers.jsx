@@ -74,17 +74,19 @@ const BestSellers = () => {
     const hasNoData = !isLoading && !hasError && bestSellingProducts.length === 0;
 
     return (
-        <section className="bg-gray-50 py-12 md:py-16">
-            <div className="container mx-auto px-4">
-                <div className="text-center mb-8">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                        <TrendingUp className="h-8 w-8 text-pink-600" />
-                        <h2 className="text-3xl font-bold text-gray-800">Our Best Sellers</h2>
+        <section className="bg-white py-12 md:py-16">
+            <div className="container mx-auto px-1 sm:px-6 lg:px-8">
+                <div className="text-center mb-10 md:mb-12">
+                    <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Our Best Sellers</h2>
+                    <div className="flex justify-center items-center mt-3 sm:mt-4">
+                        <div className="w-3 h-1 bg-pink-200 rounded"></div>
+                        <div className="w-6 sm:w-8 h-1 bg-gradient-to-r from-pink-500 to-pink-500 rounded mx-1"></div>
+                        <div className="w-3 h-1 bg-pink-200 rounded"></div>
                     </div>
-                    <p className="text-gray-600">Top picks from our valued customers this month.</p>
+                    <p className="text-gray-600 text-sm md:text-base mt-3">Top picks from our valued customers this month</p>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-4">
                     {isLoading ? (
                         Array.from({ length: 8 }).map((_, index) => (
                             <SkeletonLoader key={`skeleton-${index}`} />

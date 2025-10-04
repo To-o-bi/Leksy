@@ -195,46 +195,103 @@ const ProductDetail = ({ product, loading = false }) => {
     };
 
     /**
-     * Handle product sharing
+     * Handle product sharing - optimized for HTTPS production environment
      */
     const handleShare = async () => {
+        const productUrl = window.location.href;
+        const shareData = {
+            title: normalizedProduct.name,
+            text: `Check out this product: ${normalizedProduct.name}`,
+            url: productUrl
+        };
+
         try {
+            // Primary method: Web Share API (works on HTTPS for mobile browsers)
             if (navigator.share) {
-                await navigator.share({
-                    title: normalizedProduct.name,
-                    text: `Check out this product: ${normalizedProduct.name}`,
-                    url: window.location.href
-                });
-            } else {
-                await navigator.clipboard.writeText(window.location.href);
-                // Could add a toast notification here for clipboard success
+                // Check if the browser supports canShare
+                if (navigator.canShare) {
+                    // Verify if this specific data can be shared
+                    if (navigator.canShare(shareData)) {
+                        await navigator.share(shareData);
+                        return;
+                    }
+                } else {
+                    // Browser supports share but not canShare - try anyway
+                    await navigator.share(shareData);
+                    return;
+                }
             }
+
+            // Fallback method: Clipboard API (works on HTTPS)
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(productUrl);
+                warning('Product link copied to clipboard!');
+                return;
+            }
+
+            // Legacy fallback: execCommand (for older browsers)
+            const textArea = document.createElement('textarea');
+            textArea.value = productUrl;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    warning('Product link copied to clipboard!');
+                } else {
+                    warning('Unable to copy link. Please copy manually.');
+                }
+            } catch (err) {
+                console.error('Copy command failed:', err);
+                warning('Unable to copy link. Please copy manually.');
+            }
+            
+            document.body.removeChild(textArea);
         } catch (error) {
-            // Silently handle share/clipboard errors
-            console.warn('Share failed:', error);
+            // Handle errors gracefully
+            if (error.name === 'AbortError') {
+                // User cancelled the share dialog - do nothing
+                return;
+            }
+            
+            if (error.name === 'NotAllowedError') {
+                // Permission denied or not in secure context
+                console.error('Share not allowed:', error);
+                warning('Sharing is only available on secure connections (HTTPS).');
+                return;
+            }
+
+            // Other errors
+            console.error('Share failed:', error);
+            warning('Unable to share at this time. Please try copying the URL manually.');
         }
     };
     
     if (loading || !normalizedProduct) {
         return (
             <div className="bg-white min-h-screen">
-                <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="container mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
                     {/* Back Button Skeleton */}
-                    <div className="mb-6">
+                    <div className="mb-4 sm:mb-6">
                         <div className="flex items-center space-x-2">
                             <div className="w-5 h-5 bg-gray-200 rounded animate-pulse"></div>
                             <div className="w-24 h-4 bg-gray-200 rounded animate-pulse"></div>
                         </div>
                     </div>
                     
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
                         {/* Image Skeleton */}
-                        <div className="space-y-4">
-                            <div className="flex items-start justify-between">
-                                <div className="flex-1 bg-gray-200 rounded-xl animate-pulse" style={{ minHeight: '400px' }}></div>
-                                <div className="ml-3 w-10 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+                        <div className="space-y-3 sm:space-y-4">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 bg-gray-200 rounded-lg sm:rounded-xl animate-pulse aspect-square sm:aspect-auto" style={{ minHeight: '250px' }}></div>
+                                <div className="w-10 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
                             </div>
-                            <div className="grid grid-cols-6 gap-1.5">
+                            <div className="grid grid-cols-5 sm:grid-cols-6 gap-1.5">
                                 {Array.from({ length: 5 }).map((_, i) => (
                                     <div key={i} className="aspect-square bg-gray-200 rounded-md animate-pulse"></div>
                                 ))}
@@ -242,13 +299,13 @@ const ProductDetail = ({ product, loading = false }) => {
                         </div>
                         
                         {/* Content Skeleton */}
-                        <div className="space-y-6">
+                        <div className="space-y-4 sm:space-y-6">
                             <div className="space-y-2">
                                 <div className="w-20 h-3 bg-gray-200 rounded animate-pulse"></div>
-                                <div className="w-3/4 h-8 bg-gray-200 rounded animate-pulse"></div>
+                                <div className="w-3/4 h-6 sm:h-8 bg-gray-200 rounded animate-pulse"></div>
                             </div>
                             <div className="flex items-baseline space-x-3">
-                                <div className="w-24 h-8 bg-gray-200 rounded animate-pulse"></div>
+                                <div className="w-24 h-7 sm:h-8 bg-gray-200 rounded animate-pulse"></div>
                             </div>
                             <div className="w-32 h-4 bg-gray-200 rounded animate-pulse"></div>
                             <div className="space-y-2">
@@ -256,17 +313,17 @@ const ProductDetail = ({ product, loading = false }) => {
                                 <div className="w-full h-4 bg-gray-200 rounded animate-pulse"></div>
                                 <div className="w-2/3 h-4 bg-gray-200 rounded animate-pulse"></div>
                             </div>
-                            <div className="flex gap-3">
-                                <div className="flex-1 h-12 bg-gray-200 rounded-lg animate-pulse"></div>
-                                <div className="flex-1 h-12 bg-gray-200 rounded-lg animate-pulse"></div>
-                                <div className="w-14 h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+                            <div className="flex gap-2 sm:gap-3">
+                                <div className="flex-1 h-11 sm:h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+                                <div className="flex-1 h-11 sm:h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+                                <div className="w-11 sm:w-14 h-11 sm:h-12 bg-gray-200 rounded-lg animate-pulse"></div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
         );
-    }
+    };
 
     /**
      * Handle back navigation
@@ -282,17 +339,17 @@ const ProductDetail = ({ product, loading = false }) => {
     };
 
     return (
-        <div className="bg-white">
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white min-h-screen">
+            <div className="container mx-auto px-2 sm:px-4 lg:px-8 py-3 sm:py-8">
                 {/* Back Button */}
-                <div className="mb-6">
+                <div className="mb-4 sm:mb-6">
                     <button
                         onClick={handleGoBack}
-                        className="inline-flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors duration-200 group"
+                        className="inline-flex items-center space-x-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 hover:text-gray-900 rounded-lg transition-all duration-200 group touch-manipulation border border-gray-200 shadow-sm hover:shadow-md"
                         aria-label="Go back to previous page"
                     >
                         <svg 
-                            className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform duration-200" 
+                            className="w-4 h-4 sm:w-5 sm:h-5 transform group-hover:-translate-x-1 transition-transform duration-200" 
                             fill="none" 
                             stroke="currentColor" 
                             viewBox="0 0 24 24"
@@ -300,94 +357,156 @@ const ProductDetail = ({ product, loading = false }) => {
                         >
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                         </svg>
-                        <span className="font-medium">Back to Shop</span>
+                        <span className="font-medium text-sm sm:text-base">Back to Shop</span>
                     </button>
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-6">
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
                     {/* Product Images */}
-                    <div className="space-y-4">
-                        <div className="flex items-start justify-between">
-                            <div className="flex-1 relative bg-white rounded-xl overflow-hidden shadow-lg border border-gray-100" style={{ minHeight: '300px', maxHeight: '600px' }}>
+                    <div className="space-y-3 sm:space-y-4">
+                        {/* Mobile Layout: Main image with share button overlay, thumbnails below */}
+                        <div className="lg:hidden">
+                            <div className="relative bg-white rounded-lg overflow-hidden shadow-md border border-gray-100">
                                 <img 
                                     src={normalizedProduct.images[selectedImage]}
                                     alt={normalizedProduct.name} 
-                                    className="w-full h-auto object-contain transition-transform duration-300 hover:scale-105"
+                                    className="w-full h-auto object-contain transition-transform duration-300"
                                     loading="lazy"
                                 />
-                            </div>
-                            {/* Share Button */}
-                            <button 
-                                className="ml-3 flex items-center justify-center w-10 h-10 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2"
-                                onClick={handleShare}
-                                aria-label="Share product"
-                            >
-                                <svg 
-                                    xmlns="http://www.w3.org/2000/svg" 
-                                    className="h-5 w-5" 
-                                    fill="none" 
-                                    viewBox="0 0 24 24" 
-                                    stroke="currentColor"
-                                    strokeWidth={2}
+                                {/* Share Button - Top Right Overlay */}
+                                <button 
+                                    className="absolute top-2 right-2 flex items-center justify-center w-10 h-10 rounded-lg bg-white/90 backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-white hover:text-gray-900 transition-all duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-1 touch-manipulation z-10"
+                                    onClick={handleShare}
+                                    aria-label="Share product"
                                 >
-                                    <path 
-                                        strokeLinecap="round" 
-                                        strokeLinejoin="round"
-                                        d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" 
-                                    />
-                                </svg>
-                            </button>
+                                    <svg 
+                                        xmlns="http://www.w3.org/2000/svg" 
+                                        className="h-5 w-5" 
+                                        fill="none" 
+                                        viewBox="0 0 24 24" 
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                    >
+                                        <path 
+                                            strokeLinecap="round" 
+                                            strokeLinejoin="round"
+                                            d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" 
+                                        />
+                                    </svg>
+                                </button>
+                            </div>
+                            
+                            {/* Thumbnail Images */}
+                            {normalizedProduct.images.length > 1 && (
+                                <div className="grid grid-cols-5 gap-2 mt-3">
+                                    {normalizedProduct.images.slice(0, 5).map((image, index) => (
+                                        <button 
+                                            key={index} 
+                                            className={`relative border-2 rounded-md overflow-hidden transition-all duration-200 aspect-square focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-1 touch-manipulation ${
+                                                selectedImage === index 
+                                                    ? 'border-pink-500 shadow-md ring-2 ring-pink-200' 
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                            onClick={() => setSelectedImage(index)}
+                                            aria-label={`View image ${index + 1} of ${normalizedProduct.name}`}
+                                        >
+                                            <img 
+                                                src={image} 
+                                                alt={`${normalizedProduct.name} view ${index + 1}`} 
+                                                className="w-full h-full object-cover"
+                                                loading="lazy"
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         
-                        {normalizedProduct.images.length > 1 && (
-                            <div className="grid grid-cols-6 gap-1.5">
-                                {normalizedProduct.images.slice(0, 5).map((image, index) => (
-                                    <button 
-                                        key={index} 
-                                        className={`relative border-2 rounded-md overflow-hidden transition-all duration-200 aspect-square focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-1 ${
-                                            selectedImage === index 
-                                                ? 'border-pink-500 shadow-md ring-2 ring-pink-200' 
-                                                : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
-                                        }`}
-                                        onClick={() => setSelectedImage(index)}
-                                        aria-label={`View image ${index + 1} of ${normalizedProduct.name}`}
+                        {/* Desktop Layout: Original layout */}
+                        <div className="hidden lg:block">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 relative bg-white rounded-xl overflow-hidden shadow-lg border border-gray-100">
+                                    <img 
+                                        src={normalizedProduct.images[selectedImage]}
+                                        alt={normalizedProduct.name} 
+                                        className="w-full h-auto object-contain transition-transform duration-300 hover:scale-105"
+                                        loading="lazy"
+                                    />
+                                </div>
+                                {/* Share Button */}
+                                <button 
+                                    className="flex items-center justify-center w-11 h-11 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 touch-manipulation flex-shrink-0"
+                                    onClick={handleShare}
+                                    aria-label="Share product"
+                                >
+                                    <svg 
+                                        xmlns="http://www.w3.org/2000/svg" 
+                                        className="h-5 w-5" 
+                                        fill="none" 
+                                        viewBox="0 0 24 24" 
+                                        stroke="currentColor"
+                                        strokeWidth={2}
                                     >
-                                        <img 
-                                            src={image} 
-                                            alt={`${normalizedProduct.name} view ${index + 1}`} 
-                                            className="w-full h-full object-cover"
-                                            loading="lazy"
+                                        <path 
+                                            strokeLinecap="round" 
+                                            strokeLinejoin="round"
+                                            d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" 
                                         />
-                                    </button>
-                                ))}
+                                    </svg>
+                                </button>
                             </div>
-                        )}
+                            
+                            {normalizedProduct.images.length > 1 && (
+                                <div className="grid grid-cols-6 gap-2 mt-4">
+                                    {normalizedProduct.images.slice(0, 5).map((image, index) => (
+                                        <button 
+                                            key={index} 
+                                            className={`relative border-2 rounded-md overflow-hidden transition-all duration-200 aspect-square focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-1 touch-manipulation ${
+                                                selectedImage === index 
+                                                    ? 'border-pink-500 shadow-md ring-2 ring-pink-200' 
+                                                    : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                                            }`}
+                                            onClick={() => setSelectedImage(index)}
+                                            aria-label={`View image ${index + 1} of ${normalizedProduct.name}`}
+                                        >
+                                            <img 
+                                                src={image} 
+                                                alt={`${normalizedProduct.name} view ${index + 1}`} 
+                                                className="w-full h-full object-cover"
+                                                loading="lazy"
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                     
                     {/* Product Information */}
-                    <div className="space-y-6">
+                    <div className="space-y-4 sm:space-y-6">
                         {/* Product Name and Category */}
-                        <div className="space-y-2">
-                            <div className="text-sm text-pink-600 font-medium uppercase tracking-wide">
+                        <div className="space-y-1 sm:space-y-2">
+                            <div className="text-xs sm:text-sm text-pink-600 font-medium uppercase tracking-wide">
                                 {normalizedProduct.category}
                             </div>
-                            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 leading-tight">
+                            <h1 className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900 leading-tight">
                                 {normalizedProduct.name}
                             </h1>
                         </div>
                         
                         {/* Pricing */}
-                        <div className="flex items-baseline space-x-3">
-                            <span className="text-3xl sm:text-4xl font-semibold text-pink-600">
+                        <div className="flex items-baseline space-x-2 sm:space-x-3">
+                            <span className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-pink-600">
                                 {formatter.formatCurrency(normalizedProduct.price)}
                             </span>
                         </div>
 
                         {/* Stock Status */}
                         <div className="flex items-center space-x-2">
-                            <div className={`w-3 h-3 rounded-full ${
+                            <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${
                                 normalizedProduct.stock > 0 ? 'bg-green-500' : 'bg-red-500'
                             }`}></div>
-                            <span className={`text-sm font-medium ${
+                            <span className={`text-xs sm:text-sm font-medium ${
                                 normalizedProduct.stock > 0 ? 'text-green-700' : 'text-red-700'
                             }`}>
                                 {normalizedProduct.stock > 0 
@@ -398,9 +517,9 @@ const ProductDetail = ({ product, loading = false }) => {
                         
                         {/* Description */}
                         {normalizedProduct.description && (
-                            <div className="border-t border-gray-200 pt-6">
-                                <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
-                                <div className="text-gray-700 leading-relaxed text-base prose prose-sm max-w-none">
+                            <div className="border-t border-gray-200 pt-4 sm:pt-6">
+                                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">Description</h3>
+                                <div className="text-gray-700 leading-relaxed text-sm sm:text-base">
                                     <p>{normalizedProduct.description}</p>
                                 </div>
                             </div>
@@ -408,14 +527,14 @@ const ProductDetail = ({ product, loading = false }) => {
                         
                         {/* Quantity Selector */}
                         {normalizedProduct.stock > 0 && (
-                            <div className="flex items-center space-x-4 py-4">
-                                <label htmlFor="quantity-input" className="text-sm font-semibold text-gray-900">
+                            <div className="flex items-center space-x-3 sm:space-x-4 py-3 sm:py-4">
+                                <label htmlFor="quantity-input" className="text-sm sm:text-base font-semibold text-gray-900">
                                     Quantity:
                                 </label>
                                 <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
                                     <button 
                                         onClick={decrementQuantity} 
-                                        className="px-4 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-r border-gray-300 focus:outline-none focus:bg-gray-100"
+                                        className="px-3 sm:px-4 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-r border-gray-300 focus:outline-none focus:bg-gray-100 touch-manipulation min-h-[44px]"
                                         disabled={Number(quantity) <= 1}
                                         aria-label="Decrease quantity"
                                     >
@@ -427,14 +546,14 @@ const ProductDetail = ({ product, loading = false }) => {
                                         value={quantity}
                                         onChange={handleQuantityInputChange}
                                         onBlur={handleQuantityInputBlur}
-                                        className="w-16 text-center py-2 font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                                        className="w-12 sm:w-16 text-center py-2 font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent text-sm sm:text-base"
                                         min="1"
                                         max={normalizedProduct.stock}
                                         aria-label="Product quantity"
                                     />
                                     <button 
                                         onClick={incrementQuantity} 
-                                        className="px-4 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-l border-gray-300 focus:outline-none focus:bg-gray-100"
+                                        className="px-3 sm:px-4 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-l border-gray-300 focus:outline-none focus:bg-gray-100 touch-manipulation min-h-[44px]"
                                         disabled={Number(quantity) >= normalizedProduct.stock}
                                         aria-label="Increase quantity"
                                     >
@@ -445,56 +564,60 @@ const ProductDetail = ({ product, loading = false }) => {
                         )}
                         
                         {/* Action Buttons */}
-                        <div className="flex gap-3">
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                             <button
-                                className="flex-1 bg-pink-500 hover:bg-pink-600 text-white py-3.5 px-6 rounded-lg font-semibold transition-all duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2"
+                                className="flex-1 bg-pink-500 hover:bg-pink-600 text-white py-3 sm:py-3.5 px-4 sm:px-6 rounded-lg font-semibold transition-all duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 touch-manipulation text-sm sm:text-base min-h-[44px]"
                                 onClick={handleAddToCart}
                                 disabled={normalizedProduct.stock <= 0}
                             >
                                 Add To Cart
                             </button>
-                            <button
-                                className="flex-1 bg-transparent border-2 border-pink-500 text-pink-500 hover:bg-pink-50 py-3.5 px-6 rounded-lg font-semibold transition-all duration-200 disabled:border-gray-300 disabled:text-gray-300 disabled:cursor-not-allowed hover:shadow-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2"
-                                onClick={handleCheckoutNow}
-                                disabled={normalizedProduct.stock <= 0}
-                            >
-                                Buy Now
-                            </button>
-                            <button 
-                                className={`flex items-center justify-center w-14 h-14 rounded-lg border-2 font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                                    isProductInWishlist 
-                                        ? 'bg-pink-50 text-pink-600 border-pink-200 shadow-sm focus:ring-pink-500' 
-                                        : 'bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:border-gray-400 focus:ring-gray-500'
-                                }`}
-                                onClick={handleToggleWishlist}
-                                aria-label={isProductInWishlist ? "Remove from wishlist" : "Add to wishlist"}
-                            >
-                                <svg 
-                                    xmlns="http://www.w3.org/2000/svg" 
-                                    className="h-5 w-5" 
-                                    fill={isProductInWishlist ? 'currentColor' : 'none'} 
-                                    viewBox="0 0 24 24" 
-                                    stroke="currentColor"
-                                    strokeWidth={2}
+                            
+                            {/* Mobile: Buy Now and Wishlist on same line */}
+                            <div className="flex sm:contents gap-2">
+                                <button
+                                    className="flex-1 sm:flex-1 bg-transparent border-2 border-pink-500 text-pink-500 hover:bg-pink-50 py-3 sm:py-3.5 px-4 sm:px-6 rounded-lg font-semibold transition-all duration-200 disabled:border-gray-300 disabled:text-gray-300 disabled:cursor-not-allowed hover:shadow-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 touch-manipulation text-sm sm:text-base min-h-[44px]"
+                                    onClick={handleCheckoutNow}
+                                    disabled={normalizedProduct.stock <= 0}
                                 >
-                                    <path 
-                                        strokeLinecap="round" 
-                                        strokeLinejoin="round"
-                                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
-                                    />
-                                </svg>
-                            </button>
+                                    Checkout Now
+                                </button>
+                                <button 
+                                    className={`sm:flex-none flex items-center justify-center h-11 sm:h-14 px-4 sm:px-0 sm:min-w-[56px] rounded-lg border-2 font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 touch-manipulation ${
+                                        isProductInWishlist 
+                                            ? 'bg-pink-50 text-pink-600 border-pink-200 shadow-sm focus:ring-pink-500' 
+                                            : 'bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:border-gray-400 focus:ring-gray-500'
+                                    }`}
+                                    onClick={handleToggleWishlist}
+                                    aria-label={isProductInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+                                >
+                                    <svg 
+                                        xmlns="http://www.w3.org/2000/svg" 
+                                        className="h-5 w-5" 
+                                        fill={isProductInWishlist ? 'currentColor' : 'none'} 
+                                        viewBox="0 0 24 24" 
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                    >
+                                        <path 
+                                            strokeLinecap="round" 
+                                            strokeLinejoin="round"
+                                            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                                        />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     
                         {/* Benefits/Tags */}
                         {normalizedProduct.benefits.length > 0 && (
-                            <div className="border-t border-gray-200 pt-6">
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Perfect For:</h3>
+                            <div className="border-t border-gray-200 pt-4 sm:pt-6">
+                                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Perfect For:</h3>
                                 <div className="flex flex-wrap gap-2">
                                     {normalizedProduct.benefits.map((benefit, index) => (
                                         <span 
                                             key={index} 
-                                            className="bg-gray-100 text-gray-700 text-sm font-medium px-4 py-2 rounded-full border border-gray-200 hover:bg-gray-200 transition-colors"
+                                            className="bg-gray-100 text-gray-700 text-xs sm:text-sm font-medium px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-gray-200 hover:bg-gray-200 transition-colors"
                                         >
                                             {decodeHtmlEntities(benefit)}
                                         </span>
