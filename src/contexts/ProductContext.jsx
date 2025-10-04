@@ -14,15 +14,15 @@ export const useProducts = () => {
 // Visual configurations for categories
 const categoryVisuals = {
     'serum': { image: '/assets/images/categories/serum.png', bgColor: 'bg-pink-100', hoverColor: 'hover:bg-pink-200', imageSize: 'w-16 h-16' },
-    'moisturizer': { image: '/assets/images/categories/moisturizer.png', bgColor: 'bg-amber-50', hoverColor: 'hover:bg-amber-100', imageSize: 'w-16 h-16' },
-    'perfume': { image: '/assets/images/categories/perfume.png', bgColor: 'bg-amber-50', hoverColor: 'hover:bg-amber-100', imageSize: 'w-16 h-16' },
-    'body-and-bath': { image: '/assets/images/categories/body.png', bgColor: 'bg-pink-100', hoverColor: 'hover:bg-pink-200', imageSize: 'w-24 h-24' },
+    'moisturizer': { image: '/assets/images/categories/moisturizer.png', bgColor: 'bg-amber-100', hoverColor: 'hover:bg-amber-200', imageSize: 'w-16 h-16' }, // Changed to brown/amber-100
+    'perfume': { image: '/assets/images/categories/perfume.png', bgColor: 'bg-yellow-50', hoverColor: 'hover:bg-yellow-100', imageSize: 'w-16 h-16' },
+    'body-and-bath': { image: '/assets/images/categories/body.png', bgColor: 'bg-violet-100', hoverColor: 'hover:bg-violet-200', imageSize: 'w-24 h-24' }, // Changed to violet
     'sunscreen': { image: '/assets/images/categories/sunscreen.png', bgColor: 'bg-purple-100', hoverColor: 'hover:bg-purple-200', imageSize: 'w-16 h-16' },
     'toner': { image: '/assets/images/categories/toner.png', bgColor: 'bg-blue-100', hoverColor: 'hover:bg-blue-200', imageSize: 'w-16 h-16' },
     'cleanser': { image: '/assets/images/categories/cleanser.png', bgColor: 'bg-emerald-100', hoverColor: 'hover:bg-emerald-200', imageSize: 'w-16 h-16' },
     'eye-cream': { image: '/assets/images/categories/eye.png', bgColor: 'bg-gray-100', hoverColor: 'hover:bg-gray-200', imageSize: '!w-20 !h-20' },
     'beauty': { image: '/assets/images/categories/beauty.png', bgColor: 'bg-red-100', hoverColor: 'hover:bg-red-200', imageSize: 'w-20 h-20' },
-    'mask': { image: '/assets/images/categories/mask.png', bgColor: 'bg-amber-50', hoverColor: 'hover:bg-amber-100', imageSize: '!w-20 !h-20' },
+    'mask': { image: '/assets/images/categories/mask.png', bgColor: 'bg-orange-50', hoverColor: 'hover:bg-orange-100', imageSize: '!w-20 !h-20' },
     'default': { image: '/placeholder.jpg', bgColor: 'bg-gray-100', hoverColor: 'hover:bg-gray-200', imageSize: 'w-16 h-16' }
 };
 
