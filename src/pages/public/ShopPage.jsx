@@ -180,7 +180,7 @@ const ShopPage = () => {
     // Skeleton loading component for product grid
     const ProductGridSkeleton = () => {
         return (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-4">
                 {Array.from({ length: productsPerPage }).map((_, index) => (
                     <div key={index} className="bg-white rounded-lg shadow-sm border animate-pulse">
                         <div className="aspect-square bg-gray-200 rounded-t-lg"></div>
@@ -207,18 +207,80 @@ const ShopPage = () => {
 
     return (
         <div className="flex flex-col min-h-screen">
-            <Breadcrumb
-                items={[
-                    { label: 'Home', path: '/' },
-                    { label: 'Shop', path: '/shop' },
-                    ...(selectedFilters.category ? [{
-                        label: getCategoryDisplayName(selectedFilters.category),
-                        path: `/shop?category=${encodeURIComponent(selectedFilters.category)}`
-                    }] : [])
-                ]}
-            />
+            {/* Hero Banner */}
+            <div className="relative bg-gradient-to-r from-pink-100 to-pink-200 overflow-hidden">
+                <div className="container mx-auto px-4 md:px-12 lg:px-16 max-w-8xl">
+                    {/* Mobile View */}
+                    <div className="md:hidden relative">
+                        {/* Background Image for Mobile */}
+                        <div className="absolute inset-0 z-0">
+                            <img 
+                                src="/assets/images/hero/shop-3.png" 
+                                alt="Shop Hero" 
+                                className="w-full h-full object-cover object-right"
+                            />
+                            {/* Overlay for better text readability - stronger on the left */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-pink-100/80 via-pink-100/50 to-transparent"></div>
+                        </div>
+                        
+                        {/* Content on top of image - positioned to the left */}
+                        <div className="relative z-10 py-12 max-w-[60%]">
+                            <div className="flex items-center gap-2 text-sm text-gray-700 mb-4">
+                                <a href="/" className="hover:text-pink-600 transition-colors">Home</a>
+                                <span>›</span>
+                                <span className="text-gray-900 font-medium">Shop</span>
+                                {selectedFilters.category && (
+                                    <>
+                                        <span>›</span>
+                                        <span className="text-gray-900 font-medium">
+                                            {getCategoryDisplayName(selectedFilters.category)}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                            <h1 className="text-4xl font-bold text-gray-900">
+                                Shop
+                            </h1>
+                        </div>
+                    </div>
+
+                    {/* Desktop View - Keep original layout */}
+                    <div className="hidden md:flex items-center justify-between py-12 md:py-16 lg:py-20">
+                        {/* Left Side - Breadcrumb and Title */}
+                        <div className="z-10 flex-1">
+                            <div className="flex items-center gap-2 text-sm text-gray-700 mb-4">
+                                <a href="/" className="hover:text-pink-600 transition-colors">Home</a>
+                                <span>›</span>
+                                <span className="text-gray-900 font-medium">Shop</span>
+                                {selectedFilters.category && (
+                                    <>
+                                        <span>›</span>
+                                        <span className="text-gray-900 font-medium">
+                                            {getCategoryDisplayName(selectedFilters.category)}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900">
+                                Shop
+                            </h1>
+                        </div>
+                        
+                        {/* Right Side - Image */}
+                        <div className="flex-1 relative">
+                            <div className="md:absolute md:right-0 md:top-1/2 md:-translate-y-1/2 w-full md:max-w-md lg:max-w-lg">
+                                <img 
+                                    src="/assets/images/hero/shop-3.png" 
+                                    alt="Shop Hero" 
+                                    className="w-full h-auto object-cover rounded-lg md:rounded-l-full md:rounded-r-none"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
-            <div className="w-[87%] mx-auto py-8">
+            <div className="container mx-auto px-4 md:px-12 lg:px-16 max-w-8xl py-8">
                 <div className="mb-8">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                         <div className="relative w-full md:w-auto">
