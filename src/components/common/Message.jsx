@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
 
 const Message = ({ 
@@ -8,6 +8,14 @@ const Message = ({
   onClose 
 }) => {
   const [isExiting, setIsExiting] = useState(false);
+  const [isEntering, setIsEntering] = useState(true);
+
+  useEffect(() => {
+    // Trigger entrance animation
+    setIsEntering(true);
+    const timer = setTimeout(() => setIsEntering(false), 300);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Triggers the exit animation and then calls the parent's onClose handler.
   const handleClose = useCallback(() => {
@@ -20,10 +28,10 @@ const Message = ({
   // Helper to select the correct icon based on message type
   const messageIcon = () => {
     switch (type) {
-      case 'success': return <CheckCircle className="w-5 h-5" />;
-      case 'error': return <AlertCircle className="w-5 h-5" />;
-      case 'warning': return <AlertTriangle className="w-5 h-5" />;
-      case 'info': default: return <Info className="w-5 h-5" />;
+      case 'success': return <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />;
+      case 'error': return <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" />;
+      case 'warning': return <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />;
+      case 'info': default: return <Info className="w-4 h-4 sm:w-5 sm:h-5" />;
     }
   };
 
@@ -42,27 +50,34 @@ const Message = ({
     info: 'text-blue-500'
   };
 
+  // Determine animation state
+  const getAnimationClass = () => {
+    if (isExiting) return 'opacity-0 translate-x-full';
+    if (isEntering) return 'translate-x-full';
+    return 'opacity-100 translate-x-0';
+  };
+
   return (
     <div 
       className={`
-        p-4 rounded-md shadow-lg
-        border-l-4 max-w-md w-full md:w-96
-        flex items-start gap-3
-        transform transition-all duration-300 ease-in-out
+        p-3 sm:p-4 rounded-md shadow-lg
+        border-l-4 w-[calc(100vw-1.5rem)] sm:w-full sm:max-w-md md:w-96
+        flex items-start gap-2 sm:gap-3
+        transform transition-all duration-300 ease-out
         ${messageClasses[type] || messageClasses.info}
-        ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}
+        ${getAnimationClass()}
       `}
       role="alert"
     >
-      <div className={`flex-shrink-0 ${iconClasses[type] || iconClasses.info}`}>
+      <div className={`flex-shrink-0 mt-0.5 sm:mt-0 ${iconClasses[type] || iconClasses.info}`}>
         {messageIcon()}
       </div>
       
-      <div className="flex-grow flex items-center gap-2">
-        <p className="font-medium">{message}</p>
+      <div className="flex-grow flex items-center gap-2 min-w-0">
+        <p className="font-medium text-sm sm:text-base break-words">{message}</p>
         {/* Display a counter badge if the message has been triggered more than once */}
         {count > 1 && (
-          <span className="bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">
+          <span className="bg-gray-200 text-gray-600 text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
             x{count}
           </span>
         )}
@@ -70,10 +85,10 @@ const Message = ({
       
       <button 
         onClick={handleClose}
-        className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition"
+        className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition touch-manipulation min-w-[24px] min-h-[24px] flex items-center justify-center -mr-1 sm:mr-0"
         aria-label="Close"
       >
-        <X className="w-5 h-5" />
+        <X className="w-4 h-4 sm:w-5 sm:h-5" />
       </button>
     </div>
   );

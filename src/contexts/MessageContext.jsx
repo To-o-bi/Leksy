@@ -76,7 +76,7 @@ export const MessageProvider = ({ children }) => {
       {children}
       
       {/* Container for the message, positioned at the top-right */}
-      <div className="fixed top-5 right-5 z-[9999] w-full max-w-sm pointer-events-none">
+      <div className="fixed top-4 sm:top-5 right-2 sm:right-5 z-[9999] pointer-events-none flex justify-end">
         {message && (
           // Wrapper to re-enable pointer events for the message itself
           <div className="pointer-events-auto">
