@@ -9,23 +9,23 @@ const ConsultationPage = () => {
   return (
     <div className="bg-white min-h-screen">
       {/* Hero Section */}
-      <div className="relative py-16">
+      <div className="relative py-12 md:py-16">
         {/* Background Image with Overlay */}
         <div className="absolute inset-0 overflow-hidden">
           <div 
-            className="absolute inset-0 bg-cover bg-[center_10%]"
+            className="absolute inset-0 bg-cover bg-center md:bg-[center_10%]"
             style={{
               backgroundImage: "url('public/assets/images/banners/fine.jpg')",
             }}
           ></div>
           <div className="absolute inset-0 bg-gradient-to-r from-pink-500 to-pink-400 opacity-60"></div>
           
-          {/* Floating Bubbles */}
+          {/* Floating Bubbles - 1 on mobile, 10 on desktop */}
           <div className="absolute inset-0">
             {[...Array(10)].map((_, i) => (
               <div
                 key={i}
-                className="absolute rounded-full bg-pink-200 opacity-20"
+                className={`absolute rounded-full bg-pink-200 opacity-20 ${i > 0 ? 'hidden md:block' : ''}`}
                 style={{
                   width: `${Math.random() * 100 + 50}px`,
                   height: `${Math.random() * 100 + 50}px`,
@@ -39,12 +39,12 @@ const ConsultationPage = () => {
         </div>
         
         {/* Content */}
-        <div className="container mx-auto px-4 relative z-10">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 relative z-10">
           <div className="text-center max-w-3xl mx-auto">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 text-white">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 md:mb-4 text-white px-2">
               Personalized Skincare Consultation
             </h1>
-            <p className="text-lg text-white mb-8">
+            <p className="text-base sm:text-lg text-white mb-6 md:mb-8 px-2">
               Get expert advice tailored to your unique skin needs and concerns.
               Our specialists will create a customized routine just for you.
             </p>
@@ -53,7 +53,7 @@ const ConsultationPage = () => {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-12">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 py-8 md:py-12">
         <ConsultationForm />
       </div>
 

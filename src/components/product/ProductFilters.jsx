@@ -18,8 +18,20 @@ export default function ProductFilters({ selectedFilters, onFilterChange, horizo
                 setIsFilterOpen(false);
             }
         };
+        
+        const handleTouchOutside = (event) => {
+            if (filterRef.current && !filterRef.current.contains(event.target)) {
+                setIsFilterOpen(false);
+            }
+        };
+        
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleTouchOutside);
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleTouchOutside);
+        };
     }, []);
 
     const toggleFilter = useCallback(() => setIsFilterOpen(prev => !prev), []);
@@ -54,57 +66,57 @@ export default function ProductFilters({ selectedFilters, onFilterChange, horizo
     }, [hasCategory, hasConcerns, selectedFilters.category, selectedFilters.concerns]);
 
     return (
-        <div className={`font-sans ${horizontal ? 'flex flex-wrap items-start gap-4' : 'p-4'}`}>
-            <div className="relative" ref={filterRef}>
+        <div className={`font-sans ${horizontal ? 'flex flex-wrap items-start gap-4' : 'p-2 sm:p-4'}`}>
+            <div className="relative w-full sm:w-auto" ref={filterRef}>
                 <button
                     onClick={toggleFilter}
-                    className={`flex items-center justify-between px-4 py-2 bg-white border ${hasFilters ? 'border-pink-300 bg-pink-50' : 'border-gray-300'} rounded-md shadow-sm hover:border-pink-400 transition-colors ${horizontal ? 'w-auto min-w-40' : 'w-64'} focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-300`}
+                    className={`flex items-center justify-between px-3 sm:px-4 py-2 bg-white border ${hasFilters ? 'border-pink-300 bg-pink-50' : 'border-gray-300'} rounded-md shadow-sm hover:border-pink-400 transition-colors ${horizontal ? 'w-full sm:w-auto sm:min-w-40' : 'w-full sm:w-64'} focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-300`}
                 >
-                    <span className={`${hasFilters ? 'text-pink-600' : 'text-gray-600'} truncate`}>{buttonLabel}</span>
-                    <ChevronDown className={`w-4 h-4 ${hasFilters ? 'text-pink-500' : 'text-gray-500'} ml-2 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
+                    <span className={`${hasFilters ? 'text-pink-600' : 'text-gray-600'} truncate text-sm sm:text-base`}>{buttonLabel}</span>
+                    <ChevronDown className={`w-4 h-4 ${hasFilters ? 'text-pink-500' : 'text-gray-500'} ml-2 flex-shrink-0 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {isFilterOpen && (
-                    <div className="absolute z-50 w-64 mt-1 bg-white border border-gray-200 rounded-md shadow-lg right-0">
+                    <div className="absolute z-50 w-full sm:w-64 mt-1 bg-white border border-gray-200 rounded-md shadow-lg left-0 sm:right-0 sm:left-auto max-w-sm">
                         <div className="flex border-b border-gray-200">
-                            <button onClick={() => setActiveTab('category')} className={`flex-1 py-2 text-center text-sm font-medium transition-colors ${activeTab === 'category' ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
+                            <button onClick={() => setActiveTab('category')} className={`flex-1 py-2 px-2 text-center text-xs sm:text-sm font-medium transition-colors ${activeTab === 'category' ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
                                 Categories
                             </button>
-                            <button onClick={() => setActiveTab('concern')} className={`flex-1 py-2 text-center text-sm font-medium transition-colors ${activeTab === 'concern' ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
+                            <button onClick={() => setActiveTab('concern')} className={`flex-1 py-2 px-2 text-center text-xs sm:text-sm font-medium transition-colors ${activeTab === 'concern' ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
                                 Concerns
                             </button>
                         </div>
 
                         {activeTab === 'category' ? (
-                            <div className="max-h-60 overflow-y-auto">
-                                <button onClick={() => selectCategory('')} className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${!selectedFilters.category ? 'bg-pink-100 text-pink-800 font-medium' : 'text-gray-700'}`}>
+                            <div className="max-h-60 sm:max-h-72 overflow-y-auto">
+                                <button onClick={() => selectCategory('')} className={`w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm hover:bg-gray-100 transition-colors ${!selectedFilters.category ? 'bg-pink-100 text-pink-800 font-medium' : 'text-gray-700'}`}>
                                     All Products
                                 </button>
                                 {categories.map((category) => (
-                                    <button key={category} onClick={() => selectCategory(category)} className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${selectedFilters.category === category ? 'bg-pink-100 text-pink-800 font-medium' : 'text-gray-700'}`}>
+                                    <button key={category} onClick={() => selectCategory(category)} className={`w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm hover:bg-gray-100 transition-colors ${selectedFilters.category === category ? 'bg-pink-100 text-pink-800 font-medium' : 'text-gray-700'}`}>
                                         {getCategoryDisplayName(category)}
                                     </button>
                                 ))}
                             </div>
                         ) : (
-                            <div className="p-3">
-                                <p className="text-sm font-medium text-gray-700 mb-3">Select skin concerns:</p>
-                                <div className="space-y-2">
+                            <div className="p-2 sm:p-3">
+                                <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2 sm:mb-3">Select skin concerns:</p>
+                                <div className="space-y-1 sm:space-y-2 max-h-60 sm:max-h-72 overflow-y-auto">
                                     {availableConcerns.map((concern) => (
                                         <label key={concern} className="flex items-center cursor-pointer hover:bg-gray-50 rounded p-1 transition-colors">
                                             <input
                                                 type="checkbox"
                                                 checked={selectedFilters.concerns?.includes(concern) || false}
                                                 onChange={() => toggleConcern(concern)}
-                                                className="w-4 h-4 mr-3 border-gray-300 rounded text-pink-500 focus:ring-pink-300 focus:ring-2"
+                                                className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 sm:mr-3 border-gray-300 rounded text-pink-500 focus:ring-pink-300 focus:ring-2 flex-shrink-0"
                                             />
-                                            <span className="text-sm text-gray-700 select-none">{concern}</span>
+                                            <span className="text-xs sm:text-sm text-gray-700 select-none">{concern}</span>
                                         </label>
                                     ))}
                                 </div>
                                 
                                 {hasConcerns && (
-                                    <button onClick={() => onFilterChange({ concerns: [] })} className="w-full mt-3 px-3 py-1 text-sm text-pink-600 hover:text-pink-800 hover:bg-pink-50 rounded transition-colors">
+                                    <button onClick={() => onFilterChange({ concerns: [] })} className="w-full mt-2 sm:mt-3 px-3 py-1 text-xs sm:text-sm text-pink-600 hover:text-pink-800 hover:bg-pink-50 rounded transition-colors">
                                         Clear all concerns
                                     </button>
                                 )}
