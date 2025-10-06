@@ -119,7 +119,13 @@ curl --location --request GET '{base_url}/api/fetch-product?product_id={product_
 		"available_qty": 12,
 		"images": ["image_1", "image_2", "image_3"],
 		"category": "moisturizers",
-		"concern_options": ["rashes", "acne", "scars"]
+		"concern_options": ["rashes", "acne", "scars"],
+		"modified_at": "2025-11-28 10:00:32",
+		"isAppliedDiscount": 1,
+		"discount_percent": 12,
+		"isAppliedDeal": 0,
+		"deal_price": 2700,
+		"original_price": 2999 // i.e original price without applying any discount/deal offer
 	}
 }
 ```
@@ -156,7 +162,13 @@ Can take (optionally):
 			"available_qty": 12,
 			"images": ["image_1", "image_2", "image_3"],
 			"category": "moisturizers",
-			"concern_options": ["rashes", "acne", "scars"]
+			"concern_options": ["rashes", "acne", "scars"],
+			"modified_at": "2025-11-28 10:00:32",
+			"isAppliedDiscount": 1,
+			"discount_percent": 12,
+			"isAppliedDeal": 0,
+			"deal_price": 2700,
+			"original_price": 3200
 		},
 		{
 			"product_id": "5432e42f",
@@ -168,7 +180,13 @@ Can take (optionally):
 			"available_qty": 5,
 			"images": ["image_1", "image_2", "image_3"],
 			"category": "face cleansers",
-			"concern_options": ["rashes", "acne", "scars"]
+			"concern_options": ["rashes", "acne", "scars"],
+			"modified_at": "2025-11-28 10:00:32",
+			"isAppliedDiscount": 1,
+			"discount_percent": 10,
+			"isAppliedDeal": 0,
+			"deal_price": 12000,
+			"original_price": 14000
 		}
 	]
 }
@@ -890,7 +908,7 @@ curl --location --request POST '{base_url}/api/admin/update-consultation?consult
 ## Send Consultation Link
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/send_consultation_link?consultation_id={consultation_id}&meet_link={meet_link}?override={true/false|default:false|optional}' \
+curl --location --request POST '{base_url}/api/admin/send-consultation-link?consultation_id={consultation_id}&meet_link={meet_link}?override={true/false|default:false|optional}' \
 --header 'Authorization: Bearer {token}'
 ```
 
@@ -1140,6 +1158,117 @@ curl --location --request GET '{base_url}/api/fetch-sales'
 		},
 		...
 	]
+}
+```
+
+
+
+# DISCOUNTS (NOT DEALS - DEAL IS SPECIFIC TO A PRODUCT, BUT DISCOUNT APPLIES TO MANY PRODUCTS AT ONCE INSTEAD)
+
+## Fetch All Discounts
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/manage-discounts?action=fetch' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Discount data returned 3 results",
+	"discount_data": [
+		{
+			"id": 1,
+			"category": "others",
+			"discount_percent": "10.00",
+			"isFirstTimeOnly": 1,
+			"valid_from": "2025-06-25",
+			"valid_to": "2025-06-25",
+			"isActive": 1,
+			"created_at": "2025-10-06 00:09:26",
+			"modified_at": "2025-10-06 00:17:38"
+		},
+		...
+	],
+	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30d9ef2db9"
+}
+```
+
+## Fetch A Discount
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/manage-discounts?action=fetch&discount_id={discount_id}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Discount data fetched successfully!",
+	"discount_data": {
+		"id": 3,
+		"category": "all",
+		"discount_percent": "10.00",
+		"isFirstTimeOnly": 1,
+		"valid_from": "2025-06-25",
+		"valid_to": "2025-06-25",
+		"isActive": 1,
+		"created_at": "2025-10-06 00:32:30",
+		"modified_at": "2025-10-06 00:32:30"
+	},
+	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30e4ff13e3"
+}
+```
+
+## Add A Discount
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/manage-discounts?action=edit&discount_id={discount_id}&category={a_valid_category|optional|default:all}&discount_percent={numeric|float|0-100}&valid_from={valid_date_format}&valid_to={valid_dateformat}&isFirstTimeOnly={boolean|optional|default:true}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Discount data added successfully!",
+	"discount_data": {
+		"id": 8,
+		"category": "all",
+		"discount_percent": "10.00",
+		"isFirstTimeOnly": 1,
+		"valid_from": "2025-06-25",
+		"valid_to": "2025-06-25",
+		"isActive": 1,
+		"created_at": "2025-10-06 01:44:37",
+		"modified_at": "2025-10-06 01:44:37"
+	},
+	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e310f520652"
+}
+```
+
+## Edit A Discount
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/manage-discounts?action=edit&discount_id={discount_id}&category={a_valid_category|optional|default:all}&discount_percent={numeric|float:0-100|optional}&valid_from={valid_date_format|optional}&valid_to={valid_dateformat|optional}&isFirstTimeOnly={boolean|optional|default:true}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Discount data updated successfully!",
+	"discount_data": {
+		"id": 4,
+		"category": "serums",
+		"discount_percent": "10.00",
+		"isFirstTimeOnly": 1,
+		"valid_from": "2025-06-25",
+		"valid_to": "2025-06-25",
+		"isActive": 1,
+		"created_at": "2025-10-06 00:38:55",
+		"modified_at": "2025-10-06 00:38:55"
+	},
+	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30eeebb1ba"
 }
 ```
 
