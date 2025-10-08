@@ -23,6 +23,7 @@ const ConsultationForm = () => {
   const [submitError, setSubmitError] = useState('');
   const [bookedTimes, setBookedTimes] = useState([]);
   const [isLoadingBookedTimes, setIsLoadingBookedTimes] = useState(false);
+  const [lastFetchTime, setLastFetchTime] = useState(null);
   
   const consultationDate = watch('consultationDate');
 
@@ -40,7 +41,7 @@ const ConsultationForm = () => {
   useEffect(() => {
     if (consultationDate && !isWeekend(consultationDate)) {
       setIsLoadingBookedTimes(true);
-      setSubmitError(''); // Clear any previous errors
+      setSubmitError('');
       
       fetchBookedTimes(consultationDate)
         .then(data => {
@@ -48,8 +49,8 @@ const ConsultationForm = () => {
           
           if (data.code === 200) {
             setBookedTimes(data.booked_times || []);
+            setLastFetchTime(Date.now());
             
-            // Log for debugging
             if (data.booked_times && data.booked_times.length > 0) {
               console.log('Booked times:', data.booked_times);
             }
@@ -71,6 +72,32 @@ const ConsultationForm = () => {
     }
   }, [consultationDate]);
 
+  useEffect(() => {
+    if (step === 3 && consultationDate && !isWeekend(consultationDate)) {
+      const refreshInterval = setInterval(() => {
+        console.log('Auto-refreshing booked times...');
+        fetchBookedTimes(consultationDate)
+          .then(data => {
+            if (data.code === 200) {
+              const newBookedTimes = data.booked_times || [];
+              
+              const hasChanges = JSON.stringify(newBookedTimes) !== JSON.stringify(bookedTimes);
+              if (hasChanges) {
+                console.log('Booked times updated:', newBookedTimes);
+                setBookedTimes(newBookedTimes);
+                setLastFetchTime(Date.now());
+              }
+            }
+          })
+          .catch(error => {
+            console.error('Error refreshing booked times:', error);
+          });
+      }, 30000);
+
+      return () => clearInterval(refreshInterval);
+    }
+  }, [step, consultationDate, bookedTimes]);
+
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     setSubmitError('');
@@ -86,14 +113,21 @@ const ConsultationForm = () => {
 
       const selectedTimeRange = timeSlotMapping[data.timeSlot];
       
-      // Double-check if the slot is still available
-      console.log('Checking availability for:', {
-        date: data.consultationDate,
-        timeRange: selectedTimeRange,
-        bookedTimes: bookedTimes
-      });
+      console.log('Fetching latest booked times before submission...');
+      let latestBookedTimes = [];
       
-      const isTimeBooked = bookedTimes.some(booked => {
+      try {
+        const latestData = await fetchBookedTimes(data.consultationDate);
+        if (latestData.code === 200) {
+          latestBookedTimes = latestData.booked_times || [];
+          console.log('Latest booked times:', latestBookedTimes);
+        }
+      } catch (fetchError) {
+        console.warn('Could not fetch latest times, proceeding with cached data:', fetchError);
+        latestBookedTimes = bookedTimes;
+      }
+      
+      const isTimeBooked = latestBookedTimes.some(booked => {
         const dateMatch = booked.date === data.consultationDate;
         const timeMatch = booked.time_range === selectedTimeRange;
         
@@ -110,7 +144,8 @@ const ConsultationForm = () => {
       });
 
       if (isTimeBooked) {
-        throw new Error('This time slot is no longer available. Please select another time.');
+        setBookedTimes(latestBookedTimes);
+        throw new Error('This time slot was just booked by another user. Please select another time.');
       }
 
       const consultationData = {
@@ -152,24 +187,22 @@ const ConsultationForm = () => {
     } catch (error) {
       console.error('Submission error:', error);
       
-      // Extract clean error message
       let errorMessage = error.message || 'Failed to book consultation. Please try again.';
       
-      // If the error message contains "Error: " prefix, remove it
       if (errorMessage.startsWith('Error: ')) {
         errorMessage = errorMessage.substring(7);
       }
       
       setSubmitError(errorMessage);
       
-      // If it's a booking conflict, refresh the booked times
-      if (errorMessage.includes('already been booked') || errorMessage.includes('no longer available')) {
+      if (errorMessage.includes('already been booked') || errorMessage.includes('no longer available') || errorMessage.includes('just booked')) {
         console.log('Refreshing booked times due to conflict...');
         if (consultationDate && !isWeekend(consultationDate)) {
           fetchBookedTimes(consultationDate)
             .then(data => {
               if (data.code === 200) {
                 setBookedTimes(data.booked_times || []);
+                setLastFetchTime(Date.now());
               }
             })
             .catch(err => console.error('Error refreshing booked times:', err));
@@ -249,6 +282,7 @@ const ConsultationForm = () => {
             isLoadingBookedTimes={isLoadingBookedTimes}
             submitError={submitError}
             isSubmitting={isSubmitting}
+            lastFetchTime={lastFetchTime}
           />
         )}
 

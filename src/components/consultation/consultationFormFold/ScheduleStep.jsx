@@ -18,6 +18,7 @@ const ScheduleStep = ({
   submitError, 
   isSubmitting,
   setValue,
+  lastFetchTime,
 }) => {
   const consultationDate = watch('consultationDate');
   const selectedTimeSlot = watch('timeSlot');
@@ -42,6 +43,16 @@ const ScheduleStep = ({
     return nextDay.toISOString().split('T')[0];
   };
 
+  const getTimeAgo = (timestamp) => {
+    if (!timestamp) return '';
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 10) return 'just now';
+    if (seconds < 60) return `${seconds} seconds ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes === 1) return '1 minute ago';
+    return `${minutes} minutes ago`;
+  };
+
   useEffect(() => {
     if (consultationDate && isWeekend(consultationDate)) {
       setValue('consultationDate', '');
@@ -64,6 +75,18 @@ const ScheduleStep = ({
         }
       } else {
         setDateError('');
+      }
+      
+      // Check if currently selected time slot is now booked
+      if (selectedTimeSlot) {
+        const apiTimeRange = timeSlotMapping[selectedTimeSlot];
+        const isNowBooked = bookedTimes.some(
+          booked => booked.date === consultationDate && booked.time_range === apiTimeRange
+        );
+        if (isNowBooked) {
+          setValue('timeSlot', '');
+          setDateError('Your selected time slot was just booked by another user. Please select another time.');
+        }
       }
     } else {
       setDateError('');
@@ -138,13 +161,20 @@ const ScheduleStep = ({
         
         {!dateError && !errors.consultationDate && consultationDate && (
           <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
-            <div className="flex items-center">
-              <svg className="w-4 h-4 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span className="text-xs text-green-700">
-                Great! This date has available time slots. Please select your preferred time below.
-              </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <svg className="w-4 h-4 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="text-xs text-green-700">
+                  Great! This date has available time slots. Please select your preferred time below.
+                </span>
+              </div>
+              {lastFetchTime && (
+                <span className="text-xs text-green-600 italic whitespace-nowrap ml-2">
+                  Updated {getTimeAgo(lastFetchTime)}
+                </span>
+              )}
             </div>
           </div>
         )}
