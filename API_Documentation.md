@@ -1223,7 +1223,7 @@ curl --location --request POST '{base_url}/api/admin/manage-discounts?action=fet
 ## Add A Discount
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/manage-discounts?action=edit&discount_id={discount_id}&category={a_valid_category|optional|default:all}&discount_percent={numeric|float|0-100}&valid_from={valid_date_format}&valid_to={valid_dateformat}&isFirstTimeOnly={boolean|optional|default:true}' \
+curl --location --request POST '{base_url}/api/admin/manage-discounts?action=edit&discount_id={discount_id}&category={a_valid_category|optional|default:all}&discount_percent={numeric|float:0-100}&valid_from={valid_date_format:yyyy-mm-dd}&valid_to={valid_date_format:yyyy-mm-dd}&isFirstTimeOnly={boolean|optional|default:true}&isActive={boolean|optional|default:true}' \
 --header 'Authorization: Bearer {token}'
 ```
 
@@ -1249,7 +1249,7 @@ curl --location --request POST '{base_url}/api/admin/manage-discounts?action=edi
 ## Edit A Discount
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/manage-discounts?action=edit&discount_id={discount_id}&category={a_valid_category|optional|default:all}&discount_percent={numeric|float:0-100|optional}&valid_from={valid_date_format|optional}&valid_to={valid_dateformat|optional}&isFirstTimeOnly={boolean|optional|default:true}' \
+curl --location --request POST '{base_url}/api/admin/manage-discounts?action=edit&discount_id={discount_id}&category={a_valid_category|optional}&discount_percent={numeric|float:0-100|optional}&valid_from={valid_date_format:yyyy-mm-dd|optional}&valid_to={valid_date_format:yyyy-mm-dd|optional}&isFirstTimeOnly={boolean|optional}&isActive={boolean|optional}' \
 --header 'Authorization: Bearer {token}'
 ```
 
@@ -1268,6 +1268,21 @@ curl --location --request POST '{base_url}/api/admin/manage-discounts?action=edi
 		"created_at": "2025-10-06 00:38:55",
 		"modified_at": "2025-10-06 00:38:55"
 	},
+	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30eeebb1ba"
+}
+```
+
+## Delete A Discount
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/manage-discounts?action=delete&discount_id={discount_id}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Discount data deleted successfully!",
 	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30eeebb1ba"
 }
 ```
