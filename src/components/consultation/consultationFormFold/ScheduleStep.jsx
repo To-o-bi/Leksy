@@ -49,10 +49,8 @@ const ScheduleStep = ({
     }
   }, [consultationDate, setValue]);
 
-  // Fixed useEffect for checking booked times
   useEffect(() => {
     if (consultationDate && !isWeekend(consultationDate)) {
-      // Check if all time slots are booked for this date
       const allBooked = validTimeRanges.every(validTime => 
         bookedTimes.some(booked => 
           booked.date === consultationDate && booked.time_range === validTime
@@ -61,15 +59,14 @@ const ScheduleStep = ({
       
       if (allBooked && bookedTimes.length > 0) {
         setDateError('All time slots are booked for this date. Please choose another date.');
-        // Clear the selected time slot if it exists
         if (selectedTimeSlot) {
           setValue('timeSlot', '');
         }
       } else {
-        setDateError(''); // Clear error when slots are available
+        setDateError('');
       }
     } else {
-      setDateError(''); // Clear error when no date selected or weekend
+      setDateError('');
     }
   }, [consultationDate, bookedTimes, selectedTimeSlot, setValue]);
 
@@ -128,7 +125,6 @@ const ScheduleStep = ({
           <span className="text-red-500 text-sm mt-1 block">{errors.consultationDate.message}</span>
         )}
         
-        {/* Show date error for fully booked dates */}
         {dateError && !errors.consultationDate && (
           <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-md">
             <div className="flex items-center">
@@ -140,7 +136,6 @@ const ScheduleStep = ({
           </div>
         )}
         
-        {/* Show info message only when no errors and date is selected */}
         {!dateError && !errors.consultationDate && consultationDate && (
           <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
             <div className="flex items-center">
@@ -154,7 +149,6 @@ const ScheduleStep = ({
           </div>
         )}
 
-        {/* Show general info when no date is selected */}
         {!consultationDate && !errors.consultationDate && (
           <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
             <div className="flex items-center">
@@ -354,13 +348,13 @@ const ScheduleStep = ({
         <span className="text-red-500 text-sm block">{errors.termsAgreed.message}</span>
       )}
 
-      {submitError && !submitError.includes('date') && !submitError.includes('Date') && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 animate-pulse">
+      {submitError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex items-center">
             <svg className="w-5 h-5 text-red-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-sm text-red-700">{submitError}</span>
+            <span className="text-sm text-red-700 font-medium">{submitError}</span>
           </div>
         </div>
       )}

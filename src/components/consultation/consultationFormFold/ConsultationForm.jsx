@@ -22,6 +22,7 @@ const ConsultationForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [bookedTimes, setBookedTimes] = useState([]);
+  const [isLoadingBookedTimes, setIsLoadingBookedTimes] = useState(false);
   
   const consultationDate = watch('consultationDate');
 
@@ -38,18 +39,35 @@ const ConsultationForm = () => {
 
   useEffect(() => {
     if (consultationDate && !isWeekend(consultationDate)) {
+      setIsLoadingBookedTimes(true);
+      setSubmitError(''); // Clear any previous errors
+      
       fetchBookedTimes(consultationDate)
         .then(data => {
+          console.log('Fetched booked times for', consultationDate, ':', data);
+          
           if (data.code === 200) {
-            setBookedTimes(data.booked_times);
+            setBookedTimes(data.booked_times || []);
+            
+            // Log for debugging
+            if (data.booked_times && data.booked_times.length > 0) {
+              console.log('Booked times:', data.booked_times);
+            }
+          } else {
+            console.warn('Unexpected response code:', data);
+            setBookedTimes([]);
           }
         })
         .catch(error => {
           console.error('Error fetching booked times:', error);
-          setBookedTimes([]); // Reset on error
+          setBookedTimes([]);
+          setSubmitError('Unable to fetch available time slots. Please try again.');
+        })
+        .finally(() => {
+          setIsLoadingBookedTimes(false);
         });
     } else {
-      setBookedTimes([]); // Clear booked times when no valid date
+      setBookedTimes([]);
     }
   }, [consultationDate]);
 
@@ -67,12 +85,32 @@ const ConsultationForm = () => {
       }
 
       const selectedTimeRange = timeSlotMapping[data.timeSlot];
-      const isTimeBooked = bookedTimes.some(booked => 
-        booked.date === data.consultationDate && booked.time_range === selectedTimeRange
-      );
+      
+      // Double-check if the slot is still available
+      console.log('Checking availability for:', {
+        date: data.consultationDate,
+        timeRange: selectedTimeRange,
+        bookedTimes: bookedTimes
+      });
+      
+      const isTimeBooked = bookedTimes.some(booked => {
+        const dateMatch = booked.date === data.consultationDate;
+        const timeMatch = booked.time_range === selectedTimeRange;
+        
+        console.log('Comparing:', {
+          bookedDate: booked.date,
+          selectedDate: data.consultationDate,
+          dateMatch,
+          bookedTime: booked.time_range,
+          selectedTime: selectedTimeRange,
+          timeMatch
+        });
+        
+        return dateMatch && timeMatch;
+      });
 
       if (isTimeBooked) {
-        throw new Error('Selected time slot is no longer available. Please choose another time.');
+        throw new Error('This time slot is no longer available. Please select another time.');
       }
 
       const consultationData = {
@@ -91,7 +129,11 @@ const ConsultationForm = () => {
         success_redirect: getSuccessRedirectURL()
       };
 
+      console.log('Submitting consultation data:', consultationData);
+
       const result = await initiateConsultation(consultationData);
+      
+      console.log('Consultation result:', result);
       
       if (result.code === 200 && result.authorization_url) {
         sessionStorage.setItem('consultationBooking', JSON.stringify({
@@ -109,14 +151,36 @@ const ConsultationForm = () => {
       }
     } catch (error) {
       console.error('Submission error:', error);
-      setSubmitError(error.message || 'Failed to book consultation. Please try again.');
+      
+      // Extract clean error message
+      let errorMessage = error.message || 'Failed to book consultation. Please try again.';
+      
+      // If the error message contains "Error: " prefix, remove it
+      if (errorMessage.startsWith('Error: ')) {
+        errorMessage = errorMessage.substring(7);
+      }
+      
+      setSubmitError(errorMessage);
+      
+      // If it's a booking conflict, refresh the booked times
+      if (errorMessage.includes('already been booked') || errorMessage.includes('no longer available')) {
+        console.log('Refreshing booked times due to conflict...');
+        if (consultationDate && !isWeekend(consultationDate)) {
+          fetchBookedTimes(consultationDate)
+            .then(data => {
+              if (data.code === 200) {
+                setBookedTimes(data.booked_times || []);
+              }
+            })
+            .catch(err => console.error('Error refreshing booked times:', err));
+        }
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const nextStep = () => {
-    // Clear any previous submit errors when moving between steps
     setSubmitError('');
     
     if (step === 1) {
@@ -181,14 +245,14 @@ const ConsultationForm = () => {
             errors={errors} 
             watch={watch} 
             setValue={setValue}
-            bookedTimes={bookedTimes} 
+            bookedTimes={bookedTimes}
+            isLoadingBookedTimes={isLoadingBookedTimes}
             submitError={submitError}
             isSubmitting={isSubmitting}
           />
         )}
 
-        {/* Only show submit error at the bottom if it's NOT a date-related error (those are handled in ScheduleStep) */}
-        {submitError && !submitError.toLowerCase().includes('date') && !submitError.toLowerCase().includes('time slot') && step !== 3 && (
+        {submitError && step !== 3 && (
           <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
             <div className="flex items-center">
               <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -222,7 +286,7 @@ const ConsultationForm = () => {
           ) : (
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLoadingBookedTimes}
               className="ml-auto px-6 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
               {isSubmitting ? (
