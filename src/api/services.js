@@ -111,7 +111,7 @@ export const authService = {
   }
 };
 
-// Enhanced Product Service with Debug Logging
+// Product Service
 export const productService = {
   async fetchProducts(filters = {}) {
     const params = {};
@@ -128,23 +128,7 @@ export const productService = {
   async fetchProduct(productId) {
     if (!productId) throw new Error('Product ID is required');
     
-    console.log('🔍 Fetching product with ID:', productId);
-    
     const response = await api.get(ENDPOINTS.FETCH_PRODUCT, { product_id: productId });
-    
-    // Debug: Log the raw response
-    console.log('📥 Raw fetchProduct response:', response);
-    console.log('📥 Response data:', response.data);
-    
-    if (response.data && response.data.product) {
-      console.log('🔍 Product concern_options from API:', {
-        raw: response.data.product.concern_options,
-        type: typeof response.data.product.concern_options,
-        isArray: Array.isArray(response.data.product.concern_options),
-        stringified: JSON.stringify(response.data.product.concern_options)
-      });
-    }
-    
     return response.data;
   },
 
@@ -158,11 +142,6 @@ export const productService = {
   async updateProduct(productId, productData) {
     if (!productId) throw new Error('Product ID is required');
     
-    console.log('🚀 Starting updateProduct with:', {
-      productId,
-      productData: JSON.stringify(productData, null, 2)
-    });
-    
     const formData = new FormData();
     formData.append('product_id', productId);
 
@@ -171,116 +150,35 @@ export const productService = {
       if (productData[field] !== undefined && productData[field] !== null) {
         const value = productData[field].toString().trim();
         formData.append(field, value);
-        console.log(`📝 Added field ${field}:`, value);
       }
-    });
-    
-    // CRITICAL: Enhanced concern_options handling with extensive debugging
-    console.log('🎯 Processing concern_options:', {
-      original: productData.concern_options,
-      type: typeof productData.concern_options,
-      isArray: Array.isArray(productData.concern_options),
-      length: productData.concern_options?.length,
-      isDefined: productData.concern_options !== undefined,
-      isNull: productData.concern_options === null,
-      stringified: JSON.stringify(productData.concern_options)
     });
     
     if (productData.concern_options !== undefined) {
       let concernsToSend = '';
       
       if (Array.isArray(productData.concern_options)) {
-        // If it's an array (including empty array), join with commas
         concernsToSend = productData.concern_options.join(',');
-        console.log('✅ Processed as array - joined result:', concernsToSend);
       } else if (productData.concern_options) {
-        // If it's a string or other value, convert to string
         concernsToSend = productData.concern_options.toString();
-        console.log('✅ Processed as string:', concernsToSend);
       } else {
-        // Explicitly handle null/undefined/false cases
         concernsToSend = '';
-        console.log('✅ Processed as empty (null/undefined/false)');
       }
       
-      // Always append, even if empty string (this tells backend to clear concerns)
       formData.append('concern_options', concernsToSend);
-      console.log('📤 Final concern_options being sent:', {
-        value: concernsToSend,
-        length: concernsToSend.length,
-        isEmpty: concernsToSend === '',
-        type: typeof concernsToSend
-      });
-    } else {
-      console.log('⚠️ concern_options is undefined - not sending to backend');
     }
 
     if (productData.removed_images?.length) {
       const removedImagesStr = productData.removed_images.join(',');
       formData.append('removed_images', removedImagesStr);
-      console.log('🗑️ Removed images:', removedImagesStr);
     }
 
     if (productData.images?.length) {
-      console.log('🖼️ Adding new images:', productData.images.length);
       productData.images.forEach((image, index) => {
         formData.append('images[]', image);
-        console.log(`📷 Image ${index + 1}:`, image.name || 'Unknown filename', `(${image.size} bytes)`);
       });
     }
 
-    // Debug: Log all FormData entries
-    console.log('📋 Complete FormData being sent:');
-    for (let [key, value] of formData.entries()) {
-      if (key === 'images[]') {
-        console.log(`${key}: [File: ${value.name || 'unknown'}, ${value.size || 'unknown size'} bytes]`);
-      } else {
-        console.log(`${key}:`, value);
-      }
-    }
-
-    console.log('🌐 Making API request to updateProduct...');
     const response = await api.postFormData(ENDPOINTS.UPDATE_PRODUCT, formData);
-    
-    // Enhanced response debugging
-    console.log('📥 Raw updateProduct response:', response);
-    console.log('📥 Response status:', response.status);
-    console.log('📥 Response headers:', response.headers);
-    console.log('📥 Response data:', response.data);
-    
-    // Try to parse if it's a string with HTML
-    let parsedResponse = response.data;
-    if (typeof response.data === 'string') {
-      console.log('🔍 Response is string, attempting to parse...');
-      
-      // Check for HTML response (common backend error)
-      if (response.data.includes('<!DOCTYPE') || response.data.includes('<html')) {
-        console.error('❌ Received HTML response instead of JSON - this indicates a backend error');
-        console.log('📄 HTML Response preview:', response.data.substring(0, 500) + '...');
-      }
-      
-      // Try to extract JSON from string response
-      try {
-        const jsonMatch = response.data.match(/\{.*\}$/);
-        if (jsonMatch) {
-          parsedResponse = JSON.parse(jsonMatch[0]);
-          console.log('✅ Extracted JSON from string response:', parsedResponse);
-        }
-      } catch (e) {
-        console.error('❌ Failed to parse JSON from string response:', e);
-      }
-    }
-    
-    // Log final parsed response
-    console.log('📋 Final parsed response:', {
-      code: parsedResponse?.code,
-      message: parsedResponse?.message,
-      success: parsedResponse?.success,
-      data: parsedResponse?.data,
-      product: parsedResponse?.product,
-      fullResponse: parsedResponse
-    });
-    
     return response.data;
   },
 
@@ -344,6 +242,7 @@ export const productService = {
     return formData;
   }
 };
+
 
 // Contact Service
 export const contactService = {

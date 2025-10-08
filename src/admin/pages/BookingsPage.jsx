@@ -212,7 +212,7 @@ const BookingsPage = () => {
       formData.append('meet_link', meetLink);
       formData.append('override', String(override));
 
-      const response = await api.post('admin/send_consultation_link', formData);
+      const response = await api.post('admin/send-consultation-link', formData);
       if (response.data?.code === 200) {
         const updated = response.data.consultation;
         const updateFn = b => (b.id === bookingId ? { ...b, meetLink: updated.meet_link || '' } : b);
