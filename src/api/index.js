@@ -1,4 +1,4 @@
-export { authService, productService, contactService, orderService } from './services.js';
+export { authService, productService, contactService, orderService, discountService } from './services.js';
 export { formatPrice, formatDate, getInitials, sanitizeHtml, debounce } from './utils.js';
 export { validators, validateForm } from './validation.js';
 export { ENDPOINTS, CATEGORIES, API_CONFIG } from './config.js';

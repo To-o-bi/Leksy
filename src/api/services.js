@@ -1,6 +1,7 @@
 import api from './axios.js';
 import { ENDPOINTS, CATEGORIES } from './config.js';
 
+
 // Utility functions
 const isBrowser = () => typeof window !== 'undefined';
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -464,6 +465,299 @@ export const consultationService = {
     }
 
     return cleanData;
+  }
+};
+
+
+// discountService.js
+
+export const discountService = {
+  async fetchDiscounts() {
+    try {
+      const formBody = new URLSearchParams({ action: 'fetch' }).toString();
+      
+      const response = await api.post(
+        ENDPOINTS.MANAGE_DISCOUNTS,
+        formBody,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch discounts');
+    }
+  },
+
+  async fetchDiscount(discountId) {
+    if (!discountId) throw new Error('Discount ID is required');
+    
+    try {
+      const formBody = new URLSearchParams({
+        action: 'fetch',
+        discount_id: discountId
+      }).toString();
+      
+      const response = await api.post(
+        ENDPOINTS.MANAGE_DISCOUNTS,
+        formBody,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch discount');
+    }
+  },
+
+  async addDiscount(discountData) {
+    this._validateDiscountData(discountData);
+    
+    const data = {
+      category: discountData.category || 'all',
+      discount_percent: discountData.discount_percent,
+      valid_from: discountData.valid_from,
+      valid_to: discountData.valid_to,
+      isFirstTimeOnly: discountData.isFirstTimeOnly ? '1' : '0',
+      isActive: '1'
+    };
+
+    try {
+      const formBody = new URLSearchParams({
+        action: 'add',
+        ...data
+      }).toString();
+      
+      const response = await api.post(
+        ENDPOINTS.MANAGE_DISCOUNTS,
+        formBody,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      if (response.data.code === 200) {
+        return response.data;
+      }
+      
+      throw new Error(response.data.message || 'Failed to add discount');
+    } catch (error) {
+      throw new Error(error.response?.data?.message || error.message || 'Failed to add discount');
+    }
+  },
+
+  async editDiscount(discountId, discountData) {
+    if (!discountId) throw new Error('Discount ID is required');
+    
+    const data = {
+      discount_id: discountId
+    };
+
+    if (discountData.category !== undefined) data.category = discountData.category;
+    if (discountData.discount_percent !== undefined) data.discount_percent = discountData.discount_percent;
+    if (discountData.valid_from !== undefined) data.valid_from = discountData.valid_from;
+    if (discountData.valid_to !== undefined) data.valid_to = discountData.valid_to;
+    if (discountData.isFirstTimeOnly !== undefined) data.isFirstTimeOnly = discountData.isFirstTimeOnly ? '1' : '0';
+    if (discountData.isActive !== undefined) data.isActive = discountData.isActive ? '1' : '0';
+
+    try {
+      const formBody = new URLSearchParams({
+        action: 'edit',
+        ...data
+      }).toString();
+      
+      const response = await api.post(
+        ENDPOINTS.MANAGE_DISCOUNTS,
+        formBody,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      if (response.data.code === 200) {
+        return response.data;
+      }
+      
+      throw new Error(response.data.message || 'Failed to edit discount');
+    } catch (error) {
+      throw new Error(error.response?.data?.message || error.message || 'Failed to edit discount');
+    }
+  },
+
+  async deleteDiscount(discountId) {
+    if (!discountId) throw new Error('Discount ID is required');
+    
+    try {
+      const formBody = new URLSearchParams({
+        action: 'delete',
+        discount_id: discountId
+      }).toString();
+      
+      const response = await api.post(
+        ENDPOINTS.MANAGE_DISCOUNTS,
+        formBody,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to delete discount');
+    }
+  },
+
+  async fetchActiveDiscounts() {
+    try {
+      const formBody = new URLSearchParams({ action: 'fetch' }).toString();
+      
+      const response = await api.post(
+        ENDPOINTS.MANAGE_DISCOUNTS,
+        formBody,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      if (response.data?.code === 200 && response.data?.discount_data) {
+        const allDiscounts = response.data.discount_data;
+        const now = new Date();
+        
+        const activeDiscounts = allDiscounts.filter((discount) => {
+          if (!discount.isActive) return false;
+          
+          const validFrom = new Date(discount.valid_from);
+          const validTo = new Date(discount.valid_to);
+          validTo.setHours(23, 59, 59, 999);
+          
+          return now >= validFrom && now <= validTo;
+        });
+        
+        return {
+          code: 200,
+          discounts: activeDiscounts,
+          message: 'Active discounts fetched successfully'
+        };
+      }
+      
+      return { code: 200, discounts: [], message: 'No active discounts' };
+    } catch (error) {
+      return { code: 200, discounts: [], message: 'No discounts available' };
+    }
+  },
+
+  calculateDiscountedPrice(product, discounts) {
+    if (!discounts || discounts.length === 0) return null;
+    if (!product || !product.price) return null;
+    
+    const now = new Date();
+    const productCategory = (product.category || '').toLowerCase().trim();
+
+    const applicableDiscounts = discounts.filter(discount => {
+      if (!discount.isActive) return false;
+
+      const validFrom = new Date(discount.valid_from);
+      const validTo = new Date(discount.valid_to);
+      validTo.setHours(23, 59, 59, 999);
+
+      if (now < validFrom || now > validTo) return false;
+
+      const discountCategory = (discount.category || '').toLowerCase().trim();
+      
+      if (discountCategory === 'all') return true;
+      
+      if (discountCategory === 'others') {
+        const mainCategories = ['serum', 'cleanser', 'toner', 'mask', 'sunscreen', 
+                                'moisturizer', 'body-and-bath', 'eye-cream', 'beauty', 'perfume'];
+        return !mainCategories.includes(productCategory);
+      }
+      
+      const normalizedDiscountCategory = discountCategory.replace(/\s+/g, '-');
+      const normalizedProductCategory = productCategory.replace(/\s+/g, '-');
+      
+      return normalizedDiscountCategory === normalizedProductCategory;
+    });
+
+    if (applicableDiscounts.length === 0) return null;
+
+    const bestDiscount = applicableDiscounts.reduce((max, current) => {
+      const currentPercent = parseFloat(current.discount_percent) || 0;
+      const maxPercent = parseFloat(max.discount_percent) || 0;
+      return currentPercent > maxPercent ? current : max;
+    });
+
+    const discountPercent = parseFloat(bestDiscount.discount_percent) || 0;
+    const originalPrice = parseFloat(product.price) || 0;
+    const discountedPrice = originalPrice - (originalPrice * discountPercent / 100);
+
+    return {
+      originalPrice,
+      discountedPrice: Math.max(0, discountedPrice),
+      discountPercent,
+      savings: originalPrice - discountedPrice,
+      validUntil: bestDiscount.valid_to,
+      discountId: bestDiscount.id
+    };
+  },
+
+  applyDiscountToProduct(product, discounts) {
+    if (!product) return product;
+    
+    const discountInfo = this.calculateDiscountedPrice(product, discounts);
+    
+    if (discountInfo) {
+      return {
+        ...product,
+        hasDiscount: true,
+        originalPrice: discountInfo.originalPrice,
+        discountedPrice: discountInfo.discountedPrice,
+        discountPercent: discountInfo.discountPercent,
+        savings: discountInfo.savings,
+        discountValidUntil: discountInfo.validUntil
+      };
+    }
+    
+    return product;
+  },
+
+  applyDiscountsToProducts(products, discounts) {
+    if (!products || !Array.isArray(products)) return products;
+    if (!discounts || discounts.length === 0) return products;
+    
+    return products.map(product => this.applyDiscountToProduct(product, discounts));
+  },
+
+  _validateDiscountData(discountData) {
+    if (!discountData.discount_percent || discountData.discount_percent <= 0 || discountData.discount_percent > 100) {
+      throw new Error('Discount percentage must be between 0 and 100');
+    }
+
+    if (!discountData.valid_from) throw new Error('Start date is required');
+    if (!discountData.valid_to) throw new Error('End date is required');
+
+    const startDate = new Date(discountData.valid_from);
+    const endDate = new Date(discountData.valid_to);
+
+    if (isNaN(startDate.getTime())) throw new Error('Invalid start date format');
+    if (isNaN(endDate.getTime())) throw new Error('Invalid end date format');
+    if (endDate < startDate) throw new Error('End date must be after start date');
+
+    return true;
   }
 };
 

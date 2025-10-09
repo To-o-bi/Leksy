@@ -147,10 +147,42 @@ const AdminSidebar = ({ isOpen, isMobile, onClose, onOpen }) => {
     { name: 'Notifications', path: '/admin/notifications', icon: ( <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 17H20L18.5955 15.5955C18.2157 15.2157 18 14.6976 18 14.1585V11C18 8.38757 16.3304 6.16509 14 5.34142V5C14 3.89543 13.1046 3 12 3C10.8954 3 10 3.89543 10 5V5.34142C7.66962 6.16509 6 8.38757 6 11V14.1585C6 14.6976 5.78428 15.2157 5.40446 15.5955L4 17H9M15 17V18C15 19.6569 13.6569 21 12 21C10.3431 21 9 19.6569 9 18V17M15 17H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg> )},
   ];
 
-  const otherNavItems = [
-    { name: 'Newsletter', path: '/admin/newsletter', icon: ( <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 5H21V15H17C16.4477 15 16 15.4477 16 16V17C16 18.6569 14.6569 20 13 20H11C9.34315 20 8 18.6569 8 17V16C8 15.4477 7.55228 15 7 15H3V5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 10L9 13L15 13L21 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> )},
-    { name: 'Delivery', path: '/admin/delivery', icon: ( <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7H16V17H3V7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M16 11H20L21.5 13V17H16V11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="7.5" cy="17.5" r="1.5" fill="currentColor"/><circle cx="18.5" cy="17.5" r="1.5" fill="currentColor"/></svg> )},
-  ];
+const otherNavItems = [
+  { 
+    name: 'Newsletter', 
+    path: '/admin/newsletter', 
+    icon: ( 
+      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 5H21V15H17C16.4477 15 16 15.4477 16 16V17C16 18.6569 14.6569 20 13 20H11C9.34315 20 8 18.6569 8 17V16C8 15.4477 7.55228 15 7 15H3V5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M3 10L9 13L15 13L21 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg> 
+    )
+  },
+  { 
+    name: 'Delivery', 
+    path: '/admin/delivery', 
+    icon: ( 
+      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 7H16V17H3V7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M16 11H20L21.5 13V17H16V11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="7.5" cy="17.5" r="1.5" fill="currentColor"/>
+        <circle cx="18.5" cy="17.5" r="1.5" fill="currentColor"/>
+      </svg> 
+    )
+  },
+  
+  { 
+    name: 'Discounts', 
+    path: '/admin/discounts', 
+    icon: ( 
+      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 5H7C5.89543 5 5 5.89543 5 7V9L12 16L19 9V7C19 5.89543 18.1046 5 17 5H15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="9" cy="9" r="1" fill="currentColor"/>
+        <path d="M15 3L9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+      </svg> 
+    )
+  },
+];
 
   // Logout button component
   const LogoutButton = ({ isMobileVersion = false }) => (

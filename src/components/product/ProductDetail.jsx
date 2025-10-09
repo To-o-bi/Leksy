@@ -2,14 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useCart } from '../../hooks/useCart';
 import { useNavigate } from 'react-router-dom';
 import { useWishlist } from '../../contexts/WishlistContext';
+import { useDiscounts } from '../../contexts/DiscountContext';
 import { useMessage } from '../../contexts/MessageContext';
 import { formatter } from '../../utils/formatter';
 
-/**
- * Decodes HTML entities that might come from the API
- * @param {string} text - Text containing HTML entities
- * @returns {string} Decoded text
- */
 const decodeHtmlEntities = (text) => {
     if (!text || typeof text !== 'string') return text;
     const textarea = document.createElement('textarea');
@@ -17,10 +13,6 @@ const decodeHtmlEntities = (text) => {
     return textarea.value;
 };
 
-/**
- * ProductDetail component for displaying product information and purchase options
- * @param {Object} product - Product data object
- */
 const ProductDetail = ({ product, loading = false }) => {
     const { addToCart } = useCart();
     const navigate = useNavigate();
@@ -29,6 +21,7 @@ const ProductDetail = ({ product, loading = false }) => {
     const [componentReady, setComponentReady] = useState(false);
 
     const { toggleWishlistItem, isInWishlist } = useWishlist();
+    const { applyDiscountToProduct, loading: discountsLoading } = useDiscounts();
     const { warning } = useMessage();
 
     const normalizedProduct = useMemo(() => {
@@ -37,12 +30,9 @@ const ProductDetail = ({ product, loading = false }) => {
         const price = parseFloat(product.price) || 0;
         const category = (product.category || '').toLowerCase();
         
-        // Get concern_options and handle various formats
         let rawBenefits = product.concern_options || [];
         
-        // If it's a string, try to parse it
         if (typeof rawBenefits === 'string') {
-            // Handle "others" string case
             if (rawBenefits.toLowerCase().trim() === 'others' || rawBenefits.trim() === '') {
                 rawBenefits = [];
             } else {
@@ -54,12 +44,10 @@ const ProductDetail = ({ product, loading = false }) => {
             }
         }
         
-        // Filter out "others" from the array
         let benefits = Array.isArray(rawBenefits) 
             ? rawBenefits.filter(b => b && b.toLowerCase() !== 'others')
             : [];
         
-        // Add category-specific benefits if no valid concerns exist
         if (benefits.length === 0) {
             if (category === 'perfume') {
                 benefits = ['Luxurious Fragrance'];
@@ -68,7 +56,7 @@ const ProductDetail = ({ product, loading = false }) => {
             }
         }
 
-        return {
+        const baseProduct = {
             ...product,
             product_id: product.product_id || product.id,
             name: decodeHtmlEntities(product.name || 'Unknown Product'),
@@ -79,47 +67,40 @@ const ProductDetail = ({ product, loading = false }) => {
             stock: parseInt(product.available_qty, 10) || 0,
             benefits: benefits,
         };
-    }, [product]);
 
-    // Effect to handle component readiness and transition end
+        return applyDiscountToProduct(baseProduct);
+    }, [product, applyDiscountToProduct]);
+
     useEffect(() => {
-        if (normalizedProduct && !loading) {
-            // Small delay to ensure DOM is fully rendered
+        if (normalizedProduct && !loading && !discountsLoading) {
             const timer = setTimeout(() => {
                 setComponentReady(true);
             }, 200);
             
             return () => clearTimeout(timer);
         }
-    }, [normalizedProduct, loading]);
+    }, [normalizedProduct, loading, discountsLoading]);
 
-    // Handle images loading for better UX
     useEffect(() => {
         if (normalizedProduct?.images?.length > 0 && componentReady) {
             const imagePromises = normalizedProduct.images.map(imageSrc => {
                 return new Promise((resolve) => {
                     const img = new Image();
                     img.onload = resolve;
-                    img.onerror = resolve; // Still resolve on error
+                    img.onerror = resolve;
                     img.src = imageSrc;
                 });
             });
 
-            Promise.all(imagePromises).then(() => {
-                // All images loaded - component is truly ready
-            });
+            Promise.all(imagePromises).then(() => {});
         }
     }, [normalizedProduct, componentReady]);
 
-    // Memoize the wishlist status check
     const isProductInWishlist = useMemo(() => {
         if (!normalizedProduct?.product_id) return false;
         return isInWishlist(normalizedProduct.product_id);
     }, [isInWishlist, normalizedProduct]);
 
-    /**
-     * Increment quantity with stock validation
-     */
     const incrementQuantity = () => {
         const stock = normalizedProduct.stock;
         const currentQuantity = Number(quantity) || 0;
@@ -130,9 +111,6 @@ const ProductDetail = ({ product, loading = false }) => {
         }
     };
 
-    /**
-     * Decrement quantity with minimum validation
-     */
     const decrementQuantity = () => {
         const currentQuantity = Number(quantity) || 1;
         if (currentQuantity > 1) {
@@ -140,10 +118,6 @@ const ProductDetail = ({ product, loading = false }) => {
         }
     };
 
-    /**
-     * Handle direct quantity input changes
-     * @param {Event} e - Input change event
-     */
     const handleQuantityInputChange = (e) => {
         const value = e.target.value;
         if (value === '' || /^\d+$/.test(value)) {
@@ -159,27 +133,18 @@ const ProductDetail = ({ product, loading = false }) => {
         }
     };
     
-    /**
-     * Handle quantity input blur event
-     */
     const handleQuantityInputBlur = () => {
         if (quantity === '' || Number(quantity) < 1) {
             setQuantity(1);
         }
     };
 
-    /**
-     * Add product to cart with current quantity
-     */
     const handleAddToCart = () => {
         if (normalizedProduct.stock < 1) return;
         const quantityToAdd = Number(quantity) || 1;
         addToCart(normalizedProduct, quantityToAdd);
     };
 
-    /**
-     * Add to cart and navigate to checkout
-     */
     const handleCheckoutNow = () => {
         if (normalizedProduct.stock < 1) return;
         const quantityToAdd = Number(quantity) || 1;
@@ -187,16 +152,10 @@ const ProductDetail = ({ product, loading = false }) => {
         navigate('/checkout');
     };
 
-    /**
-     * Toggle wishlist status
-     */
     const handleToggleWishlist = () => {
         toggleWishlistItem(normalizedProduct);
     };
 
-    /**
-     * Handle product sharing - optimized for HTTPS production environment
-     */
     const handleShare = async () => {
         const productUrl = window.location.href;
         const shareData = {
@@ -206,30 +165,24 @@ const ProductDetail = ({ product, loading = false }) => {
         };
 
         try {
-            // Primary method: Web Share API (works on HTTPS for mobile browsers)
             if (navigator.share) {
-                // Check if the browser supports canShare
                 if (navigator.canShare) {
-                    // Verify if this specific data can be shared
                     if (navigator.canShare(shareData)) {
                         await navigator.share(shareData);
                         return;
                     }
                 } else {
-                    // Browser supports share but not canShare - try anyway
                     await navigator.share(shareData);
                     return;
                 }
             }
 
-            // Fallback method: Clipboard API (works on HTTPS)
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 await navigator.clipboard.writeText(productUrl);
                 warning('Product link copied to clipboard!');
                 return;
             }
 
-            // Legacy fallback: execCommand (for older browsers)
             const textArea = document.createElement('textarea');
             textArea.value = productUrl;
             textArea.style.position = 'fixed';
@@ -247,36 +200,28 @@ const ProductDetail = ({ product, loading = false }) => {
                     warning('Unable to copy link. Please copy manually.');
                 }
             } catch (err) {
-                console.error('Copy command failed:', err);
                 warning('Unable to copy link. Please copy manually.');
             }
             
             document.body.removeChild(textArea);
         } catch (error) {
-            // Handle errors gracefully
             if (error.name === 'AbortError') {
-                // User cancelled the share dialog - do nothing
                 return;
             }
             
             if (error.name === 'NotAllowedError') {
-                // Permission denied or not in secure context
-                console.error('Share not allowed:', error);
                 warning('Sharing is only available on secure connections (HTTPS).');
                 return;
             }
 
-            // Other errors
-            console.error('Share failed:', error);
             warning('Unable to share at this time. Please try copying the URL manually.');
         }
     };
     
-    if (loading || !normalizedProduct) {
+    if (loading || !normalizedProduct || discountsLoading) {
         return (
             <div className="bg-white min-h-screen">
                 <div className="container mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
-                    {/* Back Button Skeleton */}
                     <div className="mb-4 sm:mb-6">
                         <div className="flex items-center space-x-2">
                             <div className="w-5 h-5 bg-gray-200 rounded animate-pulse"></div>
@@ -285,7 +230,6 @@ const ProductDetail = ({ product, loading = false }) => {
                     </div>
                     
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-                        {/* Image Skeleton */}
                         <div className="space-y-3 sm:space-y-4">
                             <div className="flex items-start justify-between gap-2">
                                 <div className="flex-1 bg-gray-200 rounded-lg sm:rounded-xl animate-pulse aspect-square sm:aspect-auto" style={{ minHeight: '250px' }}></div>
@@ -298,7 +242,6 @@ const ProductDetail = ({ product, loading = false }) => {
                             </div>
                         </div>
                         
-                        {/* Content Skeleton */}
                         <div className="space-y-4 sm:space-y-6">
                             <div className="space-y-2">
                                 <div className="w-20 h-3 bg-gray-200 rounded animate-pulse"></div>
@@ -323,17 +266,12 @@ const ProductDetail = ({ product, loading = false }) => {
                 </div>
             </div>
         );
-    };
+    }
 
-    /**
-     * Handle back navigation
-     */
     const handleGoBack = () => {
-        // Try to go back in history first
         if (window.history.length > 1) {
             navigate(-1);
         } else {
-            // Fallback to shop page
             navigate('/shop');
         }
     };
@@ -341,7 +279,6 @@ const ProductDetail = ({ product, loading = false }) => {
     return (
         <div className="bg-white min-h-screen">
             <div className="container mx-auto px-2 sm:px-4 lg:px-8 py-3 sm:py-8">
-                {/* Back Button */}
                 <div className="mb-4 sm:mb-6">
                     <button
                         onClick={handleGoBack}
@@ -362,18 +299,25 @@ const ProductDetail = ({ product, loading = false }) => {
                 </div>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-                    {/* Product Images */}
                     <div className="space-y-3 sm:space-y-4">
-                        {/* Mobile Layout: Main image with share button overlay, thumbnails below */}
                         <div className="lg:hidden">
                             <div className="relative bg-white rounded-lg overflow-hidden shadow-md border border-gray-100">
+                                {normalizedProduct.hasDiscount && (
+                                    <div className="absolute top-3 left-3 z-20 bg-gradient-to-r from-red-500 to-red-600 text-white text-sm font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                        </svg>
+                                        <span>{normalizedProduct.discountPercent}% OFF</span>
+                                    </div>
+                                )}
+                                
                                 <img 
                                     src={normalizedProduct.images[selectedImage]}
                                     alt={normalizedProduct.name} 
                                     className="w-full h-auto object-contain transition-transform duration-300"
                                     loading="lazy"
                                 />
-                                {/* Share Button - Top Right Overlay */}
+                                
                                 <button 
                                     className="absolute top-2 right-2 flex items-center justify-center w-10 h-10 rounded-lg bg-white/90 backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-white hover:text-gray-900 transition-all duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-1 touch-manipulation z-10"
                                     onClick={handleShare}
@@ -396,7 +340,6 @@ const ProductDetail = ({ product, loading = false }) => {
                                 </button>
                             </div>
                             
-                            {/* Thumbnail Images */}
                             {normalizedProduct.images.length > 1 && (
                                 <div className="grid grid-cols-5 gap-2 mt-3">
                                     {normalizedProduct.images.slice(0, 5).map((image, index) => (
@@ -422,10 +365,18 @@ const ProductDetail = ({ product, loading = false }) => {
                             )}
                         </div>
                         
-                        {/* Desktop Layout: Original layout */}
                         <div className="hidden lg:block">
                             <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 relative bg-white rounded-xl overflow-hidden shadow-lg border border-gray-100">
+                                    {normalizedProduct.hasDiscount && (
+                                        <div className="absolute top-4 left-4 z-20 bg-gradient-to-r from-red-500 to-red-600 text-white text-base font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                            </svg>
+                                            <span>{normalizedProduct.discountPercent}% OFF</span>
+                                        </div>
+                                    )}
+                                    
                                     <img 
                                         src={normalizedProduct.images[selectedImage]}
                                         alt={normalizedProduct.name} 
@@ -433,7 +384,6 @@ const ProductDetail = ({ product, loading = false }) => {
                                         loading="lazy"
                                     />
                                 </div>
-                                {/* Share Button */}
                                 <button 
                                     className="flex items-center justify-center w-11 h-11 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 touch-manipulation flex-shrink-0"
                                     onClick={handleShare}
@@ -482,9 +432,7 @@ const ProductDetail = ({ product, loading = false }) => {
                         </div>
                     </div>
                     
-                    {/* Product Information */}
                     <div className="space-y-4 sm:space-y-6">
-                        {/* Product Name and Category */}
                         <div className="space-y-1 sm:space-y-2">
                             <div className="text-xs sm:text-sm text-pink-600 font-medium uppercase tracking-wide">
                                 {normalizedProduct.category}
@@ -494,14 +442,39 @@ const ProductDetail = ({ product, loading = false }) => {
                             </h1>
                         </div>
                         
-                        {/* Pricing */}
-                        <div className="flex items-baseline space-x-2 sm:space-x-3">
-                            <span className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-pink-600">
-                                {formatter.formatCurrency(normalizedProduct.price)}
-                            </span>
+                        <div className="space-y-2">
+                            <div className="flex items-baseline space-x-2 sm:space-x-3">
+                                {normalizedProduct.hasDiscount ? (
+                                    <>
+                                        <span className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-pink-600">
+                                            {formatter.formatCurrency(normalizedProduct.discountedPrice)}
+                                        </span>
+                                        <span className="text-lg sm:text-xl lg:text-2xl text-gray-500 line-through">
+                                            {formatter.formatCurrency(normalizedProduct.originalPrice)}
+                                        </span>
+                                    </>
+                                ) : (
+                                    <span className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-pink-600">
+                                        {formatter.formatCurrency(normalizedProduct.price)}
+                                    </span>
+                                )}
+                            </div>
+                            
+                            {normalizedProduct.hasDiscount && (
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center bg-red-100 text-red-700 text-sm font-semibold px-3 py-1 rounded-full">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Save {formatter.formatCurrency(normalizedProduct.savings)}
+                                    </span>
+                                    <span className="text-xs text-gray-600">
+                                        ({normalizedProduct.discountPercent}% off)
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Stock Status */}
                         <div className="flex items-center space-x-2">
                             <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${
                                 normalizedProduct.stock > 0 ? 'bg-green-500' : 'bg-red-500'
@@ -515,7 +488,6 @@ const ProductDetail = ({ product, loading = false }) => {
                             </span>
                         </div>
                         
-                        {/* Description */}
                         {normalizedProduct.description && (
                             <div className="border-t border-gray-200 pt-4 sm:pt-6">
                                 <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">Description</h3>
@@ -525,7 +497,6 @@ const ProductDetail = ({ product, loading = false }) => {
                             </div>
                         )}
                         
-                        {/* Quantity Selector */}
                         {normalizedProduct.stock > 0 && (
                             <div className="flex items-center space-x-3 sm:space-x-4 py-3 sm:py-4">
                                 <label htmlFor="quantity-input" className="text-sm sm:text-base font-semibold text-gray-900">
@@ -563,7 +534,6 @@ const ProductDetail = ({ product, loading = false }) => {
                             </div>
                         )}
                         
-                        {/* Action Buttons */}
                         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                             <button
                                 className="flex-1 bg-pink-500 hover:bg-pink-600 text-white py-3 sm:py-3.5 px-4 sm:px-6 rounded-lg font-semibold transition-all duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 touch-manipulation text-sm sm:text-base min-h-[44px]"
@@ -573,7 +543,6 @@ const ProductDetail = ({ product, loading = false }) => {
                                 Add To Cart
                             </button>
                             
-                            {/* Mobile: Buy Now and Wishlist on same line */}
                             <div className="flex sm:contents gap-2">
                                 <button
                                     className="flex-1 sm:flex-1 bg-transparent border-2 border-pink-500 text-pink-500 hover:bg-pink-50 py-3 sm:py-3.5 px-4 sm:px-6 rounded-lg font-semibold transition-all duration-200 disabled:border-gray-300 disabled:text-gray-300 disabled:cursor-not-allowed hover:shadow-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 touch-manipulation text-sm sm:text-base min-h-[44px]"
@@ -609,7 +578,6 @@ const ProductDetail = ({ product, loading = false }) => {
                             </div>
                         </div>
                     
-                        {/* Benefits/Tags */}
                         {normalizedProduct.benefits.length > 0 && (
                             <div className="border-t border-gray-200 pt-4 sm:pt-6">
                                 <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Perfect For:</h3>

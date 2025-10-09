@@ -90,7 +90,8 @@ const adminPages = {
   InboxPage: lazy(() => import('../admin/pages/InboxPage')),
   BookingsPage: lazy(() => import('../admin/pages/BookingsPage')),
   NewsletterAdmin: lazy(() => import('../admin/pages/NewsletterAdmin')),
-  DeliveryFees: lazy(() => import('../admin/pages/DeliveryFees'))
+  DeliveryFees: lazy(() => import('../admin/pages/DeliveryFees')),
+  DiscountsPage: lazy(() => import('../admin/pages/DiscountsPage'))
 };
 
 const LoginWrapper = memo(() => {
@@ -185,6 +186,7 @@ const AppRoutes = () => {
             <Route path="bookings/:id" element={<adminPages.BookingsPage />} />   
             <Route path="newsletter" element={<adminPages.NewsletterAdmin />} />
             <Route path="delivery" element={<adminPages.DeliveryFees />} />
+            <Route path="discounts" element={<adminPages.DiscountsPage />} />
             <Route path="*" element={<publicPages.NotFound />} />
           </Route>
 

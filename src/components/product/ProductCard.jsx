@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { useCart } from '../../hooks/useCart';
+import { useDiscounts } from '../../contexts/DiscountContext';
 import { formatter } from '../../utils/formatter';
 import { useProductNavigation } from '../../routes/RouteTransitionLoader';
 
-// Utility function to decode HTML entities, preventing XSS
 const decodeHtmlEntities = (text) => {
   if (typeof text !== 'string') return text;
   const textarea = document.createElement('textarea');
@@ -16,10 +16,10 @@ const decodeHtmlEntities = (text) => {
 const ProductCard = ({ product }) => {
   const { isInWishlist, toggleWishlistItem } = useWishlist();
   const { addToCart } = useCart();
+  const { applyDiscountToProduct, loading: discountsLoading } = useDiscounts();
   const navigate = useNavigate();
   const { navigateToProduct } = useProductNavigation();
   
-  // Normalize product data to handle inconsistencies from the API
   const normalizedProduct = useMemo(() => {
     if (!product) return null;
     const productId = product.product_id || product.id || product._id;
@@ -27,7 +27,7 @@ const ProductCard = ({ product }) => {
 
     const price = parseFloat(product.price) || 0;
 
-    return {
+    const baseProduct = {
       ...product,
       id: productId,
       name: decodeHtmlEntities(product.name || 'Unknown Product'),
@@ -35,13 +35,14 @@ const ProductCard = ({ product }) => {
       image: product.images?.[0] || 'https://placehold.co/300x300/f7f7f7/ccc?text=Product',
       stock: parseInt(product.available_qty, 10) || 0,
     };
-  }, [product]);
+
+    return applyDiscountToProduct(baseProduct);
+  }, [product, applyDiscountToProduct]);
 
   const isProductInWishlist = useMemo(() => {
     return normalizedProduct ? isInWishlist(normalizedProduct.id) : false;
   }, [normalizedProduct, isInWishlist]);
 
-  // Check if product should show NEW badge
   const shouldShowNewBadge = useMemo(() => {
     if (!normalizedProduct) return false;
     
@@ -90,6 +91,18 @@ const ProductCard = ({ product }) => {
   };
 
   const renderTopBadge = () => {
+    if (normalizedProduct.hasDiscount) {
+      return (
+        <div className="absolute top-2 left-2 z-20 bg-gradient-to-r from-red-500 to-red-600 text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full shadow-md flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+          </svg>
+          <span className="hidden sm:inline">{normalizedProduct.discountPercent}% OFF</span>
+          <span className="sm:hidden">{normalizedProduct.discountPercent}%</span>
+        </div>
+      );
+    }
+    
     if (shouldShowNewBadge) {
       return (
         <div className="absolute top-2 left-2 z-20 bg-gradient-to-r from-green-500 to-green-600 text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full shadow-md flex items-center">
@@ -155,9 +168,32 @@ const ProductCard = ({ product }) => {
         </button>
         
         <div className="flex items-center justify-between flex-wrap gap-1 mb-3">
-          <p className="text-gray-900 font-bold text-sm sm:text-lg">{formatter.formatCurrency(normalizedProduct.price)}</p>
+          <div className="flex items-center gap-2">
+            {normalizedProduct.hasDiscount ? (
+              <>
+                <p className="text-gray-900 font-bold text-sm sm:text-lg">
+                  {formatter.formatCurrency(normalizedProduct.discountedPrice)}
+                </p>
+                <p className="text-gray-500 text-xs sm:text-sm line-through">
+                  {formatter.formatCurrency(normalizedProduct.originalPrice)}
+                </p>
+              </>
+            ) : (
+              <p className="text-gray-900 font-bold text-sm sm:text-lg">
+                {formatter.formatCurrency(normalizedProduct.price)}
+              </p>
+            )}
+          </div>
           {renderStockStatus()}
         </div>
+
+        {normalizedProduct.hasDiscount && (
+          <div className="mb-3">
+            <span className="inline-block bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded">
+              Save {formatter.formatCurrency(normalizedProduct.savings)}
+            </span>
+          </div>
+        )}
 
         <button 
           onClick={handleAddToCart} 

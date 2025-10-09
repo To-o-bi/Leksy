@@ -1,4 +1,4 @@
-// src/api/config.js - Corrected endpoints based on API documentation
+// src/api/config.js 
 export const API_CONFIG = {
   BASE_URL: import.meta.env.VITE_API_URL || 'https://leksycosmetics.com/api',
   TIMEOUT: 30000,
@@ -25,7 +25,7 @@ export const ENDPOINTS = {
   // Orders - CORRECTED based on API docs
   INITIATE_CHECKOUT: '/checkout/initiate',
   FETCH_ORDER: '/fetch-order',
-  FETCH_ORDERS: '/fetch-orders', // CORRECTED: Removed /admin/ prefix
+  FETCH_ORDERS: '/fetch-orders',
   CHANGE_DELIVERY_STATUS: '/admin/change-delivery-status',
   
   // Contact - from API docs
@@ -37,7 +37,7 @@ export const ENDPOINTS = {
   INITIATE_CONSULTATION: '/consultation/initiate',
   FETCH_BOOKED_TIMES: '/consultation/fetch-booked-times',
   FETCH_CONSULTATION: '/admin/fetch-consultation',
-  FETCH_CONSULTATIONS: '/fetch-consultations', // CORRECTED: Based on API docs pattern
+  FETCH_CONSULTATIONS: '/fetch-consultations',
   
   // Newsletter - from API docs
   ADD_NEWSLETTER_SUBSCRIBER: '/newsletter-subscribers/add',
@@ -47,7 +47,10 @@ export const ENDPOINTS = {
   // Delivery - from API docs
   FETCH_DELIVERY_FEE: '/fetch-delivery-fee',
   FETCH_DELIVERY_FEES: '/fetch-delivery-fees',
-  UPDATE_DELIVERY_FEES: '/admin/update-delivery-fees'
+  UPDATE_DELIVERY_FEES: '/admin/update-delivery-fees',
+  
+  // Discounts - NEW
+  MANAGE_DISCOUNTS: '/admin/manage-discounts'
 };
 
 // From API docs - valid categories

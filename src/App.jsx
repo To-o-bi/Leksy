@@ -6,6 +6,7 @@ import { MessageProvider } from './contexts/MessageContext';
 import { CartProvider } from './contexts/CartContext';
 import { WishlistProvider } from './contexts/WishlistContext';
 import { ProductProvider } from './contexts/ProductContext';
+import { DiscountProvider } from './contexts/DiscountContext';
 import TokenExpiryWarning from './components/TokenExpiryWarning';
 import AppRoutes from './routes/AppRoutes';
 
@@ -16,13 +17,15 @@ const App = () => {
       <AuthProvider>
         <MessageProvider>
           <ProductProvider>
-            <CartProvider>
-              <WishlistProvider>
-                {/* TokenExpiryWarning should be inside all providers to access auth state */}
-                <TokenExpiryWarning />
-                <AppRoutes />                
-              </WishlistProvider>       
-            </CartProvider>
+            <DiscountProvider> 
+              <CartProvider>
+                <WishlistProvider>
+                  {/* TokenExpiryWarning should be inside all providers to access auth state */}
+                  <TokenExpiryWarning />
+                  <AppRoutes />                
+                </WishlistProvider>       
+              </CartProvider>
+            </DiscountProvider>
           </ProductProvider>
         </MessageProvider>
       </AuthProvider>
