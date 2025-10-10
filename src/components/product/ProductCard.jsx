@@ -1,8 +1,7 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { useCart } from '../../hooks/useCart';
-import { useDiscounts } from '../../contexts/DiscountContext';
 import { formatter } from '../../utils/formatter';
 import { useProductNavigation } from '../../routes/RouteTransitionLoader';
 
@@ -16,7 +15,6 @@ const decodeHtmlEntities = (text) => {
 const ProductCard = ({ product }) => {
   const { isInWishlist, toggleWishlistItem } = useWishlist();
   const { addToCart } = useCart();
-  const { applyDiscountToProduct, loading: discountsLoading } = useDiscounts();
   const navigate = useNavigate();
   const { navigateToProduct } = useProductNavigation();
   
@@ -26,18 +24,29 @@ const ProductCard = ({ product }) => {
     if (!productId) return null;
 
     const price = parseFloat(product.price) || 0;
+    
+    // Check if backend has already applied discount
+    const hasBackendDiscount = product.isAppliedDiscount === true || product.isAppliedDiscount === 'true';
+    const discountPercent = hasBackendDiscount ? parseFloat(product.discount_percent) || 0 : 0;
+    const slashedPrice = product.slashed_price ? parseFloat(product.slashed_price) : null;
+    const originalPrice = slashedPrice || product.original_price || price;
 
-    const baseProduct = {
+    return {
       ...product,
       id: productId,
       name: decodeHtmlEntities(product.name || 'Unknown Product'),
       price: price,
       image: product.images?.[0] || 'https://placehold.co/300x300/f7f7f7/ccc?text=Product',
       stock: parseInt(product.available_qty, 10) || 0,
+      // Use backend discount data
+      hasDiscount: hasBackendDiscount && discountPercent > 0,
+      discountPercent: discountPercent,
+      originalPrice: originalPrice,
+      discountedPrice: hasBackendDiscount ? price : null,
+      savings: hasBackendDiscount && slashedPrice ? slashedPrice - price : 0,
+      discountValidUntil: product.deal_end_date || null
     };
-
-    return applyDiscountToProduct(baseProduct);
-  }, [product, applyDiscountToProduct]);
+  }, [product]);
 
   const isProductInWishlist = useMemo(() => {
     return normalizedProduct ? isInWishlist(normalizedProduct.id) : false;
@@ -45,6 +54,9 @@ const ProductCard = ({ product }) => {
 
   const shouldShowNewBadge = useMemo(() => {
     if (!normalizedProduct) return false;
+    
+    // Don't show NEW badge if there's a discount
+    if (normalizedProduct.hasDiscount) return false;
     
     if (normalizedProduct.showNewBadge) return true;
     if (normalizedProduct.isNew) return true;
@@ -91,7 +103,7 @@ const ProductCard = ({ product }) => {
   };
 
   const renderTopBadge = () => {
-    if (normalizedProduct.hasDiscount) {
+    if (normalizedProduct.hasDiscount && normalizedProduct.discountPercent) {
       return (
         <div className="absolute top-2 left-2 z-20 bg-gradient-to-r from-red-500 to-red-600 text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full shadow-md flex items-center">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -128,7 +140,7 @@ const ProductCard = ({ product }) => {
             aria-label="Toggle Wishlist" 
             className="bg-white rounded-full p-2 sm:p-2 shadow-md hover:bg-pink-100 hover:text-pink-500 transition-colors touch-manipulation active:scale-95"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 sm:h-4 sm:w-4 ${isProductInWishlist ? 'text-pink-500' : 'text-gray-500'}`} fill={isProductInWishlist ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 sm:h-4 sm:w-4 ${isProductInWishlist ? 'text-pink-500' : 'text-gray-500'}`} fill={isProductInWishlist ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.0 0 00-6.364 0z" /></svg>
           </button>
         </div>
         
@@ -169,7 +181,7 @@ const ProductCard = ({ product }) => {
         
         <div className="flex items-center justify-between flex-wrap gap-1 mb-3">
           <div className="flex items-center gap-2">
-            {normalizedProduct.hasDiscount ? (
+            {normalizedProduct.hasDiscount && normalizedProduct.discountedPrice ? (
               <>
                 <p className="text-gray-900 font-bold text-sm sm:text-lg">
                   {formatter.formatCurrency(normalizedProduct.discountedPrice)}
@@ -187,7 +199,7 @@ const ProductCard = ({ product }) => {
           {renderStockStatus()}
         </div>
 
-        {normalizedProduct.hasDiscount && (
+        {normalizedProduct.hasDiscount && normalizedProduct.savings > 0 && (
           <div className="mb-3">
             <span className="inline-block bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded">
               Save {formatter.formatCurrency(normalizedProduct.savings)}

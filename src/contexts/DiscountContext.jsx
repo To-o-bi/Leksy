@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { discountService } from '../api/services';
 
 const DiscountContext = createContext();
@@ -16,15 +16,24 @@ export const DiscountProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastFetch, setLastFetch] = useState(null);
+  const isFetchingRef = useRef(false);
 
   const fetchActiveDiscounts = useCallback(async (forceRefresh = false) => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) {
+      return;
+    }
+
     const cacheAge = lastFetch ? Date.now() - lastFetch : Infinity;
     const cacheExpired = cacheAge >= 5 * 60 * 1000;
     
+    // Check cache using ref to avoid stale closure
     if (!forceRefresh && lastFetch && !cacheExpired) {
-      return discounts;
+      setLoading(false);
+      return;
     }
 
+    isFetchingRef.current = true;
     setLoading(true);
     setError(null);
         
@@ -35,21 +44,23 @@ export const DiscountProvider = ({ children }) => {
         const activeDiscounts = response.discounts || [];
         setDiscounts(activeDiscounts);
         setLastFetch(Date.now());
+        setLoading(false);
+        isFetchingRef.current = false;
         return activeDiscounts;
       } else {
         throw new Error(response?.message || 'Failed to fetch discounts');
       }
     } catch (err) {
       setError(err.message);
-      return discounts;
-    } finally {
       setLoading(false);
+      isFetchingRef.current = false;
+      return [];
     }
-  }, [lastFetch, discounts]);
+  }, [lastFetch]);
 
   useEffect(() => {
     fetchActiveDiscounts();
-  }, []);
+  }, []); // Only run once on mount
 
   const applyDiscountToProduct = useCallback((product) => {
     return discountService.applyDiscountToProduct(product, discounts);

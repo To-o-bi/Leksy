@@ -7,6 +7,8 @@ const DiscountsPage = () => {
   const [discounts, setDiscounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingDiscount, setDeletingDiscount] = useState(null);
   const [editingDiscount, setEditingDiscount] = useState(null);
   const [formData, setFormData] = useState({
     category: 'all',
@@ -71,18 +73,29 @@ const DiscountsPage = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (discountId) => {
-    if (!window.confirm('Are you sure you want to delete this discount?')) {
-      return;
-    }
+  const handleDelete = (discount) => {
+    setDeletingDiscount(discount);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingDiscount) return;
     
     try {
-      await discountService.deleteDiscount(discountId);
+      await discountService.deleteDiscount(deletingDiscount.id);
       success('Discount deleted successfully!');
       await fetchDiscounts();
     } catch (err) {
       showError(err.message || 'Failed to delete discount');
+    } finally {
+      setShowDeleteModal(false);
+      setDeletingDiscount(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setDeletingDiscount(null);
   };
 
   const closeModal = () => {
@@ -220,7 +233,7 @@ const DiscountsPage = () => {
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDelete(discount.id)}
+                          onClick={() => handleDelete(discount)}
                           className="text-red-600 hover:text-red-900"
                         >
                           Delete
@@ -336,6 +349,60 @@ const DiscountsPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              
+              <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+                Delete Discount
+              </h3>
+              
+              <p className="text-sm text-gray-600 text-center mb-6">
+                Are you sure you want to delete this discount? This action cannot be undone.
+              </p>
+              
+              {deletingDiscount && (
+                <div className="bg-gray-50 rounded-lg p-3 mb-6">
+                  <div className="text-sm">
+                    <span className="font-medium text-gray-700">Category: </span>
+                    <span className="text-gray-900 capitalize">
+                      {deletingDiscount.category === 'all' ? 'All Products' : getCategoryDisplayName(deletingDiscount.category)}
+                    </span>
+                  </div>
+                  <div className="text-sm mt-1">
+                    <span className="font-medium text-gray-700">Discount: </span>
+                    <span className="text-pink-600 font-bold">{deletingDiscount.discount_percent}% OFF</span>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={cancelDelete}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDelete}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

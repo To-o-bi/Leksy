@@ -469,7 +469,7 @@ export const consultationService = {
 };
 
 
-// discountService.js
+// discountService.js 
 
 export const discountService = {
   async fetchDiscounts() {
@@ -639,13 +639,19 @@ export const discountService = {
         const now = new Date();
         
         const activeDiscounts = allDiscounts.filter((discount) => {
-          if (!discount.isActive) return false;
+          // Check if discount is active
+          const isActive = discount.isActive === 1 || discount.isActive === '1' || discount.isActive === true;
+          if (!isActive) return false;
           
+          // Check date range
           const validFrom = new Date(discount.valid_from);
           const validTo = new Date(discount.valid_to);
           validTo.setHours(23, 59, 59, 999);
           
-          return now >= validFrom && now <= validTo;
+          const isInDateRange = now >= validFrom && now <= validTo;
+          if (!isInDateRange) return false;
+          
+          return true;
         });
         
         return {
@@ -657,6 +663,7 @@ export const discountService = {
       
       return { code: 200, discounts: [], message: 'No active discounts' };
     } catch (error) {
+      console.error('Error fetching discounts:', error);
       return { code: 200, discounts: [], message: 'No discounts available' };
     }
   },
@@ -669,14 +676,18 @@ export const discountService = {
     const productCategory = (product.category || '').toLowerCase().trim();
 
     const applicableDiscounts = discounts.filter(discount => {
-      if (!discount.isActive) return false;
+      // Check if discount is active
+      const isActive = discount.isActive === 1 || discount.isActive === '1' || discount.isActive === true;
+      if (!isActive) return false;
 
+      // Check date range
       const validFrom = new Date(discount.valid_from);
       const validTo = new Date(discount.valid_to);
       validTo.setHours(23, 59, 59, 999);
 
       if (now < validFrom || now > validTo) return false;
 
+      // Check category match
       const discountCategory = (discount.category || '').toLowerCase().trim();
       
       if (discountCategory === 'all') return true;
@@ -695,6 +706,7 @@ export const discountService = {
 
     if (applicableDiscounts.length === 0) return null;
 
+    // Get the best discount (highest percentage)
     const bestDiscount = applicableDiscounts.reduce((max, current) => {
       const currentPercent = parseFloat(current.discount_percent) || 0;
       const maxPercent = parseFloat(max.discount_percent) || 0;
