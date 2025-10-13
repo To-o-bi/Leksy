@@ -1223,7 +1223,7 @@ curl --location --request POST '{base_url}/api/admin/manage-discounts?action=fet
 ## Add A Discount
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/manage-discounts?action=edit&discount_id={discount_id}&category={a_valid_category|optional|default:all}&discount_percent={numeric|float|0-100}&valid_from={valid_date_format}&valid_to={valid_dateformat}&isFirstTimeOnly={boolean|optional|default:true}' \
+curl --location --request POST '{base_url}/api/admin/manage-discounts?action=add&category={a_valid_category|optional|default:all}&discount_percent={numeric|float:0-100}&valid_from={valid_date_format:yyyy-mm-dd}&valid_to={valid_date_format:yyyy-mm-dd}&isFirstTimeOnly={boolean|optional|default:true}&isActive={boolean|optional|default:true}' \
 --header 'Authorization: Bearer {token}'
 ```
 
@@ -1249,7 +1249,7 @@ curl --location --request POST '{base_url}/api/admin/manage-discounts?action=edi
 ## Edit A Discount
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/manage-discounts?action=edit&discount_id={discount_id}&category={a_valid_category|optional|default:all}&discount_percent={numeric|float:0-100|optional}&valid_from={valid_date_format|optional}&valid_to={valid_dateformat|optional}&isFirstTimeOnly={boolean|optional|default:true}' \
+curl --location --request POST '{base_url}/api/admin/manage-discounts?action=edit&discount_id={discount_id}&category={a_valid_category|optional}&discount_percent={numeric|float:0-100|optional}&valid_from={valid_date_format:yyyy-mm-dd|optional}&valid_to={valid_date_format:yyyy-mm-dd|optional}&isFirstTimeOnly={boolean|optional}&isActive={boolean|optional}' \
 --header 'Authorization: Bearer {token}'
 ```
 
@@ -1272,3 +1272,110 @@ curl --location --request POST '{base_url}/api/admin/manage-discounts?action=edi
 }
 ```
 
+## Delete A Discount
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/manage-discounts?action=delete&discount_id={discount_id}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Discount data deleted successfully!",
+	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30eeebb1ba"
+}
+```
+
+
+# DELIVERY DISCOUNT (I.E, A SINGLE DISCOUNT THAT APPLIES TO ALL DELIVERY FEES)
+
+## Fetch Delivery Discount
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/manage-delivery-discount?action=fetch' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Discount data fetched successfully!",
+	"discount_data": {
+		"category": "delivery",
+		"discount_percent": "10.00",
+		"isFirstTimeOnly": 1,
+		"valid_from": "2025-06-25",
+		"valid_to": "2025-06-25",
+		"isActive": 1,
+		"created_at": "2025-10-06 00:32:30",
+		"modified_at": "2025-10-06 00:32:30"
+	},
+	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30e4ff13e3"
+}
+```
+
+## Create Delivery Discount (i.e if not already exists. If it does, please edit instead)
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/manage-delivery-discount?action=create&discount_percent={numeric|float:0-100}&valid_from={valid_date_format:yyyy-mm-dd}&valid_to={valid_date_format:yyyy-mm-dd}&isFirstTimeOnly={boolean|optional|default:true}&isActive={boolean|optional|default:true}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Discount data added successfully!",
+	"discount_data": {
+		"category": "delivery",
+		"discount_percent": "10.00",
+		"isFirstTimeOnly": 1,
+		"valid_from": "2025-06-25",
+		"valid_to": "2025-06-25",
+		"isActive": 1,
+		"created_at": "2025-10-06 01:44:37",
+		"modified_at": "2025-10-06 01:44:37"
+	},
+	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e310f520652"
+}
+```
+
+## Edit Delivery Discount
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/manage-delivery-discount?action=edit&discount_percent={numeric|float:0-100|optional}&valid_from={valid_date_format:yyyy-mm-dd|optional}&valid_to={valid_date_format:yyyy-mm-dd|optional}&isFirstTimeOnly={boolean|optional}&isActive={boolean|optional}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Discount data updated successfully!",
+	"discount_data": {
+		"category": "delivery",
+		"discount_percent": "10.00",
+		"isFirstTimeOnly": 1,
+		"valid_from": "2025-06-25",
+		"valid_to": "2025-06-25",
+		"isActive": 1,
+		"created_at": "2025-10-06 00:38:55",
+		"modified_at": "2025-10-06 00:38:55"
+	},
+	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30eeebb1ba"
+}
+```
+
+## Delete A Discount
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/manage-delivery-discount?action=delete' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Discount data deleted successfully!",
+	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30eeebb1ba"
+}
+```
