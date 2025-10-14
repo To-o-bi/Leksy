@@ -23,27 +23,32 @@ const ProductCard = ({ product }) => {
     const productId = product.product_id || product.id || product._id;
     if (!productId) return null;
 
+    // CORRECTED: Backend sends fully calculated prices
+    // Just use what backend gives you - NO CALCULATIONS NEEDED
     const price = parseFloat(product.price) || 0;
+    const originalPrice = parseFloat(product.original_price) || price;
+    const discountPercent = parseFloat(product.discount_percent) || 0;
+    const isApplied = product.isAppliedDiscount === true || product.isAppliedDiscount === 'true';
     
-    // Check if backend has already applied discount
-    const hasBackendDiscount = product.isAppliedDiscount === true || product.isAppliedDiscount === 'true';
-    const discountPercent = hasBackendDiscount ? parseFloat(product.discount_percent) || 0 : 0;
-    const slashedPrice = product.slashed_price ? parseFloat(product.slashed_price) : null;
-    const originalPrice = slashedPrice || product.original_price || price;
+    // IGNORE slashed_price completely - it's a fake marketing gimmick
+    // Backend has already done ALL calculations for you
+    
+    const hasDiscount = isApplied && discountPercent > 0 && price < originalPrice;
+    const savings = hasDiscount ? originalPrice - price : 0;
 
     return {
       ...product,
       id: productId,
       name: decodeHtmlEntities(product.name || 'Unknown Product'),
-      price: price,
+      price: price,                          // ← Final price (already calculated by backend)
       image: product.images?.[0] || 'https://placehold.co/300x300/f7f7f7/ccc?text=Product',
       stock: parseInt(product.available_qty, 10) || 0,
-      // Use backend discount data
-      hasDiscount: hasBackendDiscount && discountPercent > 0,
+      // Discount info
+      hasDiscount: hasDiscount,
       discountPercent: discountPercent,
-      originalPrice: originalPrice,
-      discountedPrice: hasBackendDiscount ? price : null,
-      savings: hasBackendDiscount && slashedPrice ? slashedPrice - price : 0,
+      originalPrice: originalPrice,          // ← Real original price (not slashed_price)
+      discountedPrice: hasDiscount ? price : null,
+      savings: savings,
       discountValidUntil: product.deal_end_date || null
     };
   }, [product]);
@@ -181,10 +186,10 @@ const ProductCard = ({ product }) => {
         
         <div className="flex items-center justify-between flex-wrap gap-1 mb-3">
           <div className="flex items-center gap-2">
-            {normalizedProduct.hasDiscount && normalizedProduct.discountedPrice ? (
+            {normalizedProduct.hasDiscount ? (
               <>
                 <p className="text-gray-900 font-bold text-sm sm:text-lg">
-                  {formatter.formatCurrency(normalizedProduct.discountedPrice)}
+                  {formatter.formatCurrency(normalizedProduct.price)}
                 </p>
                 <p className="text-gray-500 text-xs sm:text-sm line-through">
                   {formatter.formatCurrency(normalizedProduct.originalPrice)}

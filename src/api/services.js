@@ -469,7 +469,7 @@ export const consultationService = {
 };
 
 
-// discountService.js 
+// product discountService.js 
 
 export const discountService = {
   async fetchDiscounts() {
@@ -752,6 +752,191 @@ export const discountService = {
     if (!discounts || discounts.length === 0) return products;
     
     return products.map(product => this.applyDiscountToProduct(product, discounts));
+  },
+
+  _validateDiscountData(discountData) {
+    if (!discountData.discount_percent || discountData.discount_percent <= 0 || discountData.discount_percent > 100) {
+      throw new Error('Discount percentage must be between 0 and 100');
+    }
+
+    if (!discountData.valid_from) throw new Error('Start date is required');
+    if (!discountData.valid_to) throw new Error('End date is required');
+
+    const startDate = new Date(discountData.valid_from);
+    const endDate = new Date(discountData.valid_to);
+
+    if (isNaN(startDate.getTime())) throw new Error('Invalid start date format');
+    if (isNaN(endDate.getTime())) throw new Error('Invalid end date format');
+    if (endDate < startDate) throw new Error('End date must be after start date');
+
+    return true;
+  }
+};
+
+
+// deliverydiscount.js
+
+export const deliveryDiscountService = {
+  async fetchDeliveryDiscount() {
+    try {
+      const response = await api.post(
+        `${ENDPOINTS.MANAGE_DELIVERY_DISCOUNT}?action=fetch`,
+        null,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      return response.data;
+    } catch (error) {
+      // If discount doesn't exist, return null instead of throwing
+      if (error.response?.status === 404 || error.response?.data?.code === 404) {
+        return { code: 404, discount_data: null, message: 'No delivery discount found' };
+      }
+      throw new Error(error.response?.data?.message || 'Failed to fetch delivery discount');
+    }
+  },
+
+  async createDeliveryDiscount(discountData) {
+    this._validateDiscountData(discountData);
+    
+    const params = new URLSearchParams({
+      action: 'create',
+      discount_percent: discountData.discount_percent,
+      valid_from: discountData.valid_from,
+      valid_to: discountData.valid_to,
+      isFirstTimeOnly: discountData.isFirstTimeOnly ? '1' : '0',
+      isActive: discountData.isActive !== undefined ? (discountData.isActive ? '1' : '0') : '1'
+    });
+
+    try {
+      const response = await api.post(
+        `${ENDPOINTS.MANAGE_DELIVERY_DISCOUNT}?${params.toString()}`,
+        null,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      if (response.data.code === 200) {
+        return response.data;
+      }
+      
+      throw new Error(response.data.message || 'Failed to create delivery discount');
+    } catch (error) {
+      throw new Error(error.response?.data?.message || error.message || 'Failed to create delivery discount');
+    }
+  },
+
+  async editDeliveryDiscount(discountData) {
+    const params = new URLSearchParams({
+      action: 'edit'
+    });
+
+    if (discountData.discount_percent !== undefined) {
+      params.append('discount_percent', discountData.discount_percent);
+    }
+    if (discountData.valid_from !== undefined) {
+      params.append('valid_from', discountData.valid_from);
+    }
+    if (discountData.valid_to !== undefined) {
+      params.append('valid_to', discountData.valid_to);
+    }
+    if (discountData.isFirstTimeOnly !== undefined) {
+      params.append('isFirstTimeOnly', discountData.isFirstTimeOnly ? '1' : '0');
+    }
+    if (discountData.isActive !== undefined) {
+      params.append('isActive', discountData.isActive ? '1' : '0');
+    }
+
+    try {
+      const response = await api.post(
+        `${ENDPOINTS.MANAGE_DELIVERY_DISCOUNT}?${params.toString()}`,
+        null,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      if (response.data.code === 200) {
+        return response.data;
+      }
+      
+      throw new Error(response.data.message || 'Failed to edit delivery discount');
+    } catch (error) {
+      throw new Error(error.response?.data?.message || error.message || 'Failed to edit delivery discount');
+    }
+  },
+
+  async deleteDeliveryDiscount() {
+    try {
+      const response = await api.post(
+        `${ENDPOINTS.MANAGE_DELIVERY_DISCOUNT}?action=delete`,
+        null,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to delete delivery discount');
+    }
+  },
+
+  calculateDeliveryDiscount(deliveryFee, discount, isFirstTimeCustomer = false) {
+    if (!discount || !deliveryFee) return null;
+
+    // Check if discount is active
+    const isActive = discount.isActive === 1 || discount.isActive === '1' || discount.isActive === true;
+    if (!isActive) return null;
+
+    // Check if it's first-time only and user doesn't qualify
+    const isFirstTimeOnly = discount.isFirstTimeOnly === 1 || discount.isFirstTimeOnly === '1' || discount.isFirstTimeOnly === true;
+    if (isFirstTimeOnly && !isFirstTimeCustomer) return null;
+
+    // Check date range
+    const now = new Date();
+    const validFrom = new Date(discount.valid_from);
+    const validTo = new Date(discount.valid_to);
+    validTo.setHours(23, 59, 59, 999);
+
+    if (now < validFrom || now > validTo) return null;
+
+    const discountPercent = parseFloat(discount.discount_percent) || 0;
+    const originalFee = parseFloat(deliveryFee) || 0;
+    const discountedFee = originalFee - (originalFee * discountPercent / 100);
+
+    return {
+      originalFee,
+      discountedFee: Math.max(0, discountedFee),
+      discountPercent,
+      savings: originalFee - discountedFee,
+      validUntil: discount.valid_to,
+      isFirstTimeOnly
+    };
+  },
+
+  isDeliveryDiscountActive(discount) {
+    if (!discount) return false;
+
+    const isActive = discount.isActive === 1 || discount.isActive === '1' || discount.isActive === true;
+    if (!isActive) return false;
+
+    const now = new Date();
+    const validFrom = new Date(discount.valid_from);
+    const validTo = new Date(discount.valid_to);
+    validTo.setHours(23, 59, 59, 999);
+
+    return now >= validFrom && now <= validTo;
   },
 
   _validateDiscountData(discountData) {

@@ -48,8 +48,11 @@ export const ENDPOINTS = {
   FETCH_DELIVERY_FEE: '/fetch-delivery-fee',
   FETCH_DELIVERY_FEES: '/fetch-delivery-fees',
   UPDATE_DELIVERY_FEES: '/admin/update-delivery-fees',
+
+  // delivery discounts
+  MANAGE_DELIVERY_DISCOUNT: '/admin/manage-delivery-discount',
   
-  // Discounts - NEW
+  // Product Discounts 
   MANAGE_DISCOUNTS: '/admin/manage-discounts'
 };
 

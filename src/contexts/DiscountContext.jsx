@@ -15,7 +15,7 @@ export const DiscountProvider = ({ children }) => {
   const [discounts, setDiscounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [lastFetch, setLastFetch] = useState(null);
+  const lastFetchRef = useRef(null); // Use ref instead of state for cache tracking
   const isFetchingRef = useRef(false);
 
   const fetchActiveDiscounts = useCallback(async (forceRefresh = false) => {
@@ -24,13 +24,14 @@ export const DiscountProvider = ({ children }) => {
       return;
     }
 
-    const cacheAge = lastFetch ? Date.now() - lastFetch : Infinity;
+    // Use ref to avoid stale closure
+    const cacheAge = lastFetchRef.current ? Date.now() - lastFetchRef.current : Infinity;
     const cacheExpired = cacheAge >= 5 * 60 * 1000;
     
-    // Check cache using ref to avoid stale closure
-    if (!forceRefresh && lastFetch && !cacheExpired) {
+    // Check cache - but ALWAYS refresh if forceRefresh is true
+    if (!forceRefresh && lastFetchRef.current && !cacheExpired) {
       setLoading(false);
-      return;
+      return discounts; // Return current discounts
     }
 
     isFetchingRef.current = true;
@@ -42,8 +43,10 @@ export const DiscountProvider = ({ children }) => {
       
       if (response && response.code === 200) {
         const activeDiscounts = response.discounts || [];
+        
+        // CRITICAL: Always set fresh data, clear any stale state
         setDiscounts(activeDiscounts);
-        setLastFetch(Date.now());
+        lastFetchRef.current = Date.now();
         setLoading(false);
         isFetchingRef.current = false;
         return activeDiscounts;
@@ -51,22 +54,30 @@ export const DiscountProvider = ({ children }) => {
         throw new Error(response?.message || 'Failed to fetch discounts');
       }
     } catch (err) {
+      console.error('Error fetching discounts:', err);
       setError(err.message);
+      setDiscounts([]); // Clear discounts on error
       setLoading(false);
       isFetchingRef.current = false;
       return [];
     }
-  }, [lastFetch]);
+  }, []); // Remove lastFetch dependency to avoid stale closure
 
   useEffect(() => {
     fetchActiveDiscounts();
   }, []); // Only run once on mount
 
   const applyDiscountToProduct = useCallback((product) => {
+    if (!product) return product;
+    
+    // IMPORTANT: Always use current discounts, never cached
     return discountService.applyDiscountToProduct(product, discounts);
   }, [discounts]);
 
   const applyDiscountsToProducts = useCallback((products) => {
+    if (!products || !Array.isArray(products)) return products;
+    
+    // IMPORTANT: Always use current discounts
     return discountService.applyDiscountsToProducts(products, discounts);
   }, [discounts]);
 
@@ -79,8 +90,11 @@ export const DiscountProvider = ({ children }) => {
     return discountInfo !== null;
   }, [discounts]);
 
-  const refreshDiscounts = useCallback(() => {
-    return fetchActiveDiscounts(true);
+  const refreshDiscounts = useCallback(async () => {
+    // Force a complete refresh, bypassing cache
+    lastFetchRef.current = null; // Reset cache timestamp
+    const freshDiscounts = await fetchActiveDiscounts(true);
+    return freshDiscounts;
   }, [fetchActiveDiscounts]);
 
   const contextValue = useMemo(() => ({
