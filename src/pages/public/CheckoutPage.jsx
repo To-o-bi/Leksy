@@ -13,7 +13,7 @@ import {
   fetchBusParkDeliveryFee,
   getSuccessRedirectUrl,
   fetchDeliveryFeeForState
-} from '../../api/CheckoutService'; // Adjust path if needed
+} from '../../api/CheckoutService';
 
 const CheckoutPage = () => {
   const { cart, totalPrice, clearCart, validateCart } = useCart();
@@ -22,17 +22,19 @@ const CheckoutPage = () => {
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
   const [deliveryMethod, setDeliveryMethod] = useState('address');
   const [shipping, setShipping] = useState(0);
+  const [shippingDetails, setShippingDetails] = useState({
+    delivery_fee: 0,
+    original_delivery_fee: 0,
+    discount_percent: 0
+  });
   const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
   const [availableLGAs, setAvailableLGAs] = useState([]);
   const [isLoadingLGAs, setIsLoadingLGAs] = useState(false);
   const [busParkFee, setBusParkFee] = useState(null);
-  const [isFetchingBusParkFee, setIsFetchingBusParkFee] = useState(true);
   
-  // Modal state for bus park disclaimer
   const [showBusParkModal, setShowBusParkModal] = useState(false);
   const [pendingDeliveryMethod, setPendingDeliveryMethod] = useState(null);
 
-  // Added 'additional_phone' to the formData state
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -45,9 +47,25 @@ const CheckoutPage = () => {
     agreeToTerms: false
   });
 
-  const [formErrors, setFormErrors] = useState({});
   const finalTotal = totalPrice + shipping;
   const SUCCESS_REDIRECT_URL = getSuccessRedirectUrl();
+  const hasDeliveryDiscount = shippingDetails.discount_percent > 0;
+
+  const [formErrors, setFormErrors] = useState({});
+
+  // Fetch bus park fee on mount
+  useEffect(() => {
+    const getBusParkFee = async () => {
+      try {
+        const feeData = await fetchBusParkDeliveryFee();
+        setBusParkFee(feeData);
+      } catch (error) {
+        console.error("Failed to fetch bus park fee:", error);
+        setBusParkFee(null);
+      }
+    };
+    getBusParkFee();
+  }, []);
 
   useEffect(() => {
     const performInitialValidation = async () => {
@@ -67,36 +85,29 @@ const CheckoutPage = () => {
     }
   }, [cart, navigate, isProcessingOrder]);
 
-  useEffect(() => {
-    const getBusParkFee = async () => {
-      setIsFetchingBusParkFee(true);
-      try {
-        const fee = await fetchBusParkDeliveryFee();
-        setBusParkFee(fee);
-      } catch (error) {
-        console.error("Failed to fetch bus park fee:", error);
-        setBusParkFee(null); // Set to null on error
-      } finally {
-        setIsFetchingBusParkFee(false);
-      }
-    };
-    getBusParkFee();
-  }, []);
-
   const calculateShipping = useCallback(async () => {
     setIsCalculatingShipping(true);
-    let cost = 0;
+    let feeData = { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
+    
     if (deliveryMethod === 'bus-park') {
-      cost = busParkFee || 0;
+      feeData = busParkFee || feeData;
     } else if (deliveryMethod === 'address' && formData.state) {
       if (formData.state === 'Lagos' && formData.city) {
         const selectedLGA = availableLGAs.find(lga => lga.lga === formData.city);
-        cost = selectedLGA ? selectedLGA.delivery_fee : 0;
+        if (selectedLGA) {
+          feeData = {
+            delivery_fee: selectedLGA.delivery_fee,
+            original_delivery_fee: selectedLGA.original_delivery_fee,
+            discount_percent: selectedLGA.discount_percent
+          };
+        }
       } else if (formData.state !== 'Lagos') {
-        cost = await fetchDeliveryFeeForState(formData.state);
+        feeData = await fetchDeliveryFeeForState(formData.state);
       }
     }
-    setShipping(cost);
+    
+    setShipping(feeData.delivery_fee);
+    setShippingDetails(feeData);
     setIsCalculatingShipping(false);
   }, [deliveryMethod, formData.state, formData.city, availableLGAs, busParkFee]);
 
@@ -132,7 +143,6 @@ const CheckoutPage = () => {
     }
   };
 
-  // Handle delivery method change with modal for bus-park
   const handleDeliveryMethodChange = (method) => {
     if (method === 'bus-park') {
       setPendingDeliveryMethod(method);
@@ -142,14 +152,12 @@ const CheckoutPage = () => {
     }
   };
 
-  // Handle modal confirmation
   const handleBusParkModalConfirm = () => {
     setDeliveryMethod(pendingDeliveryMethod);
     setShowBusParkModal(false);
     setPendingDeliveryMethod(null);
   };
 
-  // Handle modal cancellation
   const handleBusParkModalCancel = () => {
     setShowBusParkModal(false);
     setPendingDeliveryMethod(null);
@@ -159,7 +167,6 @@ const CheckoutPage = () => {
     e.preventDefault();
     setNotification(null);
 
-    // Show bus park modal again if user is checking out with bus-park delivery
     if (deliveryMethod === 'bus-park') {
       setShowBusParkModal(true);
       return;
@@ -188,7 +195,6 @@ const CheckoutPage = () => {
     }
 
     try {
-      // The cart mapping is now handled inside initiateCheckout
       const result = await initiateCheckout(formData, deliveryMethod, cart, SUCCESS_REDIRECT_URL);
 
       if (result.code === 200 && result.authorization_url) {
@@ -219,7 +225,6 @@ const CheckoutPage = () => {
     }
   };
 
-  // Handle checkout from modal
   const handleBusParkCheckout = () => {
     setShowBusParkModal(false);
     processCheckout();
@@ -258,6 +263,22 @@ const CheckoutPage = () => {
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Checkout</h1>
           <p className="text-gray-600">Complete your order information below</p>
+          
+          {/* Delivery Discount Banner */}
+          {hasDeliveryDiscount && deliveryMethod !== 'pickup' && (
+            <div className="mt-4 mx-auto max-w-2xl">
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4">
+                <div className="flex items-center justify-center gap-2">
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                  </svg>
+                  <span className="text-green-800 font-semibold">
+                    🎉 Special Offer: {shippingDetails.discount_percent}% OFF Delivery Fees!
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -321,7 +342,7 @@ const CheckoutPage = () => {
                     </div>
                     <p className="text-xs text-gray-500 mb-2">Send using local bus park</p>
                     <p className="text-sm font-semibold text-pink-600">
-                      {isFetchingBusParkFee ? 'Loading...' : (busParkFee !== null ? formatPrice(busParkFee) : 'Unavailable')}
+                      {busParkFee ? formatPrice(busParkFee.delivery_fee) : 'Loading...'}
                     </p>
                   </div>
 
@@ -422,7 +443,6 @@ const CheckoutPage = () => {
                     {formErrors.phone && <p className="text-red-500 text-sm mt-1">{formErrors.phone}</p>}
                   </div>
 
-                  {/* START: Added Additional Phone Field */}
                   <div className="md:col-span-2">
                     <label htmlFor="additional_phone" className="block text-sm font-medium text-gray-700 mb-2">
                       Alternative Phone Number (Optional)
@@ -438,8 +458,6 @@ const CheckoutPage = () => {
                       disabled={isProcessingOrder} 
                     />
                   </div>
-                  {/* END: Added Additional Phone Field */}
-
                 </div>
               </div>
             </div>
@@ -614,10 +632,33 @@ const CheckoutPage = () => {
                       <span className="text-gray-600">Subtotal</span>
                       <span className="font-medium text-gray-900">{formatPrice(totalPrice)}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Shipping</span>
-                      <span className="font-medium text-gray-900">{getDeliveryPrice()}</span>
+                    
+                    {/* Delivery Fee with Discount */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Shipping</span>
+                        <span className="font-medium text-gray-900">{getDeliveryPrice()}</span>
+                      </div>
+                      
+                      {/* Show original price and discount if applicable */}
+                      {hasDeliveryDiscount && (
+                        <div className="pl-4 space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-500">Original Fee:</span>
+                            <span className="text-gray-500 line-through">{formatPrice(shippingDetails.original_delivery_fee)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-green-600 font-medium">
+                              Discount ({shippingDetails.discount_percent}%):
+                            </span>
+                            <span className="text-green-600 font-medium">
+                              -{formatPrice(shippingDetails.original_delivery_fee - shippingDetails.delivery_fee)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
+                    
                     <div className="border-t border-gray-200 pt-3">
                       <div className="flex justify-between text-base font-semibold">
                         <span className="text-gray-900">Total</span>
@@ -625,6 +666,15 @@ const CheckoutPage = () => {
                           {isCalculatingShipping ? 'Calculating...' : formatPrice(finalTotal)}
                         </span>
                       </div>
+                      
+                      {/* Total Savings Message */}
+                      {hasDeliveryDiscount && (
+                        <div className="mt-2 text-center">
+                          <p className="text-xs text-green-600 font-medium">
+                            🎉 You saved {formatPrice(shippingDetails.original_delivery_fee - shippingDetails.delivery_fee)} on delivery!
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

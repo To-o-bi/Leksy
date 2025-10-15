@@ -229,7 +229,9 @@ curl --location --request GET '{base_url}/api/fetch-delivery-fee?state={State|op
 {
 	"code": 200,
 	"message": "Delivery fee fetched for Alimosho!",
-	"delivery_fee": 3999
+	"delivery_fee": 3999,
+	"original_delivery_fee": 3999,
+	"discount_percent": 0
 }
 ```
 
@@ -247,7 +249,9 @@ curl --location --request GET '{base_url}/api/fetch-delivery-fees'
 	"delivery_fees": [
 		{
 			"state": "Abia",
-			"delivery_fee": 2999
+			"delivery_fee": 2999,
+			"original_delivery_fee": 2999,
+			"discount_percent": 0
 		},
 		...
 	]
@@ -269,7 +273,9 @@ curl --location --request GET '{base_url}/api/fetch-lgas-delivery-fees?state={St
 		{
 			"state": "Lagos",
 			"lga": "Epe",
-			"delivery_fee": 2999
+			"delivery_fee": 2999,
+			"original_delivery_fee": 2999,
+			"discount_percent": 0
 		},
 		...
 	]
@@ -287,7 +293,9 @@ curl --location --request GET '{base_url}/api/fetch-bus-park-delivery-fee'
 {
 	"code": 200,
 	"message": "Delivery fee fetched for Lagos Parks!",
-	"delivery_fee": 2000
+	"delivery_fee": 2000,
+	"original_delivery_fee": 2999,
+	"discount_percent": 0
 }
 ```
 

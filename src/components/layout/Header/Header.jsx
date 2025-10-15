@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useContext } from 'react';
 import { WishlistContext } from '../../../contexts/WishlistContext';
 import { useCart } from '../../../hooks/useCart';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import logo from '/assets/images/icons/leksy-logo.png';
 import CartDropdown from './CartDropdown';
 import WishlistDropdown from './WishlistDropdown';
@@ -12,8 +12,12 @@ const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [wishlistOpen, setWishlistOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname;
+  const searchInputRef = useRef(null);
   
   // Get cart from useCart hook
   const { cart, totalItems } = useCart();
@@ -42,7 +46,15 @@ const Header = () => {
     setMobileMenuOpen(false);
     setCartOpen(false);
     setWishlistOpen(false);
+    setSearchOpen(false);
   }, [location]);
+
+  // Focus search input when search opens
+  useEffect(() => {
+    if (searchOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [searchOpen]);
   
   // Check if current path matches nav item path
   const isActive = (path) => {
@@ -64,6 +76,7 @@ const Header = () => {
     e.preventDefault();
     setCartOpen(!cartOpen);
     if (wishlistOpen) setWishlistOpen(false);
+    if (searchOpen) setSearchOpen(false);
   };
 
   // Toggle wishlist dropdown
@@ -71,6 +84,31 @@ const Header = () => {
     e.preventDefault();
     setWishlistOpen(!wishlistOpen);
     if (cartOpen) setCartOpen(false);
+    if (searchOpen) setSearchOpen(false);
+  };
+
+  // Toggle search
+  const toggleSearch = (e) => {
+    e.preventDefault();
+    setSearchOpen(!searchOpen);
+    if (cartOpen) setCartOpen(false);
+    if (wishlistOpen) setWishlistOpen(false);
+    if (!searchOpen) {
+      setSearchQuery('');
+    }
+  };
+
+  // Handle search submission
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      // Navigate to shop page with search query
+      navigate('/shop', { 
+        state: { searchQuery: searchQuery.trim() } 
+      });
+      setSearchOpen(false);
+      setSearchQuery('');
+    }
   };
 
   return (
@@ -90,6 +128,36 @@ const Header = () => {
           
           {/* Actions */}
           <div className="flex items-center space-x-6">
+            {/* Search Input - Desktop */}
+            <form onSubmit={handleSearchSubmit} className="relative">
+              <input
+                type="text"
+                placeholder="Search for any product"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-300 transition-all duration-300"
+              />
+              <svg 
+                className="w-5 h-5 absolute left-3 top-2.5 text-gray-400 pointer-events-none" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              )}
+            </form>
+
             {/* Wishlist Button */}
             <button 
               onClick={toggleWishlist}
@@ -158,6 +226,17 @@ const Header = () => {
           
           {/* Mobile Actions */}
           <div className="flex items-center space-x-2 sm:space-x-3">
+            {/* Search Button (Mobile) */}
+            <button 
+              onClick={toggleSearch}
+              className={`relative p-1 ${searchOpen ? 'text-pink-500' : 'text-gray-600 active:text-pink-500'} touch-manipulation`}
+              aria-label="Search"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-7 sm:w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
+
             {/* Wishlist Button (Mobile) */}
             <button 
               onClick={toggleWishlist}
@@ -192,6 +271,72 @@ const Header = () => {
           </div>
         </div>
       </div>
+
+      {/* Search Dropdown - Desktop */}
+      {searchOpen && (
+        <div className="hidden lg:block absolute top-full left-0 right-0 bg-white shadow-lg border-t">
+          <div className="container mx-auto px-4 py-4">
+            <form onSubmit={handleSearchSubmit} className="max-w-2xl mx-auto">
+              <div className="relative">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search for products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-300 transition-colors"
+                />
+                <svg className="w-5 h-5 absolute left-4 top-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Search Dropdown - Mobile */}
+      {searchOpen && (
+        <div className="lg:hidden bg-white border-t px-3 py-3">
+          <form onSubmit={handleSearchSubmit}>
+            <div className="relative">
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-10 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-300 transition-colors"
+              />
+              <svg className="w-4 h-4 absolute left-3 top-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+      )}
       
       {/* Mobile & Tablet Navigation Menu Overlay */}
       <div 

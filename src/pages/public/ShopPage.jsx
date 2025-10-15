@@ -4,14 +4,14 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ProductGrid from '../../components/product/ProductGrid';
 import ProductFilters from '../../components/product/ProductFilters';
-import Breadcrumb from '../../components/common/Breadcrumb';
 import Pagination from '../../components/common/Pagination';
-import Loader from '../../components/common/Loader';
 import { fetchProducts, handleApiError, getCategoryDisplayName } from '../../utils/api';
+import { useRouteTransition } from '../../routes/RouteTransitionLoader';
 
 const ShopPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { endTransition } = useRouteTransition();
 
     const [products, setProducts] = useState([]);
     const [allProducts, setAllProducts] = useState([]);
@@ -26,16 +26,12 @@ const ShopPage = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [showMobileFilters, setShowMobileFilters] = useState(false);
     const [totalProductsCount, setTotalProductsCount] = useState(0);
-    const [imagesLoading, setImagesLoading] = useState(true);
-    const [loadedImages, setLoadedImages] = useState(new Set());
 
     const productsPerPage = 20;
 
     const fetchAndFilterProducts = useCallback(async (filters, search) => {
         setLoading(true);
         setError(null);
-        setImagesLoading(true);
-        setLoadedImages(new Set());
         
         try {
             const result = await fetchProducts({
@@ -65,6 +61,14 @@ const ShopPage = () => {
         fetchAndFilterProducts(selectedFilters, searchQuery);
     }, [selectedFilters, searchQuery, fetchAndFilterProducts]);
 
+    // Handle search query from navigation state
+    useEffect(() => {
+        if (location.state?.searchQuery) {
+            setSearchQuery(location.state.searchQuery);
+            navigate(location.pathname, { replace: true, state: {} });
+        }
+    }, [location.state?.searchQuery, location.pathname, navigate]);
+
     useEffect(() => {
         if (location.state?.concerns) {
             setSelectedFilters(prev => ({ ...prev, concerns: location.state.concerns }));
@@ -72,6 +76,7 @@ const ShopPage = () => {
         }
     }, [location.state, location.pathname, navigate]);
     
+    // Update products for current page
     useEffect(() => {
         const total = Math.ceil(totalProductsCount / productsPerPage);
         setTotalPages(total > 0 ? total : 1);
@@ -79,40 +84,18 @@ const ShopPage = () => {
         const endIndex = startIndex + productsPerPage;
         const currentProducts = allProducts.slice(startIndex, endIndex);
         setProducts(currentProducts);
-        
-        // Reset image loading state when products change
-        if (currentProducts.length > 0) {
-            setImagesLoading(true);
-            setLoadedImages(new Set());
-            
-            // Preload images for current page products
-            const imagePromises = currentProducts.map((product) => {
-                return new Promise((resolve) => {
-                    if (product.image) {
-                        const img = new Image();
-                        img.onload = () => {
-                            setLoadedImages(prev => new Set([...prev, product.id]));
-                            resolve();
-                        };
-                        img.onerror = () => resolve(); // Still resolve on error to not block loading
-                        img.src = product.image;
-                    } else {
-                        resolve();
-                    }
-                });
-            });
-            
-            // Set images as loaded when all are done (or timeout after 3 seconds)
-            Promise.allSettled([
-                ...imagePromises,
-                new Promise(resolve => setTimeout(resolve, 3000))
-            ]).then(() => {
-                setImagesLoading(false);
-            });
-        } else {
-            setImagesLoading(false);
-        }
     }, [allProducts, currentPage, totalProductsCount, productsPerPage]);
+
+    // End route transition when products are loaded
+    useEffect(() => {
+        if (!loading && products.length >= 0) {
+            // Small delay to ensure DOM is rendered
+            const timer = setTimeout(() => {
+                endTransition();
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [loading, products, endTransition]);
 
     const handleSearchChange = useCallback((e) => {
         setSearchQuery(e.target.value);
@@ -132,7 +115,25 @@ const ShopPage = () => {
         setSearchQuery('');
     }, []);
 
-    // Product Grid with Skeleton Loading
+    // Skeleton loading component for initial load
+    const ProductGridSkeleton = () => {
+        return (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-4">
+                {Array.from({ length: 8 }).map((_, index) => (
+                    <div key={index} className="bg-white rounded-lg shadow-sm border animate-pulse">
+                        <div className="aspect-square bg-gray-200 rounded-t-lg"></div>
+                        <div className="p-3">
+                            <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                            <div className="h-3 bg-gray-200 rounded mb-2 w-3/4"></div>
+                            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
+    // Product Grid with Loading State
     const ProductGridWithLoading = () => {
         if (loading && products.length === 0) {
             return <ProductGridSkeleton />;
@@ -158,50 +159,8 @@ const ShopPage = () => {
             );
         }
 
-        return (
-            <div className="relative">
-                {imagesLoading && (
-                    <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-md">
-                        <div className="text-center">
-                            <Loader />
-                            <p className="mt-2 text-sm text-gray-600">Loading images...</p>
-                        </div>
-                    </div>
-                )}
-                <ProductGrid 
-                    products={products} 
-                    loadedImages={loadedImages}
-                    showSkeletons={imagesLoading}
-                />
-            </div>
-        );
+        return <ProductGrid products={products} />;
     };
-
-    // Skeleton loading component for product grid
-    const ProductGridSkeleton = () => {
-        return (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-4">
-                {Array.from({ length: productsPerPage }).map((_, index) => (
-                    <div key={index} className="bg-white rounded-lg shadow-sm border animate-pulse">
-                        <div className="aspect-square bg-gray-200 rounded-t-lg"></div>
-                        <div className="p-3">
-                            <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                            <div className="h-3 bg-gray-200 rounded mb-2 w-3/4"></div>
-                            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        );
-    };
-    
-    if (loading && products.length === 0) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <Loader />
-            </div>
-        );
-    }
     
     const hasActiveFilters = selectedFilters.category || selectedFilters.concerns.length > 0 || searchQuery.trim();
 
@@ -218,6 +177,7 @@ const ShopPage = () => {
                                 src="/assets/images/hero/shop-3.png" 
                                 alt="Shop Hero" 
                                 className="w-full h-full object-cover object-right"
+                                loading="eager"
                             />
                             {/* Overlay for better text readability - stronger on the left */}
                             <div className="absolute inset-0 bg-gradient-to-r from-pink-100/80 via-pink-100/50 to-transparent"></div>
@@ -273,6 +233,7 @@ const ShopPage = () => {
                                     src="/assets/images/hero/shop-3.png" 
                                     alt="Shop Hero" 
                                     className="w-full h-auto object-cover rounded-lg md:rounded-l-full md:rounded-r-none"
+                                    loading="eager"
                                 />
                             </div>
                         </div>

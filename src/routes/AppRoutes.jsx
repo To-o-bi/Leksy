@@ -5,8 +5,9 @@ import ProtectedRoute from './ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
 import { RouteTransitionProvider } from './RouteTransitionLoader';
 
-// Import critical pages directly (no lazy loading)
+// Import critical pages directly (no lazy loading) - SHOP PAGE ADDED HERE
 import ProductDetailPage from '../pages/public/ProductDetailPage';
+import ShopPage from '../pages/public/ShopPage'; // ← CRITICAL: Load shop page eagerly
 
 const ScrollRevealLayout = memo(() => {
   useEffect(() => {
@@ -62,11 +63,10 @@ const LoadingFallback = memo(() => (
 
 LoadingFallback.displayName = 'LoadingFallback';
 
-// Lazy load non-critical pages
+// Lazy load non-critical pages (REMOVED ShopPage from here)
 const publicPages = {
   LoginPage: lazy(() => import('../pages/public/LoginPage')),
   HomePage: lazy(() => import('../pages/public/HomePage')),
-  ShopPage: lazy(() => import('../pages/public/ShopPage')),
   CartPage: lazy(() => import('../pages/public/CartPage')),
   ContactPage: lazy(() => import('../pages/public/ContactPage')),
   CheckoutPage: lazy(() => import('../pages/public/CheckoutPage')),
@@ -121,16 +121,13 @@ const AppRoutes = () => {
     return () => clearTimeout(timer);
   }, [location.pathname]);
 
-  // Preload critical components on app startup
+  // Preload critical components on app startup - REMOVED ShopPage from here since it's now eager
   useEffect(() => {
-    // Preload important pages that users frequently navigate to
     const preloadPages = () => {
       import('../pages/public/CartPage');
       import('../pages/public/CheckoutPage');
-      import('../pages/public/ShopPage');
     };
     
-    // Delay preloading to not interfere with initial load
     setTimeout(preloadPages, 2000);
   }, []);
 
@@ -149,7 +146,9 @@ const AppRoutes = () => {
           <Route element={<ScrollRevealLayout />}>
             <Route element={<PublicRoutes />}>
               <Route index element={<publicPages.HomePage />} />
-              <Route path="/shop" element={<publicPages.ShopPage />} />
+              
+              {/* ShopPage - No lazy loading for instant navigation */}
+              <Route path="/shop" element={<ShopPage />} />
               
               {/* ProductDetail - No lazy loading for instant navigation */}
               <Route path="/product/:productId" element={<ProductDetailPage />} />

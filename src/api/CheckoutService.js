@@ -30,15 +30,13 @@ export const initiateCheckout = async (formData, deliveryMethod, cart, successRe
   searchParams.append('email', formData.email);
   searchParams.append('phone', formData.phone);
   
-  // START: Corrected logic for additional_phone and added additional_details
   if (formData.additional_phone && formData.additional_phone.trim() !== '') {
     searchParams.append('additional_phone', formData.additional_phone);
   }
-  // The API uses `additional_details` for order notes.
+  
   if (formData.notes && formData.notes.trim() !== '') {
     searchParams.append('additional_details', formData.notes);
   }
-  // END: Corrected logic
 
   searchParams.append('delivery_method', deliveryMethod);
   searchParams.append('cart', JSON.stringify(cartForAPI));
@@ -81,7 +79,6 @@ export const validateCheckoutForm = (formData, deliveryMethod) => {
   if (!formData.name.trim()) errors.name = 'Name is required';
   if (!/\S+@\S+\.\S+/.test(formData.email)) errors.email = 'Email is invalid';
   if (!formData.phone.trim()) errors.phone = 'Phone number is required';
-  // Note: additional_phone is optional, so no validation is needed here.
   if (deliveryMethod === 'address') {
     if (!formData.state) errors.state = 'State is required';
     if (!formData.city) errors.city = 'City/LGA is required';
@@ -122,6 +119,109 @@ export const fetchBusParkDeliveryFee = async () => {
   } catch (error) {
     return 2000; // Fallback
   }
+};
+
+/**
+ * Fetches the active delivery discount from the API
+ * @returns {Promise<Object|null>} Delivery discount data or null
+ */
+export const fetchDeliveryDiscount = async () => {
+  try {
+    console.log('🔍 Fetching delivery discount...');
+    
+    // Using the existing backend API endpoint (no authentication needed for public access)
+    const formBody = new URLSearchParams({ action: 'fetch' }).toString();
+    
+    const response = await fetch(`${BASE_URL}/api/admin/manage-delivery-discount`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formBody
+    });
+    
+    const result = await response.json();
+    
+    console.log('📦 Delivery discount response:', result);
+    
+    if (result.code === 200 && result.discount_data) {
+      const discount = result.discount_data;
+      
+      // Check if discount is active
+      const isActive = discount.isActive === 1 || discount.isActive === '1' || discount.isActive === true;
+      if (!isActive) {
+        console.log('⚠️ Delivery discount is not active');
+        return null;
+      }
+      
+      // Check date range
+      const now = new Date();
+      const validFrom = new Date(discount.valid_from);
+      const validTo = new Date(discount.valid_to);
+      validTo.setHours(23, 59, 59, 999);
+      
+      if (now < validFrom || now > validTo) {
+        console.log('⚠️ Delivery discount is not within valid date range');
+        return null;
+      }
+      
+      console.log('✅ Active delivery discount found:', discount);
+      return discount;
+    }
+    
+    console.log('ℹ️ No delivery discount available');
+    return null;
+  } catch (error) {
+    console.error('❌ Error fetching delivery discount:', error);
+    return null;
+  }
+};
+
+/**
+ * Calculates the discounted delivery fee
+ * @param {number} deliveryFee - Original delivery fee
+ * @param {Object} discount - Delivery discount object
+ * @returns {Object|null} Discount calculation result or null
+ */
+export const calculateDeliveryDiscount = (deliveryFee, discount) => {
+  if (!discount || !deliveryFee || deliveryFee === 0) {
+    return null;
+  }
+
+  // Check if discount is active
+  const isActive = discount.isActive === 1 || discount.isActive === '1' || discount.isActive === true;
+  if (!isActive) {
+    console.log('⚠️ Discount is not active');
+    return null;
+  }
+
+  // Check date range
+  const now = new Date();
+  const validFrom = new Date(discount.valid_from);
+  const validTo = new Date(discount.valid_to);
+  validTo.setHours(23, 59, 59, 999);
+
+  if (now < validFrom || now > validTo) {
+    console.log('⚠️ Discount is outside valid date range');
+    return null;
+  }
+
+  const discountPercent = parseFloat(discount.discount_percent) || 0;
+  const originalFee = parseFloat(deliveryFee) || 0;
+  const discountAmount = originalFee * (discountPercent / 100);
+  const discountedFee = originalFee - discountAmount;
+
+  const result = {
+    originalFee,
+    discountedFee: Math.max(0, discountedFee),
+    discountPercent,
+    savings: discountAmount,
+    validUntil: discount.valid_to,
+    isFirstTimeOnly: discount.isFirstTimeOnly === 1 || discount.isFirstTimeOnly === '1' || discount.isFirstTimeOnly === true
+  };
+
+  console.log('💰 Delivery discount calculation:', result);
+  return result;
 };
 
 export const getSuccessRedirectUrl = () => `${window.location.origin}/checkout/checkout-success`;
