@@ -207,7 +207,7 @@ const EditProductPage = () => {
 
         const changes = {
             name: formData.name !== originalData.name,
-            price: parseFloat(formData.price) !== originalData.price,
+            price: parseFloat(formData.price) !== originalData.original_price,
             slashed_price: parseFloat(formData.slashed_price || 0) !== (originalData.slashed_price || 0),
             description: formData.description !== originalData.description,
             quantity: parseInt(formData.quantity, 10) !== originalData.available_qty,
@@ -251,9 +251,11 @@ const EditProductPage = () => {
                 const decodedName = decodeHtmlEntities(productData.name || '');
                 const decodedDescription = decodeHtmlEntities(productData.description || '');
 
+                // CRITICAL: Use original_price, not price (which is discounted)
+                const originalPrice = parseFloat(productData.original_price) || parseFloat(productData.price) || 0;
+
                 let fetchedConcerns = [];
                 if (typeof productData.concern_options === 'string') { 
-                    // Handle empty string, "others", or whitespace
                     const trimmed = productData.concern_options.trim().toLowerCase();
                     if (trimmed === '' || trimmed === 'others') {
                         fetchedConcerns = [];
@@ -261,7 +263,6 @@ const EditProductPage = () => {
                         try { 
                             const parsed = JSON.parse(productData.concern_options); 
                             if (Array.isArray(parsed)) {
-                                // Filter out "others" from parsed array
                                 fetchedConcerns = parsed.filter(c => c && c.toLowerCase() !== 'others');
                             } else {
                                 fetchedConcerns = [];
@@ -271,7 +272,6 @@ const EditProductPage = () => {
                         } 
                     }
                 } else if (Array.isArray(productData.concern_options)) { 
-                    // Filter out "others" from array
                     fetchedConcerns = productData.concern_options.filter(c => c && c.toLowerCase() !== 'others'); 
                 } else if (productData.concern_options === null || productData.concern_options === undefined) {
                     fetchedConcerns = [];
@@ -283,14 +283,15 @@ const EditProductPage = () => {
                     ...productData, 
                     name: decodedName,
                     description: decodedDescription,
-                    concern_options: fetchedConcerns
+                    concern_options: fetchedConcerns,
+                    original_price: originalPrice
                 };
                 
                 setOriginalData(fullOriginalData);
 
                 const newFormData = {
                     name: decodedName,
-                    price: productData.price?.toString() || '',
+                    price: originalPrice.toString(),
                     slashed_price: productData.slashed_price?.toString() || '',
                     category: productData.category || '',
                     quantity: productData.available_qty?.toString() || '',
@@ -420,12 +421,11 @@ const EditProductPage = () => {
 
         try {
             const productData = {}; 
-            const areArraysEqual = (a, b) => (a || []).sort().join() === (b || []).sort().join();
 
             if (formData.name !== originalData.name) {
                 productData.name = formData.name.trim();
             }
-            if (parseFloat(formData.price) !== originalData.price) {
+            if (parseFloat(formData.price) !== originalData.original_price) {
                 productData.price = parseFloat(formData.price);
             }
             if (formData.description !== originalData.description) {
@@ -439,7 +439,6 @@ const EditProductPage = () => {
             }
 
             // Always send concern_options to ensure backend updates it properly
-            // Send "others" if no concerns selected, otherwise send the array
             productData.concern_options = formData.concern_options.length === 0 
                 ? "others" 
                 : formData.concern_options;
@@ -563,7 +562,7 @@ const EditProductPage = () => {
                                     disabled={submitting} 
                                 />
                                 <FormField 
-                                    label="Current Price" 
+                                    label="Original Price" 
                                     name="price" 
                                     type="number" 
                                     required 

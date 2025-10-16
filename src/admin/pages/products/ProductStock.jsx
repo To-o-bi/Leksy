@@ -286,6 +286,16 @@ const ProductStockPage = () => {
     return 'bg-green-100 text-green-800';
   };
 
+  // Check if product has an active discount
+  const hasDiscount = (product) => {
+    const isApplied = product.isAppliedDiscount === true || product.isAppliedDiscount === 'true';
+    const discountPercent = parseFloat(product.discount_percent) || 0;
+    const price = parseFloat(product.price) || 0;
+    const originalPrice = parseFloat(product.original_price) || price;
+    
+    return isApplied && discountPercent > 0 && price < originalPrice;
+  };
+
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage);
@@ -415,51 +425,74 @@ const ProductStockPage = () => {
         ) : (
           <>
             <div className="space-y-4">
-              {currentProducts.map((product) => (
-                <div key={product.product_id} id={`product-row-${product.product_id}`} className={`bg-white rounded-lg border p-4 ${targetedProductId === product.product_id ? 'bg-blue-50 ring-2 ring-blue-200' : ''}`}>
-                  <div className="flex items-start space-x-3">
-                    {isSelectionMode && (
-                      <input
-                        type="checkbox"
-                        checked={selectedProducts.has(product.product_id)}
-                        onChange={() => handleProductSelect(product.product_id)}
-                        className="rounded mt-1"
+              {currentProducts.map((product) => {
+                const productHasDiscount = hasDiscount(product);
+                const originalPrice = parseFloat(product.original_price) || parseFloat(product.price);
+                const discountedPrice = parseFloat(product.price);
+
+                return (
+                  <div key={product.product_id} id={`product-row-${product.product_id}`} className={`bg-white rounded-lg border p-4 ${targetedProductId === product.product_id ? 'bg-blue-50 ring-2 ring-blue-200' : ''}`}>
+                    <div className="flex items-start space-x-3">
+                      {isSelectionMode && (
+                        <input
+                          type="checkbox"
+                          checked={selectedProducts.has(product.product_id)}
+                          onChange={() => handleProductSelect(product.product_id)}
+                          className="rounded mt-1"
+                        />
+                      )}
+                      <img
+                        src={product.images?.[0] || '/placeholder.jpg'}
+                        alt={decodeHtmlEntities(product.name)}
+                        className="w-16 h-16 object-cover rounded-md flex-shrink-0"
                       />
-                    )}
-                    <img
-                      src={product.images?.[0] || '/placeholder.jpg'}
-                      alt={decodeHtmlEntities(product.name)}
-                      className="w-16 h-16 object-cover rounded-md flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-gray-900 truncate">{decodeHtmlEntities(product.name)}</h3>
-                      <p className="text-sm text-gray-600 capitalize mb-1">{product.category}</p>
-                      <p className="font-medium text-lg">{formatPrice(product.price)}</p>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStockColor(product.available_qty)}`}>
-                          Stock: {Math.max(0, parseInt(product.available_qty, 10) || 0)}
-                        </span>
-                        {!isSelectionMode && (
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => navigate(`/admin/products/edit/${product.product_id}`)}
-                              className="text-gray-500 hover:text-gray-700 p-2"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button
-                              onClick={() => { setActiveProduct(product); setShowDeleteModal(true); }}
-                              className="text-gray-500 hover:text-red-500 p-2"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-900 truncate">{decodeHtmlEntities(product.name)}</h3>
+                        <p className="text-sm text-gray-600 capitalize mb-1">{product.category}</p>
+                        
+                        {/* Price Display */}
+                        <div className="mb-2">
+                          <p className="text-sm text-gray-600">Original: {formatPrice(originalPrice)}</p>
+                          {productHasDiscount ? (
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-green-600 font-semibold text-base">
+                                {formatPrice(discountedPrice)}
+                              </span>
+                              <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
+                                {product.discount_percent}% OFF
+                              </span>
+                            </div>
+                          ) : (
+                            <p className="text-gray-400 text-sm mt-1">No discount</p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between mt-2">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStockColor(product.available_qty)}`}>
+                            Stock: {Math.max(0, parseInt(product.available_qty, 10) || 0)}
+                          </span>
+                          {!isSelectionMode && (
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={() => navigate(`/admin/products/edit/${product.product_id}`)}
+                                className="text-gray-500 hover:text-gray-700 p-2"
+                              >
+                                <Edit size={16} />
+                              </button>
+                              <button
+                                onClick={() => { setActiveProduct(product); setShowDeleteModal(true); }}
+                                className="text-gray-500 hover:text-red-500 p-2"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {!isLoading && filteredProducts.length > 0 && totalPages > 1 && (
@@ -506,17 +539,18 @@ const ProductStockPage = () => {
                 <th className="px-3 lg:px-4 py-3 text-left text-sm font-medium text-gray-500 w-20">Image</th>
                 <th className="px-3 lg:px-4 py-3 text-left text-sm font-medium text-gray-500 min-w-[150px]">Product</th>
                 <th className="px-3 lg:px-4 py-3 text-left text-sm font-medium text-gray-500 min-w-[100px]">Category</th>
-                <th className="px-3 lg:px-4 py-3 text-left text-sm font-medium text-gray-500 min-w-[100px]">Price</th>
+                <th className="px-3 lg:px-4 py-3 text-left text-sm font-medium text-gray-500 min-w-[110px]">Original Price</th>
+                <th className="px-3 lg:px-4 py-3 text-left text-sm font-medium text-gray-500 min-w-[110px]">Discount Price</th>
                 <th className="px-3 lg:px-4 py-3 text-left text-sm font-medium text-gray-500 min-w-[80px]">Stock</th>
                 <th className="px-3 lg:px-4 py-3 text-left text-sm font-medium text-gray-500 w-24">Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={isSelectionMode ? 7 : 6} className="text-center p-8"><Loader /></td></tr>
+                <tr><td colSpan={isSelectionMode ? 8 : 7} className="text-center p-8"><Loader /></td></tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={isSelectionMode ? 7 : 6} className="text-center p-8">
+                  <td colSpan={isSelectionMode ? 8 : 7} className="text-center p-8">
                     <ShoppingBag size={48} className="mx-auto text-gray-300 mb-4" />
                     <p className="text-gray-500">{searchQuery || selectedCategory !== 'all' ? 'No products match your search.' : 'No products found'}</p>
                     {(searchQuery || selectedCategory !== 'all') && (
@@ -533,40 +567,56 @@ const ProductStockPage = () => {
                   </td>
                 </tr>
               ) : (
-                currentProducts.map((product) => (
-                  <tr key={product.product_id} id={`product-row-${product.product_id}`} className={`border-b hover:bg-gray-50 ${targetedProductId === product.product_id ? 'bg-blue-50 ring-2 ring-blue-200' : ''}`}>
-                    {isSelectionMode && (
+                currentProducts.map((product) => {
+                  const productHasDiscount = hasDiscount(product);
+                  const originalPrice = parseFloat(product.original_price) || parseFloat(product.price);
+                  const discountedPrice = parseFloat(product.price);
+
+                  return (
+                    <tr key={product.product_id} id={`product-row-${product.product_id}`} className={`border-b hover:bg-gray-50 ${targetedProductId === product.product_id ? 'bg-blue-50 ring-2 ring-blue-200' : ''}`}>
+                      {isSelectionMode && (
+                        <td className="px-3 lg:px-4 py-3">
+                          <input type="checkbox" checked={selectedProducts.has(product.product_id)} onChange={() => handleProductSelect(product.product_id)} className="rounded" />
+                        </td>
+                      )}
                       <td className="px-3 lg:px-4 py-3">
-                        <input type="checkbox" checked={selectedProducts.has(product.product_id)} onChange={() => handleProductSelect(product.product_id)} className="rounded" />
+                        <img src={product.images?.[0] || '/placeholder.jpg'} alt={decodeHtmlEntities(product.name)} className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded-md" />
                       </td>
-                    )}
-                    <td className="px-3 lg:px-4 py-3">
-                      <img src={product.images?.[0] || '/placeholder.jpg'} alt={decodeHtmlEntities(product.name)} className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded-md" />
-                    </td>
-                    <td className="px-3 lg:px-4 py-3 font-medium text-gray-900">
-                      <div className="truncate max-w-[150px] sm:max-w-[200px] lg:max-w-none">{decodeHtmlEntities(product.name)}</div>
-                    </td>
-                    <td className="px-3 lg:px-4 py-3 text-gray-600">
-                      <div className="capitalize truncate">{product.category}</div>
-                    </td>
-                    <td className="px-3 lg:px-4 py-3 font-medium">{formatPrice(product.price)}</td>
-                    <td className="px-3 lg:px-4 py-3">
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStockColor(product.available_qty)}`}>
-                        {Math.max(0, parseInt(product.available_qty, 10) || 0)}
-                      </span>
-                    </td>
-                    <td className="px-3 lg:px-4 py-3">
-                      <div className="flex space-x-2 sm:space-x-3">
-                        <button onClick={() => navigate(`/admin/products/edit/${product.product_id}`)} disabled={isSelectionMode} className="text-gray-500 hover:text-gray-700 p-1">
-                          <Edit size={14} className="sm:w-4 sm:h-4" />
-                        </button>
-                        <button onClick={() => { setActiveProduct(product); setShowDeleteModal(true); }} disabled={isSelectionMode} className="text-gray-500 hover:text-red-500 p-1">
-                          <Trash2 size={14} className="sm:w-4 sm:h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      <td className="px-3 lg:px-4 py-3 font-medium text-gray-900">
+                        <div className="truncate max-w-[150px] sm:max-w-[200px] lg:max-w-none">{decodeHtmlEntities(product.name)}</div>
+                      </td>
+                      <td className="px-3 lg:px-4 py-3 text-gray-600">
+                        <div className="capitalize truncate">{product.category}</div>
+                      </td>
+                      <td className="px-3 lg:px-4 py-3 font-medium">{formatPrice(originalPrice)}</td>
+                      <td className="px-3 lg:px-4 py-3">
+                        {productHasDiscount ? (
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-green-600">{formatPrice(discountedPrice)}</span>
+                            <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded">{product.discount_percent}%</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-sm">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 lg:px-4 py-3">
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStockColor(product.available_qty)}`}>
+                          {Math.max(0, parseInt(product.available_qty, 10) || 0)}
+                        </span>
+                      </td>
+                      <td className="px-3 lg:px-4 py-3">
+                        <div className="flex space-x-2 sm:space-x-3">
+                          <button onClick={() => navigate(`/admin/products/edit/${product.product_id}`)} disabled={isSelectionMode} className="text-gray-500 hover:text-gray-700 p-1">
+                            <Edit size={14} className="sm:w-4 sm:h-4" />
+                          </button>
+                          <button onClick={() => { setActiveProduct(product); setShowDeleteModal(true); }} disabled={isSelectionMode} className="text-gray-500 hover:text-red-500 p-1">
+                            <Trash2 size={14} className="sm:w-4 sm:h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

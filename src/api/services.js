@@ -244,7 +244,6 @@ export const productService = {
   }
 };
 
-
 // Contact Service
 export const contactService = {
   async submit(contactData) {
