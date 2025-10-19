@@ -88,140 +88,87 @@ export const validateCheckoutForm = (formData, deliveryMethod) => {
   return errors;
 };
 
-export const fetchDeliveryFeeForState = async (state) => {
+/**
+ * Fetches delivery fee for a single state or LGA
+ * Backend returns: { code, message, delivery_fee, original_delivery_fee, discount_percent }
+ */
+export const fetchDeliveryFeeForState = async (state, lga = null) => {
   try {
-    const response = await fetch(`${BASE_URL}/api/fetch-delivery-fee?state=${encodeURIComponent(state)}`);
+    let url = `${BASE_URL}/api/fetch-delivery-fee?state=${encodeURIComponent(state)}`;
+    if (lga) {
+      url += `&lga=${encodeURIComponent(lga)}`;
+    }
+    
+    const response = await fetch(url);
     const result = await response.json();
-    if (result.code === 200) return result.delivery_fee;
-    return 5000; // Fallback
+    
+    console.log('📦 Delivery fee response for state:', state, result);
+    
+    if (result.code === 200) {
+      return {
+        delivery_fee: parseFloat(result.delivery_fee) || 0,
+        original_delivery_fee: parseFloat(result.original_delivery_fee) || parseFloat(result.delivery_fee) || 0,
+        discount_percent: parseFloat(result.discount_percent) || 0
+      };
+    }
+    
+    // Fallback
+    return { delivery_fee: 5000, original_delivery_fee: 5000, discount_percent: 0 };
   } catch (error) {
-    return 5000; // Fallback
+    console.error('❌ Error fetching delivery fee:', error);
+    return { delivery_fee: 5000, original_delivery_fee: 5000, discount_percent: 0 };
   }
 };
 
+/**
+ * Fetches LGA delivery fees for Lagos state
+ * Backend returns array with: { state, lga, delivery_fee, original_delivery_fee, discount_percent }
+ */
 export const fetchLGADeliveryFees = async (state) => {
   try {
     const response = await fetch(`${BASE_URL}/api/fetch-lgas-delivery-fees?state=${encodeURIComponent(state)}`);
     const result = await response.json();
-    if (result.code === 200) return result.delivery_fees;
+    
+    if (result.code === 200 && result.delivery_fees) {
+      return result.delivery_fees.map(fee => ({
+        lga: fee.lga,
+        state: fee.state,
+        delivery_fee: fee.delivery_fee || 0,
+        original_delivery_fee: fee.original_delivery_fee || fee.delivery_fee || 0,
+        discount_percent: fee.discount_percent || 0
+      }));
+    }
+    
     return [];
   } catch (error) {
+    console.error('Error fetching LGA delivery fees:', error);
     return [];
   }
 };
 
+/**
+ * Fetches bus park delivery fee
+ * Backend returns: { delivery_fee, original_delivery_fee, discount_percent }
+ */
 export const fetchBusParkDeliveryFee = async () => {
   try {
     const response = await fetch(`${BASE_URL}/api/fetch-bus-park-delivery-fee`);
     const result = await response.json();
-    if (result.code === 200) return result.delivery_fee;
-    return 2000; // Fallback
-  } catch (error) {
-    return 2000; // Fallback
-  }
-};
-
-/**
- * Fetches the active delivery discount from the API
- * @returns {Promise<Object|null>} Delivery discount data or null
- */
-export const fetchDeliveryDiscount = async () => {
-  try {
-    console.log('🔍 Fetching delivery discount...');
     
-    // Using the existing backend API endpoint (no authentication needed for public access)
-    const formBody = new URLSearchParams({ action: 'fetch' }).toString();
-    
-    const response = await fetch(`${BASE_URL}/api/admin/manage-delivery-discount`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formBody
-    });
-    
-    const result = await response.json();
-    
-    console.log('📦 Delivery discount response:', result);
-    
-    if (result.code === 200 && result.discount_data) {
-      const discount = result.discount_data;
-      
-      // Check if discount is active
-      const isActive = discount.isActive === 1 || discount.isActive === '1' || discount.isActive === true;
-      if (!isActive) {
-        console.log('⚠️ Delivery discount is not active');
-        return null;
-      }
-      
-      // Check date range
-      const now = new Date();
-      const validFrom = new Date(discount.valid_from);
-      const validTo = new Date(discount.valid_to);
-      validTo.setHours(23, 59, 59, 999);
-      
-      if (now < validFrom || now > validTo) {
-        console.log('⚠️ Delivery discount is not within valid date range');
-        return null;
-      }
-      
-      console.log('✅ Active delivery discount found:', discount);
-      return discount;
+    if (result.code === 200) {
+      return {
+        delivery_fee: result.delivery_fee || 0,
+        original_delivery_fee: result.original_delivery_fee || result.delivery_fee || 0,
+        discount_percent: result.discount_percent || 0
+      };
     }
     
-    console.log('ℹ️ No delivery discount available');
-    return null;
+    // Fallback
+    return { delivery_fee: 2000, original_delivery_fee: 2000, discount_percent: 0 };
   } catch (error) {
-    console.error('❌ Error fetching delivery discount:', error);
-    return null;
+    console.error('Error fetching bus park delivery fee:', error);
+    return { delivery_fee: 2000, original_delivery_fee: 2000, discount_percent: 0 };
   }
-};
-
-/**
- * Calculates the discounted delivery fee
- * @param {number} deliveryFee - Original delivery fee
- * @param {Object} discount - Delivery discount object
- * @returns {Object|null} Discount calculation result or null
- */
-export const calculateDeliveryDiscount = (deliveryFee, discount) => {
-  if (!discount || !deliveryFee || deliveryFee === 0) {
-    return null;
-  }
-
-  // Check if discount is active
-  const isActive = discount.isActive === 1 || discount.isActive === '1' || discount.isActive === true;
-  if (!isActive) {
-    console.log('⚠️ Discount is not active');
-    return null;
-  }
-
-  // Check date range
-  const now = new Date();
-  const validFrom = new Date(discount.valid_from);
-  const validTo = new Date(discount.valid_to);
-  validTo.setHours(23, 59, 59, 999);
-
-  if (now < validFrom || now > validTo) {
-    console.log('⚠️ Discount is outside valid date range');
-    return null;
-  }
-
-  const discountPercent = parseFloat(discount.discount_percent) || 0;
-  const originalFee = parseFloat(deliveryFee) || 0;
-  const discountAmount = originalFee * (discountPercent / 100);
-  const discountedFee = originalFee - discountAmount;
-
-  const result = {
-    originalFee,
-    discountedFee: Math.max(0, discountedFee),
-    discountPercent,
-    savings: discountAmount,
-    validUntil: discount.valid_to,
-    isFirstTimeOnly: discount.isFirstTimeOnly === 1 || discount.isFirstTimeOnly === '1' || discount.isFirstTimeOnly === true
-  };
-
-  console.log('💰 Delivery discount calculation:', result);
-  return result;
 };
 
 export const getSuccessRedirectUrl = () => `${window.location.origin}/checkout/checkout-success`;

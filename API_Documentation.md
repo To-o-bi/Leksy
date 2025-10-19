@@ -1202,7 +1202,8 @@ curl --location --request POST '{base_url}/api/admin/manage-discounts?action=fet
 }
 ```
 
-## Fetch A Discount
+
+## Fetch A Discount (By discount_id)
 
 ```CURL
 curl --location --request POST '{base_url}/api/admin/manage-discounts?action=fetch&discount_id={discount_id}' \
@@ -1227,6 +1228,37 @@ curl --location --request POST '{base_url}/api/admin/manage-discounts?action=fet
 	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30e4ff13e3"
 }
 ```
+
+
+## Fetch Discounts (By category)
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/manage-discounts?action=fetch&category={category}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Discount data fetched successfully!",
+	"discount_data": [
+		 {
+         "id": 1,
+         "category": "serums",
+         "discount_percent": "20.00",
+         "isFirstTimeOnly": 0,
+         "valid_from": "2025-06-25",
+         "valid_to": "2025-06-25",
+         "isActive": 1,
+         "created_at": "2025-10-06 00:09:26",
+         "modified_at": "2025-10-06 00:17:38"
+      },
+		...
+	],
+	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30e4ff13e3"
+}
+```
+
 
 ## Add A Discount
 
@@ -1254,6 +1286,7 @@ curl --location --request POST '{base_url}/api/admin/manage-discounts?action=add
 }
 ```
 
+
 ## Edit A Discount
 
 ```CURL
@@ -1280,6 +1313,7 @@ curl --location --request POST '{base_url}/api/admin/manage-discounts?action=edi
 }
 ```
 
+
 ## Delete A Discount
 
 ```CURL
@@ -1296,22 +1330,56 @@ curl --location --request POST '{base_url}/api/admin/manage-discounts?action=del
 ```
 
 
+
 # DELIVERY DISCOUNT (I.E, A SINGLE DISCOUNT THAT APPLIES TO ALL DELIVERY FEES)
 
-## Fetch Delivery Discount
+## Fetch All Delivery Discounts
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/manage-delivery-discount?action=fetch' \
+curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?action=fetch' \
 --header 'Authorization: Bearer {token}'
 ```
 
 ```JSON
 {
 	"code": 200,
-	"message": "Discount data fetched successfully!",
+	"message": "Delivery discount data returned 3 results",
+	"discount_data": [
+		{
+			"id": 1,
+			"state": "ogun",
+			"discount_percent": "10.00",
+			"min_order_price_trigger": 4000,
+			"isFirstTimeOnly": 1,
+			"valid_from": "2025-06-25",
+			"valid_to": "2025-06-25",
+			"isActive": 1,
+			"created_at": "2025-10-06 00:09:26",
+			"modified_at": "2025-10-06 00:17:38"
+		},
+		...
+	],
+	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30d9ef2db9"
+}
+```
+
+
+## Fetch A Delivery Discounts (By discount_id)
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?action=fetch&discount_id={discount_id}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Delivery discount data fetched successfully!",
 	"discount_data": {
-		"category": "delivery",
+		"id": 3,
+		"state": "ogun",
 		"discount_percent": "10.00",
+		"min_order_price_trigger": 4000,
 		"isFirstTimeOnly": 1,
 		"valid_from": "2025-06-25",
 		"valid_to": "2025-06-25",
@@ -1323,20 +1391,80 @@ curl --location --request POST '{base_url}/api/admin/manage-delivery-discount?ac
 }
 ```
 
-## Create Delivery Discount (i.e if not already exists. If it does, please edit instead)
+
+## Fetch Delivery Discounts (By state)
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/manage-delivery-discount?action=create&discount_percent={numeric|float:0-100}&valid_from={valid_date_format:yyyy-mm-dd}&valid_to={valid_date_format:yyyy-mm-dd}&isFirstTimeOnly={boolean|optional|default:true}&isActive={boolean|optional|default:true}' \
+curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?action=fetch&state={state}' \
 --header 'Authorization: Bearer {token}'
 ```
 
 ```JSON
 {
 	"code": 200,
-	"message": "Discount data added successfully!",
+	"message": "Discount data fetched successfully!",
+	"discount_data": [
+		{
+			"id": 1,
+			"state": "ogun",
+			"discount_percent": "10.00",
+			"min_order_price_trigger": 4000,
+			"isFirstTimeOnly": 0,
+			"valid_from": "2025-06-25",
+			"valid_to": "2025-06-25",
+			"isActive": 1,
+			"created_at": "2025-10-06 00:09:26",
+			"modified_at": "2025-10-06 00:17:38"
+      },
+		...
+	],
+	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30e4ff13e3"
+}
+```
+
+
+## Fetch Delivery Discount
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?action=fetch' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Delivery discount data fetched successfully!",
 	"discount_data": {
-		"category": "delivery",
+		"state": "ogun",
 		"discount_percent": "10.00",
+		"min_order_price_trigger": 4000,
+		"isFirstTimeOnly": 1,
+		"valid_from": "2025-06-25",
+		"valid_to": "2025-06-25",
+		"isActive": 1,
+		"created_at": "2025-10-06 00:32:30",
+		"modified_at": "2025-10-06 00:32:30"
+	},
+	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30e4ff13e3"
+}
+```
+
+
+## Create Delivery Discount (i.e if not already exists. If it does, please edit instead)
+
+```CURL
+curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?action=add&state={a_valid_state}&discount_percent={numeric|float:0-100}&min_order_price_trigger={numeric|float}&valid_from={valid_date_format:yyyy-mm-dd}&valid_to={valid_date_format:yyyy-mm-dd}&isFirstTimeOnly={boolean|optional|default:true}&isActive={boolean|optional|default:true}' \
+--header 'Authorization: Bearer {token}'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Delivery discount data added successfully!",
+	"discount_data": {
+		"state": "ogun",
+		"discount_percent": "10.00",
+		"min_order_price_trigger": 4000,
 		"isFirstTimeOnly": 1,
 		"valid_from": "2025-06-25",
 		"valid_to": "2025-06-25",
@@ -1348,20 +1476,22 @@ curl --location --request POST '{base_url}/api/admin/manage-delivery-discount?ac
 }
 ```
 
+
 ## Edit Delivery Discount
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/manage-delivery-discount?action=edit&discount_percent={numeric|float:0-100|optional}&valid_from={valid_date_format:yyyy-mm-dd|optional}&valid_to={valid_date_format:yyyy-mm-dd|optional}&isFirstTimeOnly={boolean|optional}&isActive={boolean|optional}' \
+curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?action=edit&discount_id={discount_id}&state={a_valid_state|optional}&discount_percent={numeric|float:0-100|optional}&min_order_price_trigger={numeric|float|optional}&valid_from={valid_date_format:yyyy-mm-dd|optional}&valid_to={valid_date_format:yyyy-mm-dd|optional}&isFirstTimeOnly={boolean|optional}&isActive={boolean|optional}' \
 --header 'Authorization: Bearer {token}'
 ```
 
 ```JSON
 {
 	"code": 200,
-	"message": "Discount data updated successfully!",
+	"message": "Deivery discount data updated successfully!",
 	"discount_data": {
-		"category": "delivery",
+		"state": "ogun",
 		"discount_percent": "10.00",
+		"min_order_price_trigger": 4000,
 		"isFirstTimeOnly": 1,
 		"valid_from": "2025-06-25",
 		"valid_to": "2025-06-25",
@@ -1373,17 +1503,18 @@ curl --location --request POST '{base_url}/api/admin/manage-delivery-discount?ac
 }
 ```
 
+
 ## Delete A Discount
 
 ```CURL
-curl --location --request POST '{base_url}/api/admin/manage-delivery-discount?action=delete' \
+curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?action=delete&discount_id={discount_id}' \
 --header 'Authorization: Bearer {token}'
 ```
 
 ```JSON
 {
 	"code": 200,
-	"message": "Discount data deleted successfully!",
+	"message": "Delivery discount data deleted successfully!",
 	"token": "5d2479a685e25f628fbc9a6f4e3008ed68e30eeebb1ba"
 }
 ```

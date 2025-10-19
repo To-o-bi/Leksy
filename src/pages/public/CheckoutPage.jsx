@@ -21,16 +21,17 @@ const CheckoutPage = () => {
   const [notification, setNotification] = useState(null);
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
   const [deliveryMethod, setDeliveryMethod] = useState('address');
-  const [shipping, setShipping] = useState(0);
+  
+  // Shipping state - stores the complete fee object from backend
   const [shippingDetails, setShippingDetails] = useState({
     delivery_fee: 0,
     original_delivery_fee: 0,
     discount_percent: 0
   });
+  
   const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
   const [availableLGAs, setAvailableLGAs] = useState([]);
   const [isLoadingLGAs, setIsLoadingLGAs] = useState(false);
-  const [busParkFee, setBusParkFee] = useState(null);
   
   const [showBusParkModal, setShowBusParkModal] = useState(false);
   const [pendingDeliveryMethod, setPendingDeliveryMethod] = useState(null);
@@ -47,25 +48,29 @@ const CheckoutPage = () => {
     agreeToTerms: false
   });
 
+  // Use the discounted delivery fee from backend
+  const shipping = shippingDetails.delivery_fee;
   const finalTotal = totalPrice + shipping;
   const SUCCESS_REDIRECT_URL = getSuccessRedirectUrl();
   const hasDeliveryDiscount = shippingDetails.discount_percent > 0;
 
   const [formErrors, setFormErrors] = useState({});
 
-  // Fetch bus park fee on mount
+  // Fetch bus park fee on mount and store complete fee object
   useEffect(() => {
     const getBusParkFee = async () => {
       try {
         const feeData = await fetchBusParkDeliveryFee();
-        setBusParkFee(feeData);
+        // Store the fee for later use when bus-park is selected
+        if (deliveryMethod === 'bus-park') {
+          setShippingDetails(feeData);
+        }
       } catch (error) {
         console.error("Failed to fetch bus park fee:", error);
-        setBusParkFee(null);
       }
     };
     getBusParkFee();
-  }, []);
+  }, [deliveryMethod]);
 
   useEffect(() => {
     const performInitialValidation = async () => {
@@ -85,36 +90,51 @@ const CheckoutPage = () => {
     }
   }, [cart, navigate, isProcessingOrder]);
 
+  // Calculate shipping based on delivery method and location
   const calculateShipping = useCallback(async () => {
     setIsCalculatingShipping(true);
     let feeData = { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
     
-    if (deliveryMethod === 'bus-park') {
-      feeData = busParkFee || feeData;
-    } else if (deliveryMethod === 'address' && formData.state) {
-      if (formData.state === 'Lagos' && formData.city) {
-        const selectedLGA = availableLGAs.find(lga => lga.lga === formData.city);
-        if (selectedLGA) {
-          feeData = {
-            delivery_fee: selectedLGA.delivery_fee,
-            original_delivery_fee: selectedLGA.original_delivery_fee,
-            discount_percent: selectedLGA.discount_percent
-          };
+    try {
+      if (deliveryMethod === 'bus-park') {
+        // Fetch bus park fee with all discount info
+        feeData = await fetchBusParkDeliveryFee();
+        console.log('🚌 Bus park fee data:', feeData);
+      } else if (deliveryMethod === 'address' && formData.state) {
+        if (formData.state === 'Lagos' && formData.city) {
+          // For Lagos, find the selected LGA from available LGAs
+          const selectedLGA = availableLGAs.find(lga => lga.lga === formData.city);
+          if (selectedLGA) {
+            feeData = {
+              delivery_fee: selectedLGA.delivery_fee,
+              original_delivery_fee: selectedLGA.original_delivery_fee,
+              discount_percent: selectedLGA.discount_percent
+            };
+            console.log('🏙️ Lagos LGA fee data:', feeData);
+          }
+        } else if (formData.state !== 'Lagos') {
+          // For other states, fetch state delivery fee
+          feeData = await fetchDeliveryFeeForState(formData.state);
+          console.log('🌍 State fee data for', formData.state, ':', feeData);
         }
-      } else if (formData.state !== 'Lagos') {
-        feeData = await fetchDeliveryFeeForState(formData.state);
+      } else if (deliveryMethod === 'pickup') {
+        feeData = { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
       }
+    } catch (error) {
+      console.error('❌ Error calculating shipping:', error);
+      feeData = { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
     }
     
-    setShipping(feeData.delivery_fee);
+    console.log('✅ Final shipping details:', feeData);
     setShippingDetails(feeData);
     setIsCalculatingShipping(false);
-  }, [deliveryMethod, formData.state, formData.city, availableLGAs, busParkFee]);
+  }, [deliveryMethod, formData.state, formData.city, availableLGAs]);
 
   useEffect(() => {
     calculateShipping();
   }, [calculateShipping]);
 
+  // Load LGAs for Lagos with delivery fee info
   useEffect(() => {
     const loadLGAs = async () => {
       if (formData.state === 'Lagos' && deliveryMethod === 'address') {
@@ -123,6 +143,7 @@ const CheckoutPage = () => {
           const lgas = await fetchLGADeliveryFees(formData.state);
           setAvailableLGAs(lgas);
         } catch (error) {
+          console.error('Error loading LGAs:', error);
           setAvailableLGAs([]);
         } finally {
           setIsLoadingLGAs(false);
@@ -237,6 +258,16 @@ const CheckoutPage = () => {
     return formatPrice(shipping);
   };
 
+  // Get bus park fee for display (fetch it once for display purposes)
+  const [busParkFeeDisplay, setBusParkFeeDisplay] = useState(null);
+  useEffect(() => {
+    const loadBusParkFee = async () => {
+      const fee = await fetchBusParkDeliveryFee();
+      setBusParkFeeDisplay(fee);
+    };
+    loadBusParkFee();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1200px] mx-auto px-4 py-8">
@@ -342,7 +373,7 @@ const CheckoutPage = () => {
                     </div>
                     <p className="text-xs text-gray-500 mb-2">Send using local bus park</p>
                     <p className="text-sm font-semibold text-pink-600">
-                      {busParkFee ? formatPrice(busParkFee.delivery_fee) : 'Loading...'}
+                      {busParkFeeDisplay ? formatPrice(busParkFeeDisplay.delivery_fee) : 'Loading...'}
                     </p>
                   </div>
 
