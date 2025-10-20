@@ -222,7 +222,7 @@ curl --location --request POST '{base_url}/api/admin/update-delivery-fees?Edo={2
 ## Fetch Delivery Fee for a Single State/LGA
 
 ```CURL
-curl --location --request GET '{base_url}/api/fetch-delivery-fee?state={State|optional:when(isset(lga))}&lga={Lga|optional:when(isset(state))}'
+curl --location --request GET '{base_url}/api/fetch-delivery-fee?state={State|optional:when(isset(lga))}&lga={Lga|optional:when(isset(state))}&total_price_of_current_purchase={numeric|optional}'
 ```
 
 ```JSON
@@ -239,7 +239,7 @@ curl --location --request GET '{base_url}/api/fetch-delivery-fee?state={State|op
 ## Fetch All Delivery Fees (States Based)
 
 ```CURL
-curl --location --request GET '{base_url}/api/fetch-delivery-fees'
+curl --location --request GET '{base_url}/api/fetch-delivery-fees?total_price_of_current_purchase={numeric|optional}'
 ```
 
 ```JSON
