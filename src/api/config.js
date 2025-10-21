@@ -50,7 +50,7 @@ export const ENDPOINTS = {
   UPDATE_DELIVERY_FEES: '/admin/update-delivery-fees',
 
   // delivery discounts
-  MANAGE_DELIVERY_DISCOUNT: '/admin/manage-delivery-discount',
+  MANAGE_DELIVERY_DISCOUNT: '/admin/manage-delivery-discounts',
   
   // Product Discounts 
   MANAGE_DISCOUNTS: '/admin/manage-discounts'

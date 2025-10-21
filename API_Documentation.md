@@ -222,7 +222,7 @@ curl --location --request POST '{base_url}/api/admin/update-delivery-fees?Edo={2
 ## Fetch Delivery Fee for a Single State/LGA
 
 ```CURL
-curl --location --request GET '{base_url}/api/fetch-delivery-fee?state={State|optional:when(isset(lga))}&lga={Lga|optional:when(isset(state))}'
+curl --location --request GET '{base_url}/api/fetch-delivery-fee?state={State|optional:when(isset(lga))}&lga={Lga|optional:when(isset(state))}&total_price_of_current_purchase={numeric|optional}'
 ```
 
 ```JSON
@@ -239,7 +239,7 @@ curl --location --request GET '{base_url}/api/fetch-delivery-fee?state={State|op
 ## Fetch All Delivery Fees (States Based)
 
 ```CURL
-curl --location --request GET '{base_url}/api/fetch-delivery-fees'
+curl --location --request GET '{base_url}/api/fetch-delivery-fees?total_price_of_current_purchase={numeric|optional}'
 ```
 
 ```JSON
@@ -1333,7 +1333,7 @@ curl --location --request POST '{base_url}/api/admin/manage-discounts?action=del
 
 # DELIVERY DISCOUNT (I.E, A SINGLE DISCOUNT THAT APPLIES TO ALL DELIVERY FEES)
 
-## Fetch All Delivery Discounts
+## Fetch All Delivery Discounts (For admin's eyes only. Because all the data returned are as is in the database.)
 
 ```CURL
 curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?action=fetch' \
@@ -1347,7 +1347,7 @@ curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?a
 	"discount_data": [
 		{
 			"id": 1,
-			"state": "ogun",
+			"state": "Ogun",
 			"discount_percent": "10.00",
 			"min_order_price_trigger": 4000,
 			"isFirstTimeOnly": 1,
@@ -1364,7 +1364,36 @@ curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?a
 ```
 
 
-## Fetch A Delivery Discounts (By discount_id)
+## Fetch All Delivery Discounts (For user's eyes. All the data returned are after some strict calculations, and the particular user's tailored considerations.)
+
+```CURL
+curl --location --request POST '{base_url}/api/fetch-delivery-discounts'
+```
+
+```JSON
+{
+	"code": 200,
+	"message": "Delivery discount data returned 3 results",
+	"discount_data": [
+		{
+			"id": 1,
+			"state": "Ogun",
+			"discount_percent": "10.00",
+			"min_order_price_trigger": 4000,
+			"isFirstTimeOnly": 1,
+			"valid_from": "2025-06-25",
+			"valid_to": "2025-06-25",
+			"isActive": 1,
+			"created_at": "2025-10-06 00:09:26",
+			"modified_at": "2025-10-06 00:17:38"
+		},
+		...
+	]
+}
+```
+
+
+## Fetch A Delivery Discount (By discount_id)
 
 ```CURL
 curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?action=fetch&discount_id={discount_id}' \
@@ -1392,7 +1421,7 @@ curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?a
 ```
 
 
-## Fetch Delivery Discounts (By state)
+## Fetch All Delivery Discounts (By state)
 
 ```CURL
 curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?action=fetch&state={state}' \
@@ -1504,7 +1533,7 @@ curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?a
 ```
 
 
-## Delete A Discount
+## Delete A Delivery Discount
 
 ```CURL
 curl --location --request POST '{base_url}/api/admin/manage-delivery-discounts?action=delete&discount_id={discount_id}' \

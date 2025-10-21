@@ -776,14 +776,13 @@ export const discountService = {
 // deliverydiscount.js
 
 export const deliveryDiscountService = {
-  async fetchDeliveryDiscount() {
+  async fetchAllDeliveryDiscounts() {
     try {
       const formBody = new URLSearchParams({ action: 'fetch' }).toString();
       
-      console.log('🔍 [FETCH DELIVERY DISCOUNT] Request:', {
+      console.log('🔍 [FETCH ALL DELIVERY DISCOUNTS] Request:', {
         endpoint: ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
-        body: formBody,
-        parsedBody: Object.fromEntries(new URLSearchParams(formBody))
+        body: formBody
       });
       
       const response = await api.post(
@@ -796,19 +795,83 @@ export const deliveryDiscountService = {
         }
       );
       
-      console.log('✅ [FETCH DELIVERY DISCOUNT] Response:', response.data);
+      console.log('✅ [FETCH ALL DELIVERY DISCOUNTS] Response:', response.data);
       
       return response.data;
     } catch (error) {
-      console.error('❌ [FETCH DELIVERY DISCOUNT] Error:', {
+      console.error('❌ [FETCH ALL DELIVERY DISCOUNTS] Error:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status
       });
       
-      // If discount doesn't exist, return null instead of throwing
       if (error.response?.status === 404 || error.response?.data?.code === 404) {
-        return { code: 404, discount_data: null, message: 'No delivery discount found' };
+        return { code: 200, discount_data: [], message: 'No delivery discounts found' };
+      }
+      throw new Error(error.response?.data?.message || 'Failed to fetch delivery discounts');
+    }
+  },
+
+  async fetchDeliveryDiscountById(discountId) {
+    try {
+      const formBody = new URLSearchParams({ 
+        action: 'fetch',
+        discount_id: discountId
+      }).toString();
+      
+      console.log('🔍 [FETCH DELIVERY DISCOUNT BY ID] Request:', {
+        endpoint: ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
+        discountId
+      });
+      
+      const response = await api.post(
+        ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
+        formBody,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      console.log('✅ [FETCH DELIVERY DISCOUNT BY ID] Response:', response.data);
+      
+      return response.data;
+    } catch (error) {
+      console.error('❌ [FETCH DELIVERY DISCOUNT BY ID] Error:', error);
+      throw new Error(error.response?.data?.message || 'Failed to fetch delivery discount');
+    }
+  },
+
+  async fetchDeliveryDiscountByState(state) {
+    try {
+      const formBody = new URLSearchParams({ 
+        action: 'fetch',
+        state: state
+      }).toString();
+      
+      console.log('🔍 [FETCH DELIVERY DISCOUNT BY STATE] Request:', {
+        endpoint: ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
+        state
+      });
+      
+      const response = await api.post(
+        ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
+        formBody,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      console.log('✅ [FETCH DELIVERY DISCOUNT BY STATE] Response:', response.data);
+      
+      return response.data;
+    } catch (error) {
+      console.error('❌ [FETCH DELIVERY DISCOUNT BY STATE] Error:', error);
+      if (error.response?.status === 404 || error.response?.data?.code === 404) {
+        return { code: 404, discount_data: null, message: 'No discount found for this state' };
       }
       throw new Error(error.response?.data?.message || 'Failed to fetch delivery discount');
     }
@@ -817,23 +880,29 @@ export const deliveryDiscountService = {
   async createDeliveryDiscount(discountData) {
     this._validateDiscountData(discountData);
     
-    const data = {
-      action: 'create',
+    const params = {
+      action: 'add',
+      state: discountData.state,
       discount_percent: discountData.discount_percent,
       valid_from: discountData.valid_from,
-      valid_to: discountData.valid_to,
-      isFirstTimeOnly: discountData.isFirstTimeOnly ? '1' : '0',
-      isActive: discountData.isActive !== undefined ? (discountData.isActive ? '1' : '0') : '1'
+      valid_to: discountData.valid_to
     };
 
+    // Add optional fields
+    if (discountData.min_order_price_trigger) {
+      params.min_order_price_trigger = discountData.min_order_price_trigger;
+    }
+    
+    params.isFirstTimeOnly = discountData.isFirstTimeOnly ? '1' : '0';
+    params.isActive = discountData.isActive !== undefined ? (discountData.isActive ? '1' : '0') : '1';
+
     try {
-      const formBody = new URLSearchParams(data).toString();
+      const formBody = new URLSearchParams(params).toString();
       
       console.log('➕ [CREATE DELIVERY DISCOUNT] Request:', {
         endpoint: ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
-        body: formBody,
-        parsedBody: Object.fromEntries(new URLSearchParams(formBody)),
-        originalData: discountData
+        params,
+        formBody
       });
       
       const response = await api.post(
@@ -863,35 +932,42 @@ export const deliveryDiscountService = {
     }
   },
 
-  async editDeliveryDiscount(discountData) {
-    const data = {
-      action: 'edit'
+  async editDeliveryDiscount(discountId, discountData) {
+    const params = {
+      action: 'edit',
+      discount_id: discountId
     };
 
+    // Add only provided fields
+    if (discountData.state !== undefined) {
+      params.state = discountData.state;
+    }
     if (discountData.discount_percent !== undefined) {
-      data.discount_percent = discountData.discount_percent;
+      params.discount_percent = discountData.discount_percent;
+    }
+    if (discountData.min_order_price_trigger !== undefined) {
+      params.min_order_price_trigger = discountData.min_order_price_trigger;
     }
     if (discountData.valid_from !== undefined) {
-      data.valid_from = discountData.valid_from;
+      params.valid_from = discountData.valid_from;
     }
     if (discountData.valid_to !== undefined) {
-      data.valid_to = discountData.valid_to;
+      params.valid_to = discountData.valid_to;
     }
     if (discountData.isFirstTimeOnly !== undefined) {
-      data.isFirstTimeOnly = discountData.isFirstTimeOnly ? '1' : '0';
+      params.isFirstTimeOnly = discountData.isFirstTimeOnly ? '1' : '0';
     }
     if (discountData.isActive !== undefined) {
-      data.isActive = discountData.isActive ? '1' : '0';
+      params.isActive = discountData.isActive ? '1' : '0';
     }
 
     try {
-      const formBody = new URLSearchParams(data).toString();
+      const formBody = new URLSearchParams(params).toString();
       
       console.log('✏️ [EDIT DELIVERY DISCOUNT] Request:', {
         endpoint: ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
-        body: formBody,
-        parsedBody: Object.fromEntries(new URLSearchParams(formBody)),
-        originalData: discountData
+        params,
+        formBody
       });
       
       const response = await api.post(
@@ -921,14 +997,16 @@ export const deliveryDiscountService = {
     }
   },
 
-  async deleteDeliveryDiscount() {
+  async deleteDeliveryDiscount(discountId) {
     try {
-      const formBody = new URLSearchParams({ action: 'delete' }).toString();
+      const formBody = new URLSearchParams({ 
+        action: 'delete',
+        discount_id: discountId
+      }).toString();
       
       console.log('🗑️ [DELETE DELIVERY DISCOUNT] Request:', {
         endpoint: ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
-        body: formBody,
-        parsedBody: Object.fromEntries(new URLSearchParams(formBody))
+        discountId
       });
       
       const response = await api.post(
@@ -954,7 +1032,7 @@ export const deliveryDiscountService = {
     }
   },
 
-  calculateDeliveryDiscount(deliveryFee, discount, isFirstTimeCustomer = false) {
+  calculateDeliveryDiscount(deliveryFee, discount, orderTotal, isFirstTimeCustomer = false) {
     if (!discount || !deliveryFee) return null;
 
     // Check if discount is active
@@ -964,6 +1042,11 @@ export const deliveryDiscountService = {
     // Check if it's first-time only and user doesn't qualify
     const isFirstTimeOnly = discount.isFirstTimeOnly === 1 || discount.isFirstTimeOnly === '1' || discount.isFirstTimeOnly === true;
     if (isFirstTimeOnly && !isFirstTimeCustomer) return null;
+
+    // Check minimum order price trigger
+    if (discount.min_order_price_trigger && orderTotal < parseFloat(discount.min_order_price_trigger)) {
+      return null;
+    }
 
     // Check date range
     const now = new Date();
@@ -975,15 +1058,18 @@ export const deliveryDiscountService = {
 
     const discountPercent = parseFloat(discount.discount_percent) || 0;
     const originalFee = parseFloat(deliveryFee) || 0;
-    const discountedFee = originalFee - (originalFee * discountPercent / 100);
+    const discountAmount = originalFee * discountPercent / 100;
+    const discountedFee = originalFee - discountAmount;
 
     return {
       originalFee,
       discountedFee: Math.max(0, discountedFee),
       discountPercent,
-      savings: originalFee - discountedFee,
+      discountAmount,
+      savings: discountAmount,
       validUntil: discount.valid_to,
-      isFirstTimeOnly
+      isFirstTimeOnly,
+      state: discount.state
     };
   },
 
@@ -1002,6 +1088,10 @@ export const deliveryDiscountService = {
   },
 
   _validateDiscountData(discountData) {
+    if (!discountData.state) {
+      throw new Error('State is required');
+    }
+
     if (!discountData.discount_percent || discountData.discount_percent <= 0 || discountData.discount_percent > 100) {
       throw new Error('Discount percentage must be between 0 and 100');
     }

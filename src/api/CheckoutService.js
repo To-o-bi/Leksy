@@ -15,6 +15,15 @@ export const prepareCartForAPI = (cart) => {
 };
 
 /**
+ * Calculates total price from cart items
+ * @param {Array} cart - The cart items
+ * @returns {number} Total price
+ */
+const calculateTotalPrice = (cart) => {
+  return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+};
+
+/**
  * Initiates the checkout process using URLSearchParams.
  * @param {Object} formData - Customer form data.
  * @param {string} deliveryMethod - The selected delivery method.
@@ -49,6 +58,9 @@ export const initiateCheckout = async (formData, deliveryMethod, cart, successRe
     if (formData.state === 'Lagos' && formData.city) {
       searchParams.append('lga', formData.city);
     }
+  } else if (deliveryMethod === 'bus-park') {
+    searchParams.append('state', formData.state);
+    searchParams.append('city', formData.city);
   }
 
   const response = await fetch(`${BASE_URL}/api/checkout/initiate`, {
@@ -79,25 +91,31 @@ export const validateCheckoutForm = (formData, deliveryMethod) => {
   if (!formData.name.trim()) errors.name = 'Name is required';
   if (!/\S+@\S+\.\S+/.test(formData.email)) errors.email = 'Email is invalid';
   if (!formData.phone.trim()) errors.phone = 'Phone number is required';
+  
   if (deliveryMethod === 'address') {
     if (!formData.state) errors.state = 'State is required';
     if (!formData.city) errors.city = 'City/LGA is required';
     if (!formData.street_address) errors.street_address = 'Street address is required';
   }
+  
+  if (deliveryMethod === 'bus-park') {
+    if (!formData.state) errors.state = 'State is required';
+    if (!formData.city) errors.city = 'City/LGA is required';
+  }
+  
   if (!formData.agreeToTerms) errors.agreeToTerms = 'You must agree to the terms.';
   return errors;
 };
 
 /**
- * Fetches delivery fee for a single state or LGA
- * Backend returns: { code, message, delivery_fee, original_delivery_fee, discount_percent }
+ * Fetches delivery fee for a single state with discount already calculated
+ * @param {string} state - State name
+ * @param {number} totalPrice - Current cart total for discount calculation
+ * @returns {Promise<Object>} Fee object with delivery_fee, original_delivery_fee, discount_percent
  */
-export const fetchDeliveryFeeForState = async (state, lga = null) => {
+export const fetchDeliveryFeeForState = async (state, totalPrice = 0) => {
   try {
-    let url = `${BASE_URL}/api/fetch-delivery-fee?state=${encodeURIComponent(state)}`;
-    if (lga) {
-      url += `&lga=${encodeURIComponent(lga)}`;
-    }
+    const url = `${BASE_URL}/api/fetch-delivery-fee?state=${encodeURIComponent(state)}&total_price_of_current_purchase=${totalPrice}`;
     
     const response = await fetch(url);
     const result = await response.json();
@@ -112,61 +130,102 @@ export const fetchDeliveryFeeForState = async (state, lga = null) => {
       };
     }
     
-    // Fallback
-    return { delivery_fee: 5000, original_delivery_fee: 5000, discount_percent: 0 };
+    // Fallback if state not found
+    return { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
   } catch (error) {
-    console.error('❌ Error fetching delivery fee:', error);
-    return { delivery_fee: 5000, original_delivery_fee: 5000, discount_percent: 0 };
+    console.error('❌ Error fetching delivery fee for state:', error);
+    return { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
   }
 };
 
 /**
- * Fetches LGA delivery fees for Lagos state
- * Backend returns array with: { state, lga, delivery_fee, original_delivery_fee, discount_percent }
+ * Fetches LGA delivery fees for Lagos state with discounts already calculated
+ * @param {string} state - State name (should be 'Lagos')
+ * @param {number} totalPrice - Current cart total for discount calculation
+ * @returns {Promise<Array>} Array of LGA objects with fee info
  */
-export const fetchLGADeliveryFees = async (state) => {
+export const fetchLGADeliveryFees = async (state, totalPrice = 0) => {
   try {
-    const response = await fetch(`${BASE_URL}/api/fetch-lgas-delivery-fees?state=${encodeURIComponent(state)}`);
+    const url = `${BASE_URL}/api/fetch-lgas-delivery-fees?state=${encodeURIComponent(state)}&total_price_of_current_purchase=${totalPrice}`;
+    
+    const response = await fetch(url);
     const result = await response.json();
+    
+    console.log('🏙️ LGA delivery fees response:', result);
     
     if (result.code === 200 && result.delivery_fees) {
       return result.delivery_fees.map(fee => ({
         lga: fee.lga,
         state: fee.state,
-        delivery_fee: fee.delivery_fee || 0,
-        original_delivery_fee: fee.original_delivery_fee || fee.delivery_fee || 0,
-        discount_percent: fee.discount_percent || 0
+        delivery_fee: parseFloat(fee.delivery_fee) || 0,
+        original_delivery_fee: parseFloat(fee.original_delivery_fee) || parseFloat(fee.delivery_fee) || 0,
+        discount_percent: parseFloat(fee.discount_percent) || 0
       }));
     }
     
     return [];
   } catch (error) {
-    console.error('Error fetching LGA delivery fees:', error);
+    console.error('❌ Error fetching LGA delivery fees:', error);
     return [];
   }
 };
 
 /**
- * Fetches bus park delivery fee
- * Backend returns: { delivery_fee, original_delivery_fee, discount_percent }
+ * Fetches delivery fee for a specific LGA with discount already calculated
+ * @param {string} lga - LGA name
+ * @param {number} totalPrice - Current cart total for discount calculation
+ * @returns {Promise<Object>} Fee object with delivery_fee, original_delivery_fee, discount_percent
  */
-export const fetchBusParkDeliveryFee = async () => {
+export const fetchDeliveryFeeForLGA = async (lga, totalPrice = 0) => {
   try {
-    const response = await fetch(`${BASE_URL}/api/fetch-bus-park-delivery-fee`);
+    const url = `${BASE_URL}/api/fetch-delivery-fee?lga=${encodeURIComponent(lga)}&total_price_of_current_purchase=${totalPrice}`;
+    
+    const response = await fetch(url);
     const result = await response.json();
+    
+    console.log('🏙️ Delivery fee response for LGA:', lga, result);
     
     if (result.code === 200) {
       return {
-        delivery_fee: result.delivery_fee || 0,
-        original_delivery_fee: result.original_delivery_fee || result.delivery_fee || 0,
-        discount_percent: result.discount_percent || 0
+        delivery_fee: parseFloat(result.delivery_fee) || 0,
+        original_delivery_fee: parseFloat(result.original_delivery_fee) || parseFloat(result.delivery_fee) || 0,
+        discount_percent: parseFloat(result.discount_percent) || 0
+      };
+    }
+    
+    return { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
+  } catch (error) {
+    console.error('❌ Error fetching delivery fee for LGA:', error);
+    return { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
+  }
+};
+
+/**
+ * Fetches bus park delivery fee with discount already calculated
+ * @param {number} totalPrice - Current cart total for discount calculation
+ * @returns {Promise<Object>} Fee object with delivery_fee, original_delivery_fee, discount_percent
+ */
+export const fetchBusParkDeliveryFee = async (totalPrice = 0) => {
+  try {
+    const url = `${BASE_URL}/api/fetch-bus-park-delivery-fee?total_price_of_current_purchase=${totalPrice}`;
+    
+    const response = await fetch(url);
+    const result = await response.json();
+    
+    console.log('🚌 Bus park delivery fee response:', result);
+    
+    if (result.code === 200) {
+      return {
+        delivery_fee: parseFloat(result.delivery_fee) || 0,
+        original_delivery_fee: parseFloat(result.original_delivery_fee) || parseFloat(result.delivery_fee) || 0,
+        discount_percent: parseFloat(result.discount_percent) || 0
       };
     }
     
     // Fallback
     return { delivery_fee: 2000, original_delivery_fee: 2000, discount_percent: 0 };
   } catch (error) {
-    console.error('Error fetching bus park delivery fee:', error);
+    console.error('❌ Error fetching bus park delivery fee:', error);
     return { delivery_fee: 2000, original_delivery_fee: 2000, discount_percent: 0 };
   }
 };
