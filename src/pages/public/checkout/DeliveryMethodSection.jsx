@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatPrice } from '../../api/CheckoutService';
+import { formatPrice } from '../../../api/CheckoutService';
 
 const DeliveryMethodSection = ({ 
   deliveryMethod, 

@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../hooks/useCart';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import Notification from '../../components/common/Notification';
-import DeliveryMethodSection from './DeliveryMethodSection';
-import CustomerInformationSection from './CustomerInformationSection';
-import OrderSummarySection from './OrderSummarySection';
-import BusParkModal from './BusParkModal';
+import DeliveryMethodSection from './checkout/DeliveryMethodSection';
+import CustomerInformationSection from './PolicyPages/CustomerInformationSection';
+import OrderSummarySection from './checkout/OrderSummarySection';
+import BusParkModal from './checkout/BusParkModal';
 import {
   validateCheckoutForm,
   initiateCheckout,
@@ -96,35 +96,117 @@ const CheckoutPage = () => {
     
     try {
       if (deliveryMethod === 'bus-park') {
-        // Fetch bus park fee with discount already calculated by backend
         feeData = await fetchBusParkDeliveryFee(totalPrice);
-        console.log('🚌 Bus park fee data (with discount):', feeData);
       } else if (deliveryMethod === 'address' && formData.state) {
+        // DEBUG LOGS FOR HOME DELIVERY ONLY
+        console.log('🏠 ========== HOME DELIVERY DEBUG START ==========');
+        console.log('📋 [REQUEST INFO]');
+        console.log(JSON.stringify({
+          timestamp: new Date().toISOString(),
+          delivery_method: 'address',
+          cart_total_price: totalPrice,
+          selected_state: formData.state,
+          selected_city: formData.city,
+          cart_items: cart.map(item => ({
+            product_id: item.product_id,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            total: item.price * item.quantity
+          }))
+        }, null, 2));
+        
         if (formData.state === 'Lagos' && formData.city) {
-          // For Lagos LGA, fetch specific LGA fee with discount
+          console.log('🏙️ [LAGOS LGA REQUEST]');
+          console.log('API Endpoint: GET /api/fetch-delivery-fee');
+          console.log('Query Parameters:', JSON.stringify({
+            lga: formData.city,
+            total_price_of_current_purchase: totalPrice
+          }, null, 2));
+          
           feeData = await fetchDeliveryFeeForLGA(formData.city, totalPrice);
-          console.log('🏙️ Lagos LGA fee data (with discount):', feeData);
+          
+          console.log('🏙️ [LAGOS LGA RESPONSE]');
+          console.log(JSON.stringify(feeData, null, 2));
+          
+          console.log('🏙️ [LAGOS LGA ANALYSIS]');
+          console.log(JSON.stringify({
+            original_delivery_fee: feeData.original_delivery_fee,
+            discounted_delivery_fee: feeData.delivery_fee,
+            discount_percent: feeData.discount_percent,
+            savings: feeData.original_delivery_fee - feeData.delivery_fee,
+            discount_applied: feeData.discount_percent > 0,
+            issue: feeData.discount_percent === 0 ? 'BACKEND NOT APPLYING DISCOUNT' : null
+          }, null, 2));
         } else if (formData.state !== 'Lagos') {
-          // For other states, fetch state delivery fee with discount
+          console.log('🌍 [STATE DELIVERY REQUEST]');
+          console.log('API Endpoint: GET /api/fetch-delivery-fee');
+          console.log('Query Parameters:', JSON.stringify({
+            state: formData.state,
+            total_price_of_current_purchase: totalPrice
+          }, null, 2));
+          
           feeData = await fetchDeliveryFeeForState(formData.state, totalPrice);
-          console.log('🌍 State fee data for', formData.state, '(with discount):', feeData);
+          
+          console.log('🌍 [STATE DELIVERY RESPONSE]');
+          console.log(JSON.stringify(feeData, null, 2));
+          
+          console.log('🌍 [STATE DELIVERY ANALYSIS]');
+          console.log(JSON.stringify({
+            original_delivery_fee: feeData.original_delivery_fee,
+            discounted_delivery_fee: feeData.delivery_fee,
+            discount_percent: feeData.discount_percent,
+            savings: feeData.original_delivery_fee - feeData.delivery_fee,
+            discount_applied: feeData.discount_percent > 0,
+            expected_discount_from_admin: '70% (as per admin dashboard)',
+            expected_discounted_fee: feeData.original_delivery_fee * 0.3,
+            actual_fee_returned: feeData.delivery_fee,
+            issue: feeData.discount_percent === 0 ? '⚠️ BACKEND NOT APPLYING DISCOUNT - Check backend discount calculation logic' : null
+          }, null, 2));
         }
+        
+        console.log('✅ [FINAL SHIPPING DETAILS]');
+        console.log(JSON.stringify(feeData, null, 2));
+        console.log('🏠 ========== HOME DELIVERY DEBUG END ==========');
       } else if (deliveryMethod === 'pickup') {
         feeData = { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
       }
     } catch (error) {
-      console.error('❌ Error calculating shipping:', error);
+      if (deliveryMethod === 'address') {
+        console.error('❌ ========== HOME DELIVERY ERROR ==========');
+        console.error('Error Details:', JSON.stringify({
+          message: error.message,
+          stack: error.stack,
+          state: formData.state,
+          city: formData.city,
+          totalPrice: totalPrice,
+          response_data: error.response?.data
+        }, null, 2));
+        console.error('❌ ========== ERROR END ==========');
+      }
       feeData = { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
     }
     
-    console.log('✅ Final shipping details:', feeData);
     setShippingDetails(feeData);
     setIsCalculatingShipping(false);
-  }, [deliveryMethod, formData.state, formData.city, totalPrice]);
+  }, [deliveryMethod, formData.state, formData.city, totalPrice, cart]);
 
   useEffect(() => {
     calculateShipping();
   }, [calculateShipping]);
+
+  useEffect(() => {
+    // Only log when home delivery discount changes
+    if (deliveryMethod === 'address' && shippingDetails.discount_percent > 0) {
+      console.log('📊 [DISCOUNT APPLIED]', {
+        state: formData.state,
+        original_fee: shippingDetails.original_delivery_fee,
+        discounted_fee: shippingDetails.delivery_fee,
+        discount_percent: shippingDetails.discount_percent,
+        you_save: shippingDetails.original_delivery_fee - shippingDetails.delivery_fee
+      });
+    }
+  }, [shippingDetails, deliveryMethod, formData.state]);
 
   // Load LGAs for Lagos with delivery fee info (including discounts)
   useEffect(() => {
@@ -135,7 +217,7 @@ const CheckoutPage = () => {
           const lgas = await fetchLGADeliveryFees(formData.state, totalPrice);
           setAvailableLGAs(lgas);
         } catch (error) {
-          console.error('Error loading LGAs:', error);
+          console.error('❌ [LAGOS LGAs] Error loading LGAs:', error);
           setAvailableLGAs([]);
         } finally {
           setIsLoadingLGAs(false);

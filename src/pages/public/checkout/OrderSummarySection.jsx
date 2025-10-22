@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatPrice } from '../../api/CheckoutService';
+import { formatPrice } from '../../../api/CheckoutService';
 
 // Note: Import Link from 'react-router-dom' and Button component in your actual file
 const Link = ({ to, children, className }) => <a href={to} className={className}>{children}</a>;
@@ -67,26 +67,38 @@ const OrderSummarySection = ({
                 <span className="font-medium text-gray-900">{formatPrice(totalPrice)}</span>
               </div>
               
-              {/* Delivery Fee with Discount */}
+              {/* Enhanced Delivery Fee with Discount Display */}
               <div className="space-y-1">
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-sm items-start">
                   <span className="text-gray-600">Shipping</span>
-                  <span className="font-medium text-gray-900">{getDeliveryPrice()}</span>
+                  {hasDeliveryDiscount && !isCalculatingShipping && deliveryMethod !== 'pickup' ? (
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-xs text-gray-400 line-through">
+                        {formatPrice(shippingDetails.original_delivery_fee)}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-base font-bold text-green-600">
+                          {formatPrice(shipping)}
+                        </span>
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-md font-semibold">
+                          -{shippingDetails.discount_percent}%
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="font-medium text-gray-900">{getDeliveryPrice()}</span>
+                  )}
                 </div>
                 
-                {/* Show original price and discount if applicable */}
-                {hasDeliveryDiscount && (
-                  <div className="pl-4 space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-500">Original Fee:</span>
-                      <span className="text-gray-500 line-through">{formatPrice(shippingDetails.original_delivery_fee)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-green-600 font-medium">
-                        Discount ({shippingDetails.discount_percent}%):
+                {/* Discount Savings Info */}
+                {hasDeliveryDiscount && deliveryMethod !== 'pickup' && !isCalculatingShipping && (
+                  <div className="bg-green-50 border border-green-200 rounded-md p-2 mt-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-green-700 font-medium">
+                        💰 Delivery Discount Savings:
                       </span>
-                      <span className="text-green-600 font-medium">
-                        -{formatPrice(shippingDetails.original_delivery_fee - shippingDetails.delivery_fee)}
+                      <span className="text-green-700 font-bold">
+                        {formatPrice(shippingDetails.original_delivery_fee - shippingDetails.delivery_fee)}
                       </span>
                     </div>
                   </div>
@@ -101,12 +113,17 @@ const OrderSummarySection = ({
                   </span>
                 </div>
                 
-                {/* Total Savings Message */}
-                {hasDeliveryDiscount && (
-                  <div className="mt-2 text-center">
-                    <p className="text-xs text-green-600 font-medium">
-                      🎉 You saved {formatPrice(shippingDetails.original_delivery_fee - shippingDetails.delivery_fee)} on delivery!
-                    </p>
+                {/* Total Savings Summary */}
+                {hasDeliveryDiscount && deliveryMethod !== 'pickup' && !isCalculatingShipping && (
+                  <div className="mt-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3">
+                    <div className="flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-xs text-green-800 font-semibold">
+                        You saved {formatPrice(shippingDetails.original_delivery_fee - shippingDetails.delivery_fee)} on delivery!
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>

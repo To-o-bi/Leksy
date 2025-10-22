@@ -1,5 +1,5 @@
 import React from 'react';
-import { nigerianStates } from '../../api/CheckoutService';
+import { nigerianStates } from '../../../api/CheckoutService';
 
 const CustomerInformationSection = ({ 
   formData, 
