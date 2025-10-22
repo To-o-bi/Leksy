@@ -14,7 +14,7 @@ const decodeHtmlEntities = (text) => {
 
 const ProductCard = ({ product }) => {
   const { isInWishlist, toggleWishlistItem } = useWishlist();
-  const { addToCart } = useCart();
+  const { addToCart, cart } = useCart();
   const navigate = useNavigate();
   const { navigateToProduct } = useProductNavigation();
   
@@ -56,6 +56,11 @@ const ProductCard = ({ product }) => {
   const isProductInWishlist = useMemo(() => {
     return normalizedProduct ? isInWishlist(normalizedProduct.id) : false;
   }, [normalizedProduct, isInWishlist]);
+
+  const isProductInCart = useMemo(() => {
+    if (!normalizedProduct?.id) return false;
+    return cart.some(item => item.product_id === normalizedProduct.id);
+  }, [cart, normalizedProduct]);
 
   const shouldShowNewBadge = useMemo(() => {
     if (!normalizedProduct) return false;
@@ -163,13 +168,24 @@ const ProductCard = ({ product }) => {
         </button>
 
         <div className="hidden sm:block absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/20 to-transparent opacity-0 transform translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
-          <button 
-            onClick={handleAddToCart} 
-            disabled={normalizedProduct.stock <= 0} 
+          <button
+            onClick={handleAddToCart}
+            disabled={normalizedProduct.stock <= 0}
             className="w-full bg-white text-gray-800 rounded-md py-2.5 px-4 text-sm font-semibold shadow-md hover:bg-pink-500 hover:text-white transition-colors flex items-center justify-center disabled:bg-gray-300 disabled:cursor-not-allowed touch-manipulation active:scale-95 min-h-[44px]"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-            <span className="truncate">Add to Cart</span>
+            {isProductInCart ? (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                <span className="truncate">In Cart (Update)</span>
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                <span className="truncate">Add to Cart</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -212,13 +228,24 @@ const ProductCard = ({ product }) => {
           </div>
         )}
 
-        <button 
-          onClick={handleAddToCart} 
-          disabled={normalizedProduct.stock <= 0} 
+        <button
+          onClick={handleAddToCart}
+          disabled={normalizedProduct.stock <= 0}
           className="sm:hidden w-full bg-pink-500 text-white rounded-md py-2 px-3 text-xs font-semibold shadow-sm hover:bg-pink-600 transition-colors flex items-center justify-center disabled:bg-gray-300 disabled:cursor-not-allowed touch-manipulation active:scale-95 min-h-[40px]"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-          <span className="truncate">Add to Cart</span>
+          {isProductInCart ? (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              <span className="truncate">In Cart (Update)</span>
+            </>
+          ) : (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+              <span className="truncate">Add to Cart</span>
+            </>
+          )}
         </button>
       </div>
     </div>

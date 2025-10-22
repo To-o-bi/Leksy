@@ -6,7 +6,8 @@ import { formatter } from '../../../utils/formatter';
 import CartDropdownItem from '../../cart/CartDropdownItem';
 
 const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
-    const { cart, totalItems, totalPrice, addToCart } = useCart();
+    const { cart, totalPrice, addToCart } = useCart();
+    const cartCount = cart.length; // Number of unique products
     const { wishlist, removeFromWishlist } = useWishlist();
     
     const sidebarRef = useRef(null);
@@ -100,7 +101,7 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
         return (
             <>
                 <div className="flex-1 overflow-y-auto">
-                    <h3 className="text-sm sm:text-md font-medium text-gray-700 px-3 sm:px-4 py-2 bg-gray-50 sticky top-0 z-10">Your Cart ({totalItems})</h3>
+                    <h3 className="text-sm sm:text-md font-medium text-gray-700 px-3 sm:px-4 py-2 bg-gray-50 sticky top-0 z-10">Your Cart ({cartCount})</h3>
                     <ul className="divide-y divide-gray-200">
                         {cart.map((item) => (
                             <CartDropdownItem key={item.product_id} item={item} onClose={onClose} />
@@ -180,7 +181,7 @@ const CartDropdown = ({ isOpen, type = 'cart', onClose }) => {
             <div ref={sidebarRef} className={`fixed top-0 right-0 bottom-0 w-full sm:w-96 sm:max-w-full bg-white shadow-xl z-50 transition-transform transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`} role="dialog" aria-modal="true">
                 <div className="flex items-center justify-between px-3 sm:px-4 pt-4 sm:pt-5 pb-2 border-b">
                     <div className="flex items-center space-x-3 sm:space-x-4">
-                        <button type="button" className={`text-xs sm:text-sm font-medium pb-2 ${activeTab === 'cart' ? 'text-pink-500 border-b-2 border-pink-500' : 'text-gray-600'}`} onClick={() => setActiveTab('cart')}>Cart ({totalItems})</button>
+                        <button type="button" className={`text-xs sm:text-sm font-medium pb-2 ${activeTab === 'cart' ? 'text-pink-500 border-b-2 border-pink-500' : 'text-gray-600'}`} onClick={() => setActiveTab('cart')}>Cart ({cartCount})</button>
                         <button type="button" className={`text-xs sm:text-sm font-medium pb-2 ${activeTab === 'wishlist' ? 'text-pink-500 border-b-2 border-pink-500' : 'text-gray-600'}`} onClick={() => setActiveTab('wishlist')}>Wishlist ({wishlist.length})</button>
                     </div>
                     <button type="button" className="text-gray-400 hover:text-gray-500 p-1" onClick={onClose} aria-label="Close panel">

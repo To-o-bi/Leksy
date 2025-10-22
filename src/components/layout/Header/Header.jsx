@@ -20,8 +20,9 @@ const Header = () => {
   const searchInputRef = useRef(null);
   
   // Get cart from useCart hook
-  const { cart, totalItems } = useCart();
-  
+  const { cart } = useCart();
+  const cartCount = cart.length; // Number of unique products
+
   // Get wishlist from WishlistContext
   const { wishlist } = useContext(WishlistContext);
   const wishlistCount = wishlist.length;
@@ -206,9 +207,9 @@ const Header = () => {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
-              {totalItems > 0 && (
+              {cartCount > 0 && (
                 <span className="absolute -top-2 -right-2 bg-pink-500 text-xs text-white rounded-full h-5 w-5 flex items-center justify-center">
-                  {totalItems > 99 ? '99+' : totalItems}
+                  {cartCount > 99 ? '99+' : cartCount}
                 </span>
               )}
             </button>
@@ -273,9 +274,9 @@ const Header = () => {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-7 sm:w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
-              {totalItems > 0 && (
+              {cartCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-pink-500 text-xs text-white rounded-full h-5 w-5 sm:h-6 sm:w-6 flex items-center justify-center text-xs sm:text-sm">
-                  {totalItems > 99 ? '99+' : totalItems}
+                  {cartCount > 99 ? '99+' : cartCount}
                 </span>
               )}
             </button>
@@ -440,7 +441,7 @@ const Header = () => {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
-              <span className="text-sm sm:text-base">Cart{totalItems > 0 ? ` (${totalItems})` : ''}</span>
+              <span className="text-sm sm:text-base">Cart{cartCount > 0 ? ` (${cartCount})` : ''}</span>
             </Link>
           </div>
         </div>
