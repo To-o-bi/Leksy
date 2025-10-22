@@ -28,14 +28,14 @@ const bubbleAnimationStyles = `
 `;
 
 const FooterLinkGroup = ({ title, links }) => (
-  <div className="w-full sm:w-1/2 xl:w-1/4 px-2 sm:px-3 lg:px-4 mb-8 sm:mb-10">
-    <h3 className="text-white font-semibold mb-4 sm:mb-6 text-base sm:text-lg">{title}</h3>
-    <ul className="space-y-2 sm:space-y-3">
+  <div className="w-1/2 md:w-1/3 lg:w-1/4 px-3 sm:px-4 mb-6 sm:mb-8">
+    <h3 className="text-white font-semibold mb-3 sm:mb-4 text-base sm:text-lg lg:text-xl">{title}</h3>
+    <ul className="space-y-2 sm:space-y-2.5">
       {links.map((link) => (
         <li key={link.path + link.label}>
           <Link 
             to={link.path} 
-            className="text-gray-100 hover:text-white transition-colors duration-300 text-xs sm:text-sm flex items-center group"
+            className="text-gray-100 hover:text-white transition-colors duration-300 text-sm sm:text-base flex items-center group"
           >
             <span className="transform translate-x-0 group-hover:translate-x-2 transition-transform duration-300 inline-block">
               {link.label}
@@ -123,37 +123,45 @@ const Footer = () => {
             </div>
           </div>
 
-          <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12">
-            <div className="flex flex-wrap -mx-2 sm:-mx-3 lg:-mx-4">
-              <div className="w-full sm:w-1/2 xl:w-1/4 px-2 sm:px-3 lg:px-4 mb-8 sm:mb-10 xl:mb-10">        
-                <div className="flex items-center mb-4 sm:mb-6">
-                  <h3 className="text-white font-bold text-lg sm:text-xl">About Leksy Cosmetics</h3>
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
+            {/* About Section - Full Width on Mobile */}
+            <div className="mb-6 sm:mb-8 lg:mb-10 pb-6 sm:pb-8 border-b border-pink-300 border-opacity-30">
+              <div className="max-w-xl lg:max-w-none">
+                <div className="flex items-center mb-3 sm:mb-4">
+                  <h3 className="text-white font-bold text-lg sm:text-xl lg:text-2xl">About Leksy Cosmetics</h3>
                 </div>
-                <p className="text-gray-100 mb-4 sm:mb-6 text-xs sm:text-sm leading-relaxed">
+                <p className="text-gray-100 mb-3 sm:mb-4 text-sm sm:text-base leading-relaxed">
                   Leksy Cosmetic is a leading skincare brand in Nigeria, dedicated to providing premium beauty and skincare products that enhance and preserve your natural glow.
                 </p>
                 <div className="transform scale-90 sm:scale-100 origin-left">
                   <SocialLinks />
                 </div>
               </div>
-              
+            </div>
+
+            {/* Link Columns - 2 columns on mobile, 3 on tablet, 4 on desktop */}
+            <div className="flex flex-wrap -mx-3 sm:-mx-4">
               <FooterLinkGroup title="My Account" links={accountLinks} />
               <FooterLinkGroup title="Shop" links={shopLinks} />
               <FooterLinkGroup title="Information" links={infoLinks} />
             </div>
             
+            {/* Bottom Bar */}
             <div className="pt-6 sm:pt-8 mt-6 sm:mt-8 border-t border-pink-300 border-opacity-30 relative z-10">
-              <div className="flex flex-col lg:flex-row justify-between items-center space-y-4 lg:space-y-0">
+              <div className="flex flex-col lg:flex-row justify-between items-center space-y-4 lg:space-y-0 gap-4">
+                {/* Logo */}
                 <div className="order-2 lg:order-1">
                   <img src={logoWhite} alt="Leksy Cosmetics" className="h-6 sm:h-8 md:h-10"/>
                 </div>
                 
-                <p className="text-xs sm:text-sm text-gray-100 text-center order-1 lg:order-2">
+                {/* Copyright */}
+                <p className="text-sm sm:text-base text-gray-100 text-center order-1 lg:order-2">
                   Leksy Cosmetics © {new Date().getFullYear()}. All rights reserved.
                 </p>
 
+                {/* Developer Credit */}
                 <div className="flex items-center order-3">
-                  <p className="text-gray-100 text-xs sm:text-sm flex flex-col sm:flex-row items-center font-light text-center sm:text-left">
+                  <p className="text-gray-100 text-sm sm:text-base flex flex-col sm:flex-row items-center font-light text-center sm:text-left">
                     <span className="mb-1 sm:mb-0">Designed and Developed by</span>
                     <a 
                       href="https://trinitystudioltd.com" 
@@ -162,7 +170,7 @@ const Footer = () => {
                       className="flex items-center sm:ml-2 hover:opacity-80 transition-all duration-300 group"
                     >
                       <img src={TrintyLogo} alt="Trinity Studio" className="h-3 sm:h-4 md:h-5 w-auto group-hover:scale-110 transition-transform duration-300" />
-                      <span className="ml-1 font-medium group-hover:text-white transition-colors duration-300 text-xs sm:text-sm">Trinity Studio</span>
+                      <span className="ml-1 font-medium group-hover:text-white transition-colors duration-300 text-sm sm:text-base">Trinity Studio</span>
                     </a>
                   </p>
                 </div>

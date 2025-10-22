@@ -27,6 +27,9 @@ const OrderSummarySection = ({
     return formatPrice(shipping);
   };
 
+  // Check if user is a first-time purchaser
+  const isFirstTimePurchase = shippingDetails?.isFirstTimePurchase === true;
+
   return (
     <div className="lg:col-span-1">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 sticky top-8 overflow-hidden">
@@ -90,8 +93,29 @@ const OrderSummarySection = ({
                   )}
                 </div>
                 
-                {/* Discount Savings Info */}
-                {hasDeliveryDiscount && deliveryMethod !== 'pickup' && !isCalculatingShipping && (
+                {/* First-Time Purchase Bonus Banner */}
+                {isFirstTimePurchase && hasDeliveryDiscount && deliveryMethod !== 'pickup' && !isCalculatingShipping && (
+                  <div className="bg-gradient-to-r from-pink-50 to-pink-50 border-2 border-pink-200 rounded-lg p-3 mt-2">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-shrink-0">
+                        <svg className="w-5 h-5 text-pink-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-bold text-pink-900 mb-1">
+                          🎉 First-Time Purchase Bonus!
+                        </p>
+                        <p className="text-xs text-pink-700">
+                          Hurray! You got a special first-time buyer discount on delivery. Welcome to Leksy Cosmetics!
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Regular Discount Savings Info (for non-first-time buyers) */}
+                {!isFirstTimePurchase && hasDeliveryDiscount && deliveryMethod !== 'pickup' && !isCalculatingShipping && (
                   <div className="bg-green-50 border border-green-200 rounded-md p-2 mt-2">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-green-700 font-medium">
@@ -115,13 +139,20 @@ const OrderSummarySection = ({
                 
                 {/* Total Savings Summary */}
                 {hasDeliveryDiscount && deliveryMethod !== 'pickup' && !isCalculatingShipping && (
-                  <div className="mt-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3">
+                  <div className={`mt-3 rounded-lg p-3 border ${
+                    isFirstTimePurchase 
+                      ? 'bg-gradient-to-r from-pink-50 to-pink-50 border-pink-200' 
+                      : 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'
+                  }`}>
                     <div className="flex items-center justify-center gap-2">
-                      <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className={`w-4 h-4 flex-shrink-0 ${isFirstTimePurchase ? 'text-pink-600' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <p className="text-xs text-green-800 font-semibold">
-                        You saved {formatPrice(shippingDetails.original_delivery_fee - shippingDetails.delivery_fee)} on delivery!
+                      <p className={`text-xs font-semibold ${isFirstTimePurchase ? 'text-pink-800' : 'text-green-800'}`}>
+                        {isFirstTimePurchase 
+                          ? `You saved ${formatPrice(shippingDetails.original_delivery_fee - shippingDetails.delivery_fee)} with your first-time bonus!`
+                          : `You saved ${formatPrice(shippingDetails.original_delivery_fee - shippingDetails.delivery_fee)} on delivery!`
+                        }
                       </p>
                     </div>
                   </div>

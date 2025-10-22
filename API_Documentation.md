@@ -228,6 +228,7 @@ curl --location --request GET '{base_url}/api/fetch-delivery-fee?state={State|op
 ```JSON
 {
 	"code": 200,
+	"isFirstTimePurchase": true, // i.e, has the user purchased before?
 	"message": "Delivery fee fetched for Alimosho!",
 	"delivery_fee": 3999,
 	"original_delivery_fee": 3999,
@@ -246,6 +247,7 @@ curl --location --request GET '{base_url}/api/fetch-delivery-fees?total_price_of
 {
 	"code": 200,
 	"message": "Delivery fees fetch returned 37 results.",
+	"isFirstTimePurchase": true, // i.e, has the user purchased before?
 	"delivery_fees": [
 		{
 			"state": "Abia",
@@ -1374,6 +1376,7 @@ curl --location --request POST '{base_url}/api/fetch-delivery-discounts'
 {
 	"code": 200,
 	"message": "Delivery discount data returned 3 results",
+	"isFirstTimePurchase": true, // i.e, has the user purchased before?
 	"discount_data": [
 		{
 			"id": 1,

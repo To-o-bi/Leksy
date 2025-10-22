@@ -25,10 +25,12 @@ const CheckoutPage = () => {
   const [deliveryMethod, setDeliveryMethod] = useState('address');
   
   // Shipping state - stores the complete fee object from backend (already discounted)
+  // ✨ UPDATED: Now includes isFirstTimePurchase field
   const [shippingDetails, setShippingDetails] = useState({
     delivery_fee: 0,
     original_delivery_fee: 0,
-    discount_percent: 0
+    discount_percent: 0,
+    isFirstTimePurchase: false  // ← NEW: Track if user is first-time buyer
   });
   
   const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
@@ -90,13 +92,24 @@ const CheckoutPage = () => {
   }, [cart, navigate, isProcessingOrder]);
 
   // Calculate shipping based on delivery method and location - backend handles discount calculation
+  // ✨ UPDATED: Now properly handles and stores isFirstTimePurchase from API responses
   const calculateShipping = useCallback(async () => {
     setIsCalculatingShipping(true);
-    let feeData = { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
+    let feeData = { 
+      delivery_fee: 0, 
+      original_delivery_fee: 0, 
+      discount_percent: 0,
+      isFirstTimePurchase: false  // ← Default value
+    };
     
     try {
       if (deliveryMethod === 'bus-park') {
         feeData = await fetchBusParkDeliveryFee(totalPrice);
+        
+        // Log first-time purchase status for bus park
+        if (feeData.isFirstTimePurchase) {
+          console.log('🎉 [FIRST-TIME BUYER] Bus Park Delivery - Welcome bonus applied!');
+        }
       } else if (deliveryMethod === 'address' && formData.state) {
         // DEBUG LOGS FOR HOME DELIVERY ONLY
         console.log('🏠 ========== HOME DELIVERY DEBUG START ==========');
@@ -129,6 +142,11 @@ const CheckoutPage = () => {
           console.log('🏙️ [LAGOS LGA RESPONSE]');
           console.log(JSON.stringify(feeData, null, 2));
           
+          // ✨ NEW: Log first-time purchase status
+          if (feeData.isFirstTimePurchase) {
+            console.log('🎉 [FIRST-TIME BUYER DETECTED] Lagos LGA - First purchase bonus active!');
+          }
+          
           console.log('🏙️ [LAGOS LGA ANALYSIS]');
           console.log(JSON.stringify({
             original_delivery_fee: feeData.original_delivery_fee,
@@ -136,6 +154,7 @@ const CheckoutPage = () => {
             discount_percent: feeData.discount_percent,
             savings: feeData.original_delivery_fee - feeData.delivery_fee,
             discount_applied: feeData.discount_percent > 0,
+            isFirstTimePurchase: feeData.isFirstTimePurchase,  // ← NEW
             issue: feeData.discount_percent === 0 ? 'BACKEND NOT APPLYING DISCOUNT' : null
           }, null, 2));
         } else if (formData.state !== 'Lagos') {
@@ -151,6 +170,11 @@ const CheckoutPage = () => {
           console.log('🌍 [STATE DELIVERY RESPONSE]');
           console.log(JSON.stringify(feeData, null, 2));
           
+          // ✨ NEW: Log first-time purchase status
+          if (feeData.isFirstTimePurchase) {
+            console.log('🎉 [FIRST-TIME BUYER DETECTED] State Delivery - First purchase bonus active!');
+          }
+          
           console.log('🌍 [STATE DELIVERY ANALYSIS]');
           console.log(JSON.stringify({
             original_delivery_fee: feeData.original_delivery_fee,
@@ -158,6 +182,7 @@ const CheckoutPage = () => {
             discount_percent: feeData.discount_percent,
             savings: feeData.original_delivery_fee - feeData.delivery_fee,
             discount_applied: feeData.discount_percent > 0,
+            isFirstTimePurchase: feeData.isFirstTimePurchase,  // ← NEW
             expected_discount_from_admin: '70% (as per admin dashboard)',
             expected_discounted_fee: feeData.original_delivery_fee * 0.3,
             actual_fee_returned: feeData.delivery_fee,
@@ -169,7 +194,12 @@ const CheckoutPage = () => {
         console.log(JSON.stringify(feeData, null, 2));
         console.log('🏠 ========== HOME DELIVERY DEBUG END ==========');
       } else if (deliveryMethod === 'pickup') {
-        feeData = { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
+        feeData = { 
+          delivery_fee: 0, 
+          original_delivery_fee: 0, 
+          discount_percent: 0,
+          isFirstTimePurchase: false 
+        };
       }
     } catch (error) {
       if (deliveryMethod === 'address') {
@@ -184,9 +214,15 @@ const CheckoutPage = () => {
         }, null, 2));
         console.error('❌ ========== ERROR END ==========');
       }
-      feeData = { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
+      feeData = { 
+        delivery_fee: 0, 
+        original_delivery_fee: 0, 
+        discount_percent: 0,
+        isFirstTimePurchase: false 
+      };
     }
     
+    // ✨ IMPORTANT: Store the complete fee data including isFirstTimePurchase
     setShippingDetails(feeData);
     setIsCalculatingShipping(false);
   }, [deliveryMethod, formData.state, formData.city, totalPrice, cart]);
@@ -195,6 +231,7 @@ const CheckoutPage = () => {
     calculateShipping();
   }, [calculateShipping]);
 
+  // ✨ UPDATED: Enhanced logging to include first-time purchase status
   useEffect(() => {
     // Only log when home delivery discount changes
     if (deliveryMethod === 'address' && shippingDetails.discount_percent > 0) {
@@ -203,7 +240,9 @@ const CheckoutPage = () => {
         original_fee: shippingDetails.original_delivery_fee,
         discounted_fee: shippingDetails.delivery_fee,
         discount_percent: shippingDetails.discount_percent,
-        you_save: shippingDetails.original_delivery_fee - shippingDetails.delivery_fee
+        you_save: shippingDetails.original_delivery_fee - shippingDetails.delivery_fee,
+        isFirstTimePurchase: shippingDetails.isFirstTimePurchase,  // ← NEW
+        customerType: shippingDetails.isFirstTimePurchase ? 'NEW CUSTOMER 🎉' : 'RETURNING CUSTOMER'  // ← NEW
       });
     }
   }, [shippingDetails, deliveryMethod, formData.state]);
@@ -217,7 +256,7 @@ const CheckoutPage = () => {
           const lgas = await fetchLGADeliveryFees(formData.state, totalPrice);
           setAvailableLGAs(lgas);
         } catch (error) {
-          console.error('❌ [LAGOS LGAs] Error loading LGAs:', error);
+          console.error('Failed to load LGAs:', error);
           setAvailableLGAs([]);
         } finally {
           setIsLoadingLGAs(false);
@@ -339,6 +378,31 @@ const CheckoutPage = () => {
     processCheckout();
   };
 
+  // ✨ NEW: Determine banner message based on first-time purchase status
+  const getDiscountBannerMessage = () => {
+    if (!hasDeliveryDiscount || deliveryMethod === 'pickup') return null;
+    
+    if (shippingDetails.isFirstTimePurchase) {
+      return {
+        icon: '🎉',
+        text: `First-Time Buyer Bonus: ${shippingDetails.discount_percent}% OFF Delivery Fees!`,
+        gradient: 'from-pink-50 to-pink-50',
+        border: 'border-pink-200',
+        textColor: 'text-pink-800'
+      };
+    }
+    
+    return {
+      icon: '🎉',
+      text: `Special Offer: ${shippingDetails.discount_percent}% OFF Delivery Fees!`,
+      gradient: 'from-green-50 to-emerald-50',
+      border: 'border-green-200',
+      textColor: 'text-green-800'
+    };
+  };
+
+  const discountBanner = getDiscountBannerMessage();
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1200px] mx-auto px-4 py-8">
@@ -366,16 +430,16 @@ const CheckoutPage = () => {
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Checkout</h1>
           <p className="text-gray-600">Complete your order information below</p>
           
-          {/* Delivery Discount Banner */}
-          {hasDeliveryDiscount && deliveryMethod !== 'pickup' && (
+          {/* ✨ UPDATED: Dynamic Delivery Discount Banner with First-Time Buyer Support */}
+          {discountBanner && (
             <div className="mt-4 mx-auto max-w-2xl">
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4">
+              <div className={`bg-gradient-to-r ${discountBanner.gradient} border-2 ${discountBanner.border} rounded-lg p-4`}>
                 <div className="flex items-center justify-center gap-2">
-                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                   </svg>
-                  <span className="text-green-800 font-semibold">
-                    🎉 Special Offer: {shippingDetails.discount_percent}% OFF Delivery Fees!
+                  <span className={`${discountBanner.textColor} font-semibold`}>
+                    {discountBanner.icon} {discountBanner.text}
                   </span>
                 </div>
               </div>
@@ -405,13 +469,13 @@ const CheckoutPage = () => {
             />
           </div>
 
-          {/* Order Summary Sidebar */}
+          {/* Order Summary Sidebar - Now receives full shippingDetails with isFirstTimePurchase */}
           <OrderSummarySection 
             cart={cart}
             totalPrice={totalPrice}
             shipping={shipping}
             finalTotal={finalTotal}
-            shippingDetails={shippingDetails}
+            shippingDetails={shippingDetails}  // ← Includes isFirstTimePurchase
             hasDeliveryDiscount={hasDeliveryDiscount}
             deliveryMethod={deliveryMethod}
             isCalculatingShipping={isCalculatingShipping}
