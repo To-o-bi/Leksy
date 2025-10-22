@@ -14,6 +14,7 @@ const Header = () => {
   const [wishlistOpen, setWishlistOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [mobileShopOpen, setMobileShopOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname;
@@ -401,21 +402,85 @@ const Header = () => {
           </button>
         </div>
         
-        <nav className="p-4">
+        <nav className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
           <ul className="space-y-2">
             {navItems.map((item) => (
               <li key={item.name}>
-                <Link 
-                  to={item.path} 
-                  className={`block py-3 px-3 rounded-md transition-colors duration-200 text-base sm:text-lg touch-manipulation ${
-                    isActive(item.path) 
-                      ? 'bg-pink-50 text-pink-500 font-medium' 
-                      : 'text-gray-800 hover:bg-gray-50 hover:text-pink-500 active:bg-gray-100'
-                  }`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {item.name}
-                </Link>
+                {item.name === 'Shop' ? (
+                  <div>
+                    <button
+                      onClick={() => setMobileShopOpen(!mobileShopOpen)}
+                      className={`w-full flex items-center justify-between py-3 px-3 rounded-md transition-colors duration-200 text-base sm:text-lg touch-manipulation ${
+                        isActive(item.path)
+                          ? 'bg-pink-50 text-pink-500 font-medium'
+                          : 'text-gray-800 hover:bg-gray-50 hover:text-pink-500 active:bg-gray-100'
+                      }`}
+                    >
+                      <span>{item.name}</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className={`h-5 w-5 transition-transform duration-200 ${mobileShopOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {mobileShopOpen && (
+                      <div className="mt-2 ml-4 space-y-1">
+                        {[
+                          { name: 'Serums', value: 'serum' },
+                          { name: 'Cleansers', value: 'cleanser' },
+                          { name: 'Toners', value: 'toner' },
+                          { name: 'Masks', value: 'mask' },
+                          { name: 'Sunscreens', value: 'sunscreen' },
+                          { name: 'Moisturizers', value: 'moisturizer' },
+                          { name: 'Body and Bath', value: 'body-and-bath' },
+                          { name: 'Eye Creams', value: 'eye-cream' },
+                          { name: 'Beauty', value: 'beauty' },
+                          { name: 'Perfumes', value: 'perfume' },
+                        ].map((category) => (
+                          <button
+                            key={category.value}
+                            onClick={() => {
+                              navigate(`/shop?category=${encodeURIComponent(category.value)}`);
+                              setMobileMenuOpen(false);
+                              setMobileShopOpen(false);
+                            }}
+                            className="w-full text-left py-2 px-3 rounded-md text-sm sm:text-base text-gray-700 hover:bg-gray-50 hover:text-pink-500 active:bg-gray-100 touch-manipulation transition-colors duration-200"
+                          >
+                            {category.name}
+                          </button>
+                        ))}
+                        <div className="border-t border-gray-200 my-1"></div>
+                        <button
+                          onClick={() => {
+                            navigate('/shop');
+                            setMobileMenuOpen(false);
+                            setMobileShopOpen(false);
+                          }}
+                          className="w-full text-left py-2 px-3 rounded-md text-sm sm:text-base text-gray-700 hover:bg-gray-50 hover:text-pink-500 active:bg-gray-100 touch-manipulation transition-colors duration-200 font-medium"
+                        >
+                          Browse All Products
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Link
+                    to={item.path}
+                    className={`block py-3 px-3 rounded-md transition-colors duration-200 text-base sm:text-lg touch-manipulation ${
+                      isActive(item.path)
+                        ? 'bg-pink-50 text-pink-500 font-medium'
+                        : 'text-gray-800 hover:bg-gray-50 hover:text-pink-500 active:bg-gray-100'
+                    }`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {item.name}
+                  </Link>
+                )}
               </li>
             ))}
           </ul>
@@ -466,15 +531,31 @@ const Header = () => {
 // Navigation Component
 const Navigation = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname;
-  
+  const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
   const navItems = [
     { name: 'Home', path: '/' },
-    { name: 'Shop', path: '/shop' },
+    { name: 'Shop', path: '/shop', hasDropdown: true },
     { name: 'Consultation', path: '/consultation' },
     { name: 'Contact us', path: '/contact' },
   ];
-  
+
+  const categories = [
+    { name: 'Serums', value: 'serum' },
+    { name: 'Cleansers', value: 'cleanser' },
+    { name: 'Toners', value: 'toner' },
+    { name: 'Masks', value: 'mask' },
+    { name: 'Sunscreens', value: 'sunscreen' },
+    { name: 'Moisturizers', value: 'moisturizer' },
+    { name: 'Body and Bath', value: 'body-and-bath' },
+    { name: 'Eye Creams', value: 'eye-cream' },
+    { name: 'Beauty', value: 'beauty' },
+    { name: 'Perfumes', value: 'perfume' },
+  ];
+
   // Check if current path matches nav item path
   const isActive = (path) => {
     if (path === '/') {
@@ -482,23 +563,95 @@ const Navigation = () => {
     }
     return currentPath.startsWith(path);
   };
-  
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShopDropdownOpen(false);
+      }
+    };
+
+    if (shopDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [shopDropdownOpen]);
+
+  const handleCategoryClick = (categoryValue) => {
+    setShopDropdownOpen(false);
+    if (categoryValue) {
+      navigate(`/shop?category=${encodeURIComponent(categoryValue)}`);
+    } else {
+      navigate('/shop');
+    }
+  };
+
   return (
     <nav>
       <ul className="flex space-x-6">
         {navItems.map((item) => (
-          <li key={item.name}>
-            <Link
-              to={item.path}
-              className={`text-gray-800 hover:text-pink-500 relative pb-2 transition-colors duration-300 ${
-                isActive(item.path) ? 'text-pink-500 font-medium' : ''
-              }`}
-            >
-              {item.name}
-              {isActive(item.path) && (
-                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-pink-500 rounded-full"></span>
-              )}
-            </Link>
+          <li key={item.name} className="relative" ref={item.hasDropdown ? dropdownRef : null}>
+            {item.hasDropdown ? (
+              <>
+                <button
+                  onClick={() => setShopDropdownOpen(!shopDropdownOpen)}
+                  className={`text-gray-800 hover:text-pink-500 relative pb-2 transition-colors duration-300 flex items-center ${
+                    isActive(item.path) ? 'text-pink-500 font-medium' : ''
+                  }`}
+                >
+                  {item.name}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`h-4 w-4 ml-1 transition-transform duration-200 ${shopDropdownOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                  {isActive(item.path) && (
+                    <span className="absolute bottom-0 left-0 w-full h-0.5 bg-pink-500 rounded-full"></span>
+                  )}
+                </button>
+
+                {shopDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
+                    {categories.map((category) => (
+                      <button
+                        key={category.value}
+                        onClick={() => handleCategoryClick(category.value)}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors duration-200"
+                      >
+                        {category.name}
+                      </button>
+                    ))}
+                    <div className="border-t border-gray-200 my-1"></div>
+                    <button
+                      onClick={() => handleCategoryClick('')}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-600 transition-colors duration-200 font-medium"
+                    >
+                      Browse All Products
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <Link
+                to={item.path}
+                className={`text-gray-800 hover:text-pink-500 relative pb-2 transition-colors duration-300 ${
+                  isActive(item.path) ? 'text-pink-500 font-medium' : ''
+                }`}
+              >
+                {item.name}
+                {isActive(item.path) && (
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-pink-500 rounded-full"></span>
+                )}
+              </Link>
+            )}
           </li>
         ))}
       </ul>

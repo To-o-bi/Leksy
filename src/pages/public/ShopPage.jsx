@@ -75,6 +75,19 @@ const ShopPage = () => {
             navigate(location.pathname, { replace: true, state: {} });
         }
     }, [location.state, location.pathname, navigate]);
+
+    // Handle category changes from URL query parameters
+    useEffect(() => {
+        const urlParams = new URLSearchParams(location.search);
+        const categoryFromUrl = urlParams.get('category') || '';
+
+        setSelectedFilters(prev => {
+            if (prev.category !== categoryFromUrl) {
+                return { ...prev, category: categoryFromUrl };
+            }
+            return prev;
+        });
+    }, [location.search]);
     
     // Update products for current page
     useEffect(() => {
