@@ -16,8 +16,8 @@ const Card = React.memo(({
   return (
     <div className={`group transform transition-all duration-1000 ease-out cursor-pointer hover:z-40 ${className}`}
          style={style}>
-      <div className="relative w-full h-full rounded-3xl bg-gradient-to-br from-pink-50 to-white p-1 shadow-2xl hover:shadow-pink-200/50">
-        <div className="w-full h-full rounded-3xl overflow-hidden bg-white shadow-inner relative">
+      <div className={`relative w-full h-full rounded-3xl bg-gradient-to-br from-pink-50 to-white p-1 ${isMobile ? '' : 'shadow-2xl hover:shadow-pink-200/50'}`}>
+        <div className={`w-full h-full rounded-3xl overflow-hidden bg-white relative ${isMobile ? '' : 'shadow-inner'}`}>
           <img
             src={cardImage}
             alt="Beauty product showcase"
@@ -162,11 +162,6 @@ const HeroCards = () => {
     setTouchEnd(0);
   };
 
-  const goToSlide = (index) => {
-    setCurrentSlide(index);
-    clearInterval(autoPlayRef.current);
-  };
-
   const cardConfigs = [
     {
       className: `w-44 h-60 sm:w-52 sm:h-72 ${
@@ -212,7 +207,7 @@ const HeroCards = () => {
 
   if (isMobile) {
     return (
-      <div className="flex-grow relative flex items-start justify-center px-4 -mt-8">
+      <div className="hero-cards invisible flex-grow relative flex items-start justify-center px-4 mt-2">
         <div
           className="relative w-full max-w-sm mx-auto overflow-hidden"
           onTouchStart={handleTouchStart}
@@ -247,25 +242,9 @@ const HeroCards = () => {
             ))}
           </div>
 
-          {/* Navigation Dots */}
-          <div className="flex justify-center gap-2 mt-2">
-            {cardData.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => goToSlide(index)}
-                className={`transition-all duration-300 rounded-full ${
-                  index === currentSlide
-                    ? 'w-8 h-2 bg-pink-500'
-                    : 'w-2 h-2 bg-pink-200 hover:bg-pink-300'
-                }`}
-                aria-label={`Go to slide ${index + 1}`}
-              />
-            ))}
-          </div>
-
           {/* Swipe Hint */}
           {centerCardAnimated && currentSlide === 0 && (
-            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-gray-400 text-xs flex items-center gap-2 animate-pulse">
+            <div className="flex items-center justify-center gap-2 mt-2 text-gray-400 text-xs animate-pulse">
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
               </svg>
@@ -282,7 +261,7 @@ const HeroCards = () => {
 
   // Desktop view (original fanned layout)
   return (
-    <div className="flex-grow relative flex items-start justify-center pt-8 md:pt-12 lg:pt-16">
+    <div className="hero-cards invisible flex-grow relative flex items-start justify-center pt-8 md:pt-12 lg:pt-16">
       <div className="flex items-center justify-center space-x-[-1.5rem] xl:space-x-[-1rem]">
         {cardData.map((card, index) => (
           <Card

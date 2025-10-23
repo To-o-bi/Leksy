@@ -223,7 +223,7 @@ const Categories = () => {
   // Loading Skeleton UI
   if (loading && categories.length === 0) {
     return (
-      <section className="py-8 sm:py-10 md:py-12 lg:py-16 bg-gray-50/30">
+      <section className="-mt-8 md:mt-0 py-8 sm:py-10 md:py-12 lg:py-16 bg-gray-50/30">
         <div className="container mx-auto px-3 sm:px-4 md:px-6 text-center">
           <div className="animate-pulse">
             <div className="h-6 sm:h-8 w-32 sm:w-48 bg-gray-200 rounded-md mx-auto mb-8 sm:mb-12"></div>
@@ -246,7 +246,7 @@ const Categories = () => {
   // No Categories to show
   if (categories.length === 0) {
     return (
-      <section className="py-8 sm:py-10 md:py-12 lg:py-16 bg-gray-50/30">
+      <section className="-mt-8 md:mt-0 py-8 sm:py-10 md:py-12 lg:py-16 bg-gray-50/30">
         <div className="container mx-auto px-3 sm:px-4 md:px-6 text-center">
           <p className="text-sm sm:text-base text-gray-500">No categories found</p>
         </div>
@@ -255,7 +255,7 @@ const Categories = () => {
   }
 
   return (
-    <section className="py-8 sm:py-10 md:py-12 lg:py-16 bg-gray-50/30">
+    <section className="-mt-8 md:mt-0 py-8 sm:py-10 md:py-12 lg:py-16 bg-gray-50/30">
       <div className="container mx-auto px-3 sm:px-4 md:px-6">
         <div className="text-center mb-6 sm:mb-8 md:mb-10 lg:mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-2 text-gray-900">Categories</h2>

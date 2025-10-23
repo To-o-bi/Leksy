@@ -26,18 +26,20 @@ const HeroBanner = () => {
   // Total slides including the hero content (index 0)
   const totalSlides = Math.max(desktopSlides.length, mobileSlides.length) + 1;
 
-  // Auto-carousel effect
+  // Auto-carousel effect - 10s for hero content, 7s for image slides
   useEffect(() => {
+    const delay = currentSlide === 0 ? 10000 : 7000; // 10s for hero, 7s for images
+
     const interval = setInterval(() => {
       setIsTransitioning(true);
       setTimeout(() => {
         setCurrentSlide((prev) => (prev + 1) % totalSlides);
         setIsTransitioning(false);
-      }, 500); // Transition duration
-    }, 7000); // 7 seconds per slide
+      }, 500);
+    }, delay);
 
     return () => clearInterval(interval);
-  }, [totalSlides]);
+  }, [currentSlide, totalSlides]);
 
   useEffect(() => {
     const ScrollReveal = window.ScrollReveal;
@@ -68,10 +70,10 @@ const HeroBanner = () => {
         duration: 1000
       });
 
-      sr.reveal('.scroll-indicator', {
+      sr.reveal('.hero-cards', {
         origin: 'bottom',
         delay: 900,
-        duration: 800
+        duration: 1000
       });
 
       // Animate background images after all other elements
@@ -178,8 +180,8 @@ const HeroBanner = () => {
         ))}
       </div>
 
-      {/* Carousel Indicators */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 flex gap-2">
+      {/* Carousel Indicators - Desktop Only */}
+      <div className="hidden md:flex absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 gap-2">
         {Array.from({ length: totalSlides }).map((_, index) => (
           <button
             key={index}
