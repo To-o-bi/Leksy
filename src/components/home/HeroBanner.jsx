@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import HeroTitle from './banner/HeroTitle';
 import HeroCards from './banner/HeroCards';
 import ScrollIndicator from './banner/ScrollIndicator';
-import SocialMediaWidget from './banner/SocialMediaWidget';
 
 const HeroBanner = () => {
   useEffect(() => {
@@ -82,15 +81,12 @@ const HeroBanner = () => {
       <div className="container mx-auto px-4 relative z-10 flex flex-col h-full">
         {/* Hero Title Section */}
         <HeroTitle />
-        
+
         {/* Hero Cards Section */}
         <HeroCards />
 
         {/* Scroll Indicator */}
         <ScrollIndicator />
-
-        {/* Social Media Widget */}
-        <SocialMediaWidget />
       </div>
     </section>
   );

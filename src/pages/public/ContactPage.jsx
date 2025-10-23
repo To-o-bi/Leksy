@@ -184,8 +184,8 @@ const ContactPage = () => {
           {/* Left Column - Contact Form */}
           <div className="lg:col-span-7">
             <ContactHeader />
-            
-            <div className="bg-white shadow-lg rounded-lg p-8">
+
+            <div className="bg-white shadow-lg rounded-lg p-4 sm:p-6 md:p-8">
               {submitSuccess ? (
                 <ContactSuccessMessage onSendAnother={handleSendAnother} />
               ) : (

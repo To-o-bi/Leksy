@@ -10,6 +10,7 @@ import ShopByConcern from '../../components/home/ShopByConcern';
 import BrandLogoSlider from '../../components/home/BrandLogoSlider';
 import Testimonials from '../../components/home/Testimonials';
 import ConsultationCTA from '../../components/home/ConsultationCTA';
+import SocialMediaWidget from '../../components/home/banner/SocialMediaWidget';
 
 const HomePage = () => {
   return (
@@ -25,9 +26,9 @@ const HomePage = () => {
           {/* Hero Banner doesn't need animation as it's visible on load */}
           <HeroBanner />
           <div className="container mx-auto px-2 md:px-8 lg:px-2 max-w-8xl">
-            
+
             <Categories />
-            
+
             <div className="reveal-bottom">
                <TrendingNow />
             </div>
@@ -43,7 +44,7 @@ const HomePage = () => {
             </div>
           </div>
           <div className="reveal-bottom">
-             <Testimonials /> 
+             <Testimonials />
           </div>
           <div className="reveal-bottom">
              <ConsultationCTA />
@@ -52,6 +53,9 @@ const HomePage = () => {
              <BrandLogoSlider />
           </div>
         </main>
+
+        {/* Social Media Widget - Global fixed position */}
+        <SocialMediaWidget />
       </div>
     </>
   );

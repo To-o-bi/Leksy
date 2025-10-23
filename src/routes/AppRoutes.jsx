@@ -14,17 +14,25 @@ const ScrollRevealLayout = memo(() => {
     const ScrollReveal = window.ScrollReveal;
 
     if (ScrollReveal) {
+      // Check if mobile device
+      const isMobile = window.innerWidth < 768;
+
       const sr = ScrollReveal({
-        distance: '60px',
-        duration: 2500,
-        delay: 400,
+        distance: isMobile ? '25px' : '40px',
+        duration: isMobile ? 900 : 1000,
+        delay: isMobile ? 100 : 150,
         reset: false,
+        viewFactor: isMobile ? 0.1 : 0.15, // Trigger earlier on mobile
+        easing: 'ease-in-out', // Soft ease-in-out
+        mobile: true, // Enable on mobile
+        opacity: 0, // Start from transparent
+        scale: 0.95, // Slight scale effect for smoothness
       });
 
-      sr.reveal('.reveal-bottom', { origin: 'bottom', interval: 200 });
-      sr.reveal('.reveal-left', { origin: 'left', interval: 200 });
-      sr.reveal('.reveal-right', { origin: 'right', interval: 200 });
-      sr.reveal('.reveal-top', { origin: 'top', interval: 200 });
+      sr.reveal('.reveal-bottom', { origin: 'bottom', interval: isMobile ? 80 : 120 });
+      sr.reveal('.reveal-left', { origin: 'left', interval: isMobile ? 80 : 120 });
+      sr.reveal('.reveal-right', { origin: 'right', interval: isMobile ? 80 : 120 });
+      sr.reveal('.reveal-top', { origin: 'top', interval: isMobile ? 80 : 120 });
     }
   }, []);
 

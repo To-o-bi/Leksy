@@ -36,10 +36,10 @@ const ImageCarousel = () => {
   }, [slides.length]);
 
   return (
-    <div className="rounded-lg overflow-hidden bg-gray-100 h-64 mb-6 relative">
+    <div className="rounded-lg overflow-hidden bg-gray-100 mb-6 relative h-48 sm:h-56 md:h-64 lg:h-72">
       <div className="h-full relative">
-        <div 
-          className="flex transition-transform duration-1000 h-full" 
+        <div
+          className="flex transition-transform duration-1000 h-full"
           style={{ transform: `translateX(-${activeSlide * 100}%)` }}
         >
           {slides.map((slide) => (
@@ -53,14 +53,14 @@ const ImageCarousel = () => {
             </div>
           ))}
         </div>
-        
+
         {/* Slide indicators */}
-        <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2">
+        <div className="absolute bottom-3 sm:bottom-4 left-0 right-0 flex justify-center space-x-2 z-10">
           {slides.map((_, index) => (
             <button
               key={index}
               onClick={() => setActiveSlide(index)}
-              className={`w-3 h-3 rounded-full transition-colors ${
+              className={`w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3 rounded-full transition-colors ${
                 activeSlide === index ? 'bg-pink-500' : 'bg-white bg-opacity-60'
               }`}
               aria-label={`Go to slide ${index + 1}`}

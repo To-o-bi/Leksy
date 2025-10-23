@@ -105,7 +105,7 @@ const CartPage = () => {
                                 {/* Cart Header */}
                                 <div className="p-4 sm:p-6 border-b">
                                     <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
-                                        Cart Items ({totalItems})
+                                        Cart Items ({cart.length})
                                     </h2>
                                 </div>
                                 

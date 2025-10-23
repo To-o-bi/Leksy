@@ -401,7 +401,7 @@ const Header = () => {
           </button>
         </div>
         
-        <nav className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+        <nav className="p-4 overflow-y-auto pb-6" style={{ maxHeight: 'calc(100vh - 140px)' }}>
           <ul className="space-y-2">
             {navItems.map((item) => (
               <li key={item.name}>
