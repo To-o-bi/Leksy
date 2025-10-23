@@ -25,7 +25,7 @@ const HomePage = () => {
         <main className="flex-grow">
           {/* Hero Banner doesn't need animation as it's visible on load */}
           <HeroBanner />
-          <div className="container mx-auto px-2 md:px-8 lg:px-2 max-w-8xl">
+          <div className="container mx-auto px-2 md:px-8 lg:px-2 max-w-8xl -mt-20 md:mt-0">
 
             <Categories />
 

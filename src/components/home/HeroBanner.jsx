@@ -92,7 +92,11 @@ const HeroBanner = () => {
   }, []);
 
   return (
-    <section className="relative h-screen bg-white overflow-hidden flex flex-col font-sans">
+    <section
+      className={`relative bg-white overflow-hidden flex flex-col font-sans transition-all duration-500 ${
+        currentSlide === 0 ? 'h-screen' : 'h-[90vh] md:h-screen'
+      }`}
+    >
 
       {/* Carousel Container */}
       <div className="absolute inset-0">

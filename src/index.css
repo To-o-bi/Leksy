@@ -6,4 +6,21 @@
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading;
   }
+
+  /* Keep base font size standard */
+  html {
+    font-size: 16px;
+  }
+
+  /* Increase body text size on mobile only */
+  @media (max-width: 767px) {
+    body, p, a:not(h1 a):not(h2 a):not(h3 a):not(h4 a):not(h5 a):not(h6 a), li, td, th, label, input, textarea, select, button {
+      font-size: 1.25rem; /* 20px when base is 16px */
+    }
+
+    /* Apply to spans not inside headings */
+    span:not(h1 span):not(h2 span):not(h3 span):not(h4 span):not(h5 span):not(h6 span) {
+      font-size: 1.25rem;
+    }
+  }
 }

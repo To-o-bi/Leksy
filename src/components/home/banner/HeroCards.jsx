@@ -1,18 +1,40 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-const Card = React.memo(({ 
-  index, 
-  cardImage, 
-  cardVideo, 
+const Card = React.memo(({
+  index,
+  cardImage,
+  cardVideo,
   centerCardAnimated,
-  isAnimating, 
+  isAnimating,
   activeCardIndex,
   className,
   style,
   isMobile
 }) => {
-  const shouldShowVideo = activeCardIndex === index;
-  
+  const [videoLoaded, setVideoLoaded] = useState(false);
+  const videoRef = useRef(null);
+  const shouldShowVideo = activeCardIndex === index && (!isMobile || videoLoaded);
+
+  useEffect(() => {
+    if (isMobile && videoRef.current && activeCardIndex === index) {
+      // For mobile, only play video after it's loaded
+      const handleCanPlay = () => {
+        setVideoLoaded(true);
+        videoRef.current?.play();
+      };
+
+      videoRef.current.addEventListener('canplaythrough', handleCanPlay);
+      videoRef.current.load();
+
+      return () => {
+        videoRef.current?.removeEventListener('canplaythrough', handleCanPlay);
+      };
+    } else if (!isMobile && videoRef.current && activeCardIndex === index) {
+      // For desktop, play immediately
+      videoRef.current.play();
+    }
+  }, [activeCardIndex, index, isMobile]);
+
   return (
     <div className={`group transform transition-all duration-1000 ease-out cursor-pointer hover:z-40 ${className}`}
          style={style}>
@@ -25,13 +47,14 @@ const Card = React.memo(({
             loading="lazy"
           />
           <video
+            ref={videoRef}
             src={cardVideo}
-            autoPlay
+            autoPlay={!isMobile}
             loop
             muted
             playsInline
             className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-100 ${shouldShowVideo ? 'opacity-100 scale-105' : 'opacity-0'}`}
-            preload="none"
+            preload={isMobile ? "auto" : "none"}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-pink-500/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         </div>

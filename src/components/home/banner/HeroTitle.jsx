@@ -4,11 +4,12 @@ import { Link } from 'react-router-dom';
 const HeroTitle = () => {
   return (
     <div className="text-center max-w-4xl mx-auto pt-4 sm:pt-6 md:pt-8 pb-0 px-4 flex-shrink-0 relative">
-      <h1 className="hero-title invisible relative z-10 text-4xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 leading-tight text-gray-800 flex flex-wrap items-center justify-center gap-x-2">
-        Your <span className="text-pink-500">Beauty,</span> Our Priority
+      <h1 className="hero-title invisible relative z-10 text-4xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 leading-tight text-gray-800">
+        <span className="block sm:inline">Your <span className="text-pink-500">Beauty,</span></span>
+        <span className="block sm:inline"> Our Priority</span>
       </h1>
 
-      <p className="hero-subtitle invisible relative z-10 text-sm sm:text-sm md:text-base lg:text-lg text-gray-600 mb-3 sm:mb-4 max-w-2xl mx-auto leading-relaxed px-2">
+      <p className="hero-subtitle invisible relative z-10 text-base sm:text-sm md:text-base lg:text-lg text-gray-600 mb-3 sm:mb-4 max-w-2xl mx-auto leading-relaxed px-2">
         Shop our best-selling skincare & cosmetics, designed for radiant, flawless skin.
       </p>
 
