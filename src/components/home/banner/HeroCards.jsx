@@ -212,8 +212,8 @@ const HeroCards = () => {
 
   if (isMobile) {
     return (
-      <div className="flex-grow relative flex items-center justify-center px-4">
-        <div 
+      <div className="flex-grow relative flex items-start justify-center px-4 -mt-8">
+        <div
           className="relative w-full max-w-sm mx-auto overflow-hidden"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -248,14 +248,14 @@ const HeroCards = () => {
           </div>
 
           {/* Navigation Dots */}
-          <div className="flex justify-center gap-2 mt-6">
+          <div className="flex justify-center gap-2 mt-2">
             {cardData.map((_, index) => (
               <button
                 key={index}
                 onClick={() => goToSlide(index)}
                 className={`transition-all duration-300 rounded-full ${
-                  index === currentSlide 
-                    ? 'w-8 h-2 bg-pink-500' 
+                  index === currentSlide
+                    ? 'w-8 h-2 bg-pink-500'
                     : 'w-2 h-2 bg-pink-200 hover:bg-pink-300'
                 }`}
                 aria-label={`Go to slide ${index + 1}`}
@@ -265,12 +265,12 @@ const HeroCards = () => {
 
           {/* Swipe Hint */}
           {centerCardAnimated && currentSlide === 0 && (
-            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-gray-400 text-sm flex items-center gap-2 animate-pulse">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-gray-400 text-xs flex items-center gap-2 animate-pulse">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
               </svg>
               <span>Swipe to explore</span>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
             </div>

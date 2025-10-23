@@ -7,8 +7,8 @@ export default {
     theme: {
       extend: {
         fontFamily: {
-          'heading': ['"Bricolage Grotesque"', 'system-ui', 'sans-serif'],
-          'sans': ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+          'heading': ['"Baloo 2"', 'system-ui', 'sans-serif'],
+          'sans': ['Afacad', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         },
       },
     },

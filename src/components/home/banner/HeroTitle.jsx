@@ -12,7 +12,7 @@ const HeroTitle = () => {
         Shop our best-selling skincare & cosmetics, designed for radiant, flawless skin.
       </p>
       
-      <div className="hero-buttons invisible relative flex flex-col sm:flex-row gap-2.5 sm:gap-3 justify-center items-stretch sm:items-center mb-0 px-2">
+      <div className="hero-buttons invisible relative flex flex-col sm:flex-row gap-2.5 sm:gap-3 justify-center items-stretch sm:items-center px-2">
         <Link 
           to="/shop" 
           className="relative z-10 group bg-pink-500 text-white py-2.5 sm:py-2.5 md:py-3 px-5 sm:px-6 rounded-full font-semibold text-xs sm:text-sm hover:bg-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center whitespace-nowrap"
