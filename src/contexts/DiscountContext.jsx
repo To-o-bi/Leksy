@@ -54,7 +54,6 @@ export const DiscountProvider = ({ children }) => {
         throw new Error(response?.message || 'Failed to fetch discounts');
       }
     } catch (err) {
-      console.error('Error fetching discounts:', err);
       setError(err.message);
       setDiscounts([]); // Clear discounts on error
       setLoading(false);

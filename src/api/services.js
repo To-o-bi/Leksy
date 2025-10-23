@@ -662,7 +662,6 @@ export const discountService = {
       
       return { code: 200, discounts: [], message: 'No active discounts' };
     } catch (error) {
-      console.error('Error fetching discounts:', error);
       return { code: 200, discounts: [], message: 'No discounts available' };
     }
   },
@@ -779,12 +778,6 @@ export const deliveryDiscountService = {
   async fetchAllDeliveryDiscounts() {
     try {
       const formBody = new URLSearchParams({ action: 'fetch' }).toString();
-      
-      console.log('🔍 [FETCH ALL DELIVERY DISCOUNTS] Request:', {
-        endpoint: ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
-        body: formBody
-      });
-      
       const response = await api.post(
         ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
         formBody,
@@ -794,17 +787,8 @@ export const deliveryDiscountService = {
           }
         }
       );
-      
-      console.log('✅ [FETCH ALL DELIVERY DISCOUNTS] Response:', response.data);
-      
       return response.data;
     } catch (error) {
-      console.error('❌ [FETCH ALL DELIVERY DISCOUNTS] Error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      
       if (error.response?.status === 404 || error.response?.data?.code === 404) {
         return { code: 200, discount_data: [], message: 'No delivery discounts found' };
       }
@@ -818,12 +802,6 @@ export const deliveryDiscountService = {
         action: 'fetch',
         discount_id: discountId
       }).toString();
-      
-      console.log('🔍 [FETCH DELIVERY DISCOUNT BY ID] Request:', {
-        endpoint: ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
-        discountId
-      });
-      
       const response = await api.post(
         ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
         formBody,
@@ -833,12 +811,8 @@ export const deliveryDiscountService = {
           }
         }
       );
-      
-      console.log('✅ [FETCH DELIVERY DISCOUNT BY ID] Response:', response.data);
-      
       return response.data;
     } catch (error) {
-      console.error('❌ [FETCH DELIVERY DISCOUNT BY ID] Error:', error);
       throw new Error(error.response?.data?.message || 'Failed to fetch delivery discount');
     }
   },
@@ -849,12 +823,6 @@ export const deliveryDiscountService = {
         action: 'fetch',
         state: state
       }).toString();
-      
-      console.log('🔍 [FETCH DELIVERY DISCOUNT BY STATE] Request:', {
-        endpoint: ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
-        state
-      });
-      
       const response = await api.post(
         ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
         formBody,
@@ -864,12 +832,8 @@ export const deliveryDiscountService = {
           }
         }
       );
-      
-      console.log('✅ [FETCH DELIVERY DISCOUNT BY STATE] Response:', response.data);
-      
       return response.data;
     } catch (error) {
-      console.error('❌ [FETCH DELIVERY DISCOUNT BY STATE] Error:', error);
       if (error.response?.status === 404 || error.response?.data?.code === 404) {
         return { code: 404, discount_data: null, message: 'No discount found for this state' };
       }
@@ -898,13 +862,6 @@ export const deliveryDiscountService = {
 
     try {
       const formBody = new URLSearchParams(params).toString();
-      
-      console.log('➕ [CREATE DELIVERY DISCOUNT] Request:', {
-        endpoint: ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
-        params,
-        formBody
-      });
-      
       const response = await api.post(
         ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
         formBody,
@@ -914,20 +871,12 @@ export const deliveryDiscountService = {
           }
         }
       );
-      
-      console.log('✅ [CREATE DELIVERY DISCOUNT] Response:', response.data);
-      
       if (response.data.code === 200) {
         return response.data;
       }
       
       throw new Error(response.data.message || 'Failed to create delivery discount');
     } catch (error) {
-      console.error('❌ [CREATE DELIVERY DISCOUNT] Error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
       throw new Error(error.response?.data?.message || error.message || 'Failed to create delivery discount');
     }
   },
@@ -963,13 +912,6 @@ export const deliveryDiscountService = {
 
     try {
       const formBody = new URLSearchParams(params).toString();
-      
-      console.log('✏️ [EDIT DELIVERY DISCOUNT] Request:', {
-        endpoint: ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
-        params,
-        formBody
-      });
-      
       const response = await api.post(
         ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
         formBody,
@@ -979,20 +921,12 @@ export const deliveryDiscountService = {
           }
         }
       );
-      
-      console.log('✅ [EDIT DELIVERY DISCOUNT] Response:', response.data);
-      
       if (response.data.code === 200) {
         return response.data;
       }
       
       throw new Error(response.data.message || 'Failed to edit delivery discount');
     } catch (error) {
-      console.error('❌ [EDIT DELIVERY DISCOUNT] Error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
       throw new Error(error.response?.data?.message || error.message || 'Failed to edit delivery discount');
     }
   },
@@ -1003,12 +937,6 @@ export const deliveryDiscountService = {
         action: 'delete',
         discount_id: discountId
       }).toString();
-      
-      console.log('🗑️ [DELETE DELIVERY DISCOUNT] Request:', {
-        endpoint: ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
-        discountId
-      });
-      
       const response = await api.post(
         ENDPOINTS.MANAGE_DELIVERY_DISCOUNT,
         formBody,
@@ -1018,16 +946,8 @@ export const deliveryDiscountService = {
           }
         }
       );
-      
-      console.log('✅ [DELETE DELIVERY DISCOUNT] Response:', response.data);
-      
       return response.data;
     } catch (error) {
-      console.error('❌ [DELETE DELIVERY DISCOUNT] Error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
       throw new Error(error.response?.data?.message || 'Failed to delete delivery discount');
     }
   },

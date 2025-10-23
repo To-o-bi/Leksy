@@ -120,7 +120,6 @@ export const fetchDeliveryFeeForState = async (state, totalPrice = 0) => {
     const response = await fetch(url);
     const result = await response.json();
     
-    console.log('📦 Delivery fee response for state:', state, result);
     
     if (result.code === 200) {
       return {
@@ -133,7 +132,6 @@ export const fetchDeliveryFeeForState = async (state, totalPrice = 0) => {
     // Fallback if state not found
     return { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
   } catch (error) {
-    console.error('❌ Error fetching delivery fee for state:', error);
     return { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
   }
 };
@@ -151,7 +149,6 @@ export const fetchLGADeliveryFees = async (state, totalPrice = 0) => {
     const response = await fetch(url);
     const result = await response.json();
     
-    console.log('🏙️ LGA delivery fees response:', result);
     
     if (result.code === 200 && result.delivery_fees) {
       return result.delivery_fees.map(fee => ({
@@ -165,7 +162,6 @@ export const fetchLGADeliveryFees = async (state, totalPrice = 0) => {
     
     return [];
   } catch (error) {
-    console.error('❌ Error fetching LGA delivery fees:', error);
     return [];
   }
 };
@@ -183,7 +179,6 @@ export const fetchDeliveryFeeForLGA = async (lga, totalPrice = 0) => {
     const response = await fetch(url);
     const result = await response.json();
     
-    console.log('🏙️ Delivery fee response for LGA:', lga, result);
     
     if (result.code === 200) {
       return {
@@ -195,7 +190,6 @@ export const fetchDeliveryFeeForLGA = async (lga, totalPrice = 0) => {
     
     return { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
   } catch (error) {
-    console.error('❌ Error fetching delivery fee for LGA:', error);
     return { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
   }
 };
@@ -212,7 +206,6 @@ export const fetchBusParkDeliveryFee = async (totalPrice = 0) => {
     const response = await fetch(url);
     const result = await response.json();
     
-    console.log('🚌 Bus park delivery fee response:', result);
     
     if (result.code === 200) {
       return {
@@ -225,7 +218,6 @@ export const fetchBusParkDeliveryFee = async (totalPrice = 0) => {
     // Fallback
     return { delivery_fee: 2000, original_delivery_fee: 2000, discount_percent: 0 };
   } catch (error) {
-    console.error('❌ Error fetching bus park delivery fee:', error);
     return { delivery_fee: 2000, original_delivery_fee: 2000, discount_percent: 0 };
   }
 };

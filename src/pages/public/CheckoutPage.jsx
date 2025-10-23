@@ -30,7 +30,7 @@ const CheckoutPage = () => {
     delivery_fee: 0,
     original_delivery_fee: 0,
     discount_percent: 0,
-    isFirstTimePurchase: false  // ← NEW: Track if user is first-time buyer
+    isFirstTimePurchase: false
   });
   
   const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
@@ -91,108 +91,24 @@ const CheckoutPage = () => {
     }
   }, [cart, navigate, isProcessingOrder]);
 
-  // Calculate shipping based on delivery method and location - backend handles discount calculation
-  // ✨ UPDATED: Now properly handles and stores isFirstTimePurchase from API responses
   const calculateShipping = useCallback(async () => {
     setIsCalculatingShipping(true);
-    let feeData = { 
-      delivery_fee: 0, 
-      original_delivery_fee: 0, 
+    let feeData = {
+      delivery_fee: 0,
+      original_delivery_fee: 0,
       discount_percent: 0,
-      isFirstTimePurchase: false  // ← Default value
+      isFirstTimePurchase: false
     };
     
     try {
       if (deliveryMethod === 'bus-park') {
         feeData = await fetchBusParkDeliveryFee(totalPrice);
-        
-        // Log first-time purchase status for bus park
-        if (feeData.isFirstTimePurchase) {
-          console.log('🎉 [FIRST-TIME BUYER] Bus Park Delivery - Welcome bonus applied!');
-        }
       } else if (deliveryMethod === 'address' && formData.state) {
-        // DEBUG LOGS FOR HOME DELIVERY ONLY
-        console.log('🏠 ========== HOME DELIVERY DEBUG START ==========');
-        console.log('📋 [REQUEST INFO]');
-        console.log(JSON.stringify({
-          timestamp: new Date().toISOString(),
-          delivery_method: 'address',
-          cart_total_price: totalPrice,
-          selected_state: formData.state,
-          selected_city: formData.city,
-          cart_items: cart.map(item => ({
-            product_id: item.product_id,
-            name: item.name,
-            quantity: item.quantity,
-            price: item.price,
-            total: item.price * item.quantity
-          }))
-        }, null, 2));
-        
         if (formData.state === 'Lagos' && formData.city) {
-          console.log('🏙️ [LAGOS LGA REQUEST]');
-          console.log('API Endpoint: GET /api/fetch-delivery-fee');
-          console.log('Query Parameters:', JSON.stringify({
-            lga: formData.city,
-            total_price_of_current_purchase: totalPrice
-          }, null, 2));
-          
           feeData = await fetchDeliveryFeeForLGA(formData.city, totalPrice);
-          
-          console.log('🏙️ [LAGOS LGA RESPONSE]');
-          console.log(JSON.stringify(feeData, null, 2));
-          
-          // ✨ NEW: Log first-time purchase status
-          if (feeData.isFirstTimePurchase) {
-            console.log('🎉 [FIRST-TIME BUYER DETECTED] Lagos LGA - First purchase bonus active!');
-          }
-          
-          console.log('🏙️ [LAGOS LGA ANALYSIS]');
-          console.log(JSON.stringify({
-            original_delivery_fee: feeData.original_delivery_fee,
-            discounted_delivery_fee: feeData.delivery_fee,
-            discount_percent: feeData.discount_percent,
-            savings: feeData.original_delivery_fee - feeData.delivery_fee,
-            discount_applied: feeData.discount_percent > 0,
-            isFirstTimePurchase: feeData.isFirstTimePurchase,  // ← NEW
-            issue: feeData.discount_percent === 0 ? 'BACKEND NOT APPLYING DISCOUNT' : null
-          }, null, 2));
         } else if (formData.state !== 'Lagos') {
-          console.log('🌍 [STATE DELIVERY REQUEST]');
-          console.log('API Endpoint: GET /api/fetch-delivery-fee');
-          console.log('Query Parameters:', JSON.stringify({
-            state: formData.state,
-            total_price_of_current_purchase: totalPrice
-          }, null, 2));
-          
           feeData = await fetchDeliveryFeeForState(formData.state, totalPrice);
-          
-          console.log('🌍 [STATE DELIVERY RESPONSE]');
-          console.log(JSON.stringify(feeData, null, 2));
-          
-          // ✨ NEW: Log first-time purchase status
-          if (feeData.isFirstTimePurchase) {
-            console.log('🎉 [FIRST-TIME BUYER DETECTED] State Delivery - First purchase bonus active!');
-          }
-          
-          console.log('🌍 [STATE DELIVERY ANALYSIS]');
-          console.log(JSON.stringify({
-            original_delivery_fee: feeData.original_delivery_fee,
-            discounted_delivery_fee: feeData.delivery_fee,
-            discount_percent: feeData.discount_percent,
-            savings: feeData.original_delivery_fee - feeData.delivery_fee,
-            discount_applied: feeData.discount_percent > 0,
-            isFirstTimePurchase: feeData.isFirstTimePurchase,  // ← NEW
-            expected_discount_from_admin: '70% (as per admin dashboard)',
-            expected_discounted_fee: feeData.original_delivery_fee * 0.3,
-            actual_fee_returned: feeData.delivery_fee,
-            issue: feeData.discount_percent === 0 ? '⚠️ BACKEND NOT APPLYING DISCOUNT - Check backend discount calculation logic' : null
-          }, null, 2));
         }
-        
-        console.log('✅ [FINAL SHIPPING DETAILS]');
-        console.log(JSON.stringify(feeData, null, 2));
-        console.log('🏠 ========== HOME DELIVERY DEBUG END ==========');
       } else if (deliveryMethod === 'pickup') {
         feeData = { 
           delivery_fee: 0, 
@@ -202,27 +118,14 @@ const CheckoutPage = () => {
         };
       }
     } catch (error) {
-      if (deliveryMethod === 'address') {
-        console.error('❌ ========== HOME DELIVERY ERROR ==========');
-        console.error('Error Details:', JSON.stringify({
-          message: error.message,
-          stack: error.stack,
-          state: formData.state,
-          city: formData.city,
-          totalPrice: totalPrice,
-          response_data: error.response?.data
-        }, null, 2));
-        console.error('❌ ========== ERROR END ==========');
-      }
       feeData = { 
         delivery_fee: 0, 
         original_delivery_fee: 0, 
         discount_percent: 0,
-        isFirstTimePurchase: false 
+        isFirstTimePurchase: false
       };
     }
-    
-    // ✨ IMPORTANT: Store the complete fee data including isFirstTimePurchase
+
     setShippingDetails(feeData);
     setIsCalculatingShipping(false);
   }, [deliveryMethod, formData.state, formData.city, totalPrice, cart]);
@@ -230,22 +133,6 @@ const CheckoutPage = () => {
   useEffect(() => {
     calculateShipping();
   }, [calculateShipping]);
-
-  // ✨ UPDATED: Enhanced logging to include first-time purchase status
-  useEffect(() => {
-    // Only log when home delivery discount changes
-    if (deliveryMethod === 'address' && shippingDetails.discount_percent > 0) {
-      console.log('📊 [DISCOUNT APPLIED]', {
-        state: formData.state,
-        original_fee: shippingDetails.original_delivery_fee,
-        discounted_fee: shippingDetails.delivery_fee,
-        discount_percent: shippingDetails.discount_percent,
-        you_save: shippingDetails.original_delivery_fee - shippingDetails.delivery_fee,
-        isFirstTimePurchase: shippingDetails.isFirstTimePurchase,  // ← NEW
-        customerType: shippingDetails.isFirstTimePurchase ? 'NEW CUSTOMER 🎉' : 'RETURNING CUSTOMER'  // ← NEW
-      });
-    }
-  }, [shippingDetails, deliveryMethod, formData.state]);
 
   // Load LGAs for Lagos with delivery fee info (including discounts)
   useEffect(() => {
@@ -256,7 +143,6 @@ const CheckoutPage = () => {
           const lgas = await fetchLGADeliveryFees(formData.state, totalPrice);
           setAvailableLGAs(lgas);
         } catch (error) {
-          console.error('Failed to load LGAs:', error);
           setAvailableLGAs([]);
         } finally {
           setIsLoadingLGAs(false);
@@ -378,7 +264,6 @@ const CheckoutPage = () => {
     processCheckout();
   };
 
-  // ✨ NEW: Determine banner message based on first-time purchase status
   const getDiscountBannerMessage = () => {
     if (!hasDeliveryDiscount || deliveryMethod === 'pickup') return null;
     
@@ -429,8 +314,7 @@ const CheckoutPage = () => {
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Checkout</h1>
           <p className="text-gray-600">Complete your order information below</p>
-          
-          {/* ✨ UPDATED: Dynamic Delivery Discount Banner with First-Time Buyer Support */}
+
           {discountBanner && (
             <div className="mt-4 mx-auto max-w-2xl">
               <div className={`bg-gradient-to-r ${discountBanner.gradient} border-2 ${discountBanner.border} rounded-lg p-4`}>
@@ -449,7 +333,6 @@ const CheckoutPage = () => {
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            {/* Delivery Method Section */}
             <DeliveryMethodSection 
               deliveryMethod={deliveryMethod}
               onDeliveryMethodChange={handleDeliveryMethodChange}
@@ -457,7 +340,6 @@ const CheckoutPage = () => {
               isProcessingOrder={isProcessingOrder}
             />
 
-            {/* Customer Information and Location Sections */}
             <CustomerInformationSection 
               formData={formData}
               formErrors={formErrors}
@@ -469,13 +351,12 @@ const CheckoutPage = () => {
             />
           </div>
 
-          {/* Order Summary Sidebar - Now receives full shippingDetails with isFirstTimePurchase */}
           <OrderSummarySection 
             cart={cart}
             totalPrice={totalPrice}
             shipping={shipping}
             finalTotal={finalTotal}
-            shippingDetails={shippingDetails}  // ← Includes isFirstTimePurchase
+            shippingDetails={shippingDetails}
             hasDeliveryDiscount={hasDeliveryDiscount}
             deliveryMethod={deliveryMethod}
             isCalculatingShipping={isCalculatingShipping}
@@ -487,7 +368,6 @@ const CheckoutPage = () => {
           />
         </form>
 
-        {/* Bus Park Disclaimer Modal */}
         <BusParkModal 
           isOpen={showBusParkModal}
           onCancel={handleBusParkModalCancel}

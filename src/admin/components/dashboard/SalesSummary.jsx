@@ -72,7 +72,6 @@ const SalesSummary = ({ dateRange = 'week' }) => {
         setChartData(mockData);
         setIsLoading(false);
       } catch (error) {
-        console.error('Error fetching chart data:', error);
         setIsLoading(false);
       }
     };

@@ -45,22 +45,18 @@ const ConsultationForm = () => {
       
       fetchBookedTimes(consultationDate)
         .then(data => {
-          console.log('Fetched booked times for', consultationDate, ':', data);
           
           if (data.code === 200) {
             setBookedTimes(data.booked_times || []);
             setLastFetchTime(Date.now());
             
             if (data.booked_times && data.booked_times.length > 0) {
-              console.log('Booked times:', data.booked_times);
             }
           } else {
-            console.warn('Unexpected response code:', data);
             setBookedTimes([]);
           }
         })
         .catch(error => {
-          console.error('Error fetching booked times:', error);
           setBookedTimes([]);
           setSubmitError('Unable to fetch available time slots. Please try again.');
         })
@@ -75,7 +71,6 @@ const ConsultationForm = () => {
   useEffect(() => {
     if (step === 3 && consultationDate && !isWeekend(consultationDate)) {
       const refreshInterval = setInterval(() => {
-        console.log('Auto-refreshing booked times...');
         fetchBookedTimes(consultationDate)
           .then(data => {
             if (data.code === 200) {
@@ -83,14 +78,12 @@ const ConsultationForm = () => {
               
               const hasChanges = JSON.stringify(newBookedTimes) !== JSON.stringify(bookedTimes);
               if (hasChanges) {
-                console.log('Booked times updated:', newBookedTimes);
                 setBookedTimes(newBookedTimes);
                 setLastFetchTime(Date.now());
               }
             }
           })
           .catch(error => {
-            console.error('Error refreshing booked times:', error);
           });
       }, 30000);
 
@@ -113,33 +106,21 @@ const ConsultationForm = () => {
 
       const selectedTimeRange = timeSlotMapping[data.timeSlot];
       
-      console.log('Fetching latest booked times before submission...');
       let latestBookedTimes = [];
       
       try {
         const latestData = await fetchBookedTimes(data.consultationDate);
         if (latestData.code === 200) {
           latestBookedTimes = latestData.booked_times || [];
-          console.log('Latest booked times:', latestBookedTimes);
         }
       } catch (fetchError) {
-        console.warn('Could not fetch latest times, proceeding with cached data:', fetchError);
         latestBookedTimes = bookedTimes;
       }
       
       const isTimeBooked = latestBookedTimes.some(booked => {
         const dateMatch = booked.date === data.consultationDate;
         const timeMatch = booked.time_range === selectedTimeRange;
-        
-        console.log('Comparing:', {
-          bookedDate: booked.date,
-          selectedDate: data.consultationDate,
-          dateMatch,
-          bookedTime: booked.time_range,
-          selectedTime: selectedTimeRange,
-          timeMatch
-        });
-        
+
         return dateMatch && timeMatch;
       });
 
@@ -164,11 +145,9 @@ const ConsultationForm = () => {
         success_redirect: getSuccessRedirectURL()
       };
 
-      console.log('Submitting consultation data:', consultationData);
 
       const result = await initiateConsultation(consultationData);
       
-      console.log('Consultation result:', result);
       
       if (result.code === 200 && result.authorization_url) {
         sessionStorage.setItem('consultationBooking', JSON.stringify({
@@ -185,7 +164,6 @@ const ConsultationForm = () => {
         throw new Error(result.message || 'Consultation booking failed');
       }
     } catch (error) {
-      console.error('Submission error:', error);
       
       let errorMessage = error.message || 'Failed to book consultation. Please try again.';
       
@@ -196,7 +174,6 @@ const ConsultationForm = () => {
       setSubmitError(errorMessage);
       
       if (errorMessage.includes('already been booked') || errorMessage.includes('no longer available') || errorMessage.includes('just booked')) {
-        console.log('Refreshing booked times due to conflict...');
         if (consultationDate && !isWeekend(consultationDate)) {
           fetchBookedTimes(consultationDate)
             .then(data => {
@@ -205,7 +182,6 @@ const ConsultationForm = () => {
                 setLastFetchTime(Date.now());
               }
             })
-            .catch(err => console.error('Error refreshing booked times:', err));
         }
       }
     } finally {

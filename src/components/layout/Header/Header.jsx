@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useContext } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { WishlistContext } from '../../../contexts/WishlistContext';
 import { useCart } from '../../../hooks/useCart';
 import { Link, useLocation, useNavigate } from 'react-router-dom';

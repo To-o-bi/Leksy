@@ -54,7 +54,6 @@ const DeliveryDiscount = () => {
         setDeliveryDiscounts([]);
       }
     } catch (err) {
-      console.error('Error fetching delivery discounts:', err);
       setDeliveryDiscounts([]);
     } finally {
       setLoading(false);
@@ -100,8 +99,7 @@ const DeliveryDiscount = () => {
           success('Delivery discounts created for all other states successfully!');
         }
       }
-      
-      // Add a small delay before fetching to ensure backend processing completes
+
       await new Promise(resolve => setTimeout(resolve, 500));
       await fetchDeliveryDiscounts();
       closeModal();

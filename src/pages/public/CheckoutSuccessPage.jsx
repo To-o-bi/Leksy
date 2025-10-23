@@ -98,7 +98,6 @@ const CheckoutSuccessPage = () => {
         setOrderDetails(JSON.parse(storedOrderDetails));
         sessionStorage.removeItem('pendingOrderDetails');
       } catch (error) {
-        console.error("Failed to parse order details from sessionStorage:", error);
       }
     }
   }, []);

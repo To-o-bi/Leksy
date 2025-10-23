@@ -34,7 +34,6 @@ const AdminHeader = ({ toggleSidebar }) => {
     try {
       await logout(navigate);
     } catch (error) {
-      console.error('Logout failed:', error);
       navigate('/admin/login', { replace: true });
     }
   };

@@ -63,7 +63,7 @@ const ConsultationPage = () => {
       <CTA />
 
       {/* CSS for floating animation */}
-      <style jsx="true">{`
+      <style>{`
         @keyframes float {
           0%, 100% {
             transform: translateY(0px);

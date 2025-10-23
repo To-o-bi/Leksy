@@ -92,34 +92,52 @@ const Footer = () => {
           <div className="absolute inset-0">
             <div className="absolute inset-0 bg-pink-500 opacity-80"></div>
             <div className="absolute inset-0">
-              {[...Array(12)].map((_, i) => (
-                <div 
-                  key={i}
-                  className="absolute rounded-full bg-white opacity-5 sm:opacity-10"
-                  style={{
-                    width: `${Math.random() * 40 + 20}px`,
-                    height: `${Math.random() * 40 + 20}px`,
-                    top: `${Math.random() * 100}%`,
-                    left: `${Math.random() * 100}%`,
-                    animation: `${Math.random() > 0.5 ? 'bounce' : 'float'} ${Math.random() * 2 + 2}s infinite ease-in-out ${Math.random() * 1}s`,
-                    animationFillMode: 'both'
-                  }}
-                ></div>
-              ))}
-              {[...Array(8)].map((_, i) => (
-                <div 
-                  key={i + 12}
-                  className="absolute rounded-full bg-white opacity-10 hidden md:block"
-                  style={{
-                    width: `${Math.random() * 80 + 50}px`,
-                    height: `${Math.random() * 80 + 50}px`,
-                    top: `${Math.random() * 100}%`,
-                    left: `${Math.random() * 100}%`,
-                    animation: `${Math.random() > 0.5 ? 'bounce' : 'float'} ${Math.random() * 2 + 3}s infinite ease-in-out ${Math.random() * 1}s`,
-                    animationFillMode: 'both'
-                  }}
-                ></div>
-              ))}
+              {[...Array(12)].map((_, i) => {
+                const animName = Math.random() > 0.5 ? 'bounce' : 'float';
+                const duration = Math.random() * 2 + 2;
+                const delay = Math.random() * 1;
+                return (
+                  <div
+                    key={i}
+                    className="absolute rounded-full bg-white opacity-5 sm:opacity-10"
+                    style={{
+                      width: `${Math.random() * 40 + 20}px`,
+                      height: `${Math.random() * 40 + 20}px`,
+                      top: `${Math.random() * 100}%`,
+                      left: `${Math.random() * 100}%`,
+                      animationName: animName,
+                      animationDuration: `${duration}s`,
+                      animationIterationCount: 'infinite',
+                      animationTimingFunction: 'ease-in-out',
+                      animationDelay: `${delay}s`,
+                      animationFillMode: 'both'
+                    }}
+                  ></div>
+                );
+              })}
+              {[...Array(8)].map((_, i) => {
+                const animName = Math.random() > 0.5 ? 'bounce' : 'float';
+                const duration = Math.random() * 2 + 3;
+                const delay = Math.random() * 1;
+                return (
+                  <div
+                    key={i + 12}
+                    className="absolute rounded-full bg-white opacity-10 hidden md:block"
+                    style={{
+                      width: `${Math.random() * 80 + 50}px`,
+                      height: `${Math.random() * 80 + 50}px`,
+                      top: `${Math.random() * 100}%`,
+                      left: `${Math.random() * 100}%`,
+                      animationName: animName,
+                      animationDuration: `${duration}s`,
+                      animationIterationCount: 'infinite',
+                      animationTimingFunction: 'ease-in-out',
+                      animationDelay: `${delay}s`,
+                      animationFillMode: 'both'
+                    }}
+                  ></div>
+                );
+              })}
             </div>
           </div>
 

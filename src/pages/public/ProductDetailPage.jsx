@@ -49,7 +49,6 @@ const ProductDetailPage = () => {
                         }
                     }
                 } catch (relatedErr) {
-                    console.error("Error fetching related products:", relatedErr);
                     setRelatedProducts([]);
                 }
                 return;
@@ -101,11 +100,9 @@ const ProductDetailPage = () => {
                         }
                     }
                 } catch (relatedErr) {
-                    console.error("Error fetching related products:", relatedErr);
                     setRelatedProducts([]);
                 }
             } catch (err) {
-                console.error("Error fetching product details:", err);
                 setError(`Failed to load product details: ${err.message}`);
                 endTransition(); // End loading overlay on error
             } finally {

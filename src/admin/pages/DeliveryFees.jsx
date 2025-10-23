@@ -40,9 +40,6 @@ const DeliveryFeeAdmin = () => {
         const data = feesResponse.value.data;
         const validFees = data.delivery_fees?.filter(fee => fee && fee.state && fee.delivery_fee !== undefined) || [];
         setDeliveryFees(validFees);
-        if (validFees.length > 0) {
-          showNotification('success', data.message || `Loaded ${validFees.length} delivery fees`);
-        }
       } else {
         throw new Error('Failed to fetch delivery fees');
       }
@@ -65,7 +62,6 @@ const DeliveryFeeAdmin = () => {
         setDeliveryDiscounts([]);
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
       showNotification('error', error.response?.data?.message || 'Failed to load data');
     } finally {
       setLoading(false);
@@ -170,7 +166,6 @@ const DeliveryFeeAdmin = () => {
       fetchData();
 
     } catch (error) {
-      console.error('Error updating delivery fee:', error);
       showNotification('error', error.response?.data?.message || error.message || 'Failed to update delivery fee');
     } finally {
       setSaving(false);
@@ -216,7 +211,6 @@ const DeliveryFeeAdmin = () => {
       fetchData();
 
     } catch (error) {
-      console.error('Error bulk updating fees:', error);
       showNotification('error', error.response?.data?.message || error.message || 'Failed to bulk update fees');
     } finally {
       setSaving(false);

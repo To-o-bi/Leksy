@@ -28,7 +28,6 @@ export const WishlistProvider = ({ children }) => {
       const savedWishlist = localStorage.getItem(STORAGE_KEY);
       return savedWishlist ? JSON.parse(savedWishlist) : [];
     } catch (error) {
-      console.error('Error parsing wishlist from localStorage:', error);
       return [];
     }
   });
@@ -40,7 +39,6 @@ export const WishlistProvider = ({ children }) => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(wishlist));
     } catch (error) {
-      console.error('Error saving wishlist to localStorage:', error);
     }
   }, [wishlist]);
 
@@ -59,7 +57,6 @@ export const WishlistProvider = ({ children }) => {
    */
   const addToWishlist = useCallback((product) => {
     if (!product?.product_id) {
-      console.error('Cannot add product without product_id to wishlist', product);
       return;
     }
     
@@ -94,7 +91,6 @@ export const WishlistProvider = ({ children }) => {
    */
   const toggleWishlistItem = useCallback((product) => {
     if (!product?.product_id) {
-      console.error('Cannot toggle product without product_id in wishlist', product);
       return;
     }
 

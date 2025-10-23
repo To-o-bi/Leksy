@@ -133,7 +133,6 @@ const BookingsPage = () => {
         throw new Error(response.data?.message || 'Failed to fetch consultation bookings');
       }
     } catch (err) {
-      console.error('Error fetching bookings:', err);
       let errorMessage = 'Failed to load consultation bookings';
       if (err.response?.status === 401 || err.message.includes('authentication')) {
         errorMessage = 'Admin authentication required. Please ensure you are logged in as an admin.';
@@ -191,7 +190,6 @@ const BookingsPage = () => {
         throw new Error(response.data?.message || 'Failed to update status');
       }
     } catch (err) {
-      console.error('Error updating session status:', err);
       setNotification({ type: 'error', message: err.message || 'Update failed.' });
       fetchBookings();
     } finally {
@@ -223,7 +221,6 @@ const BookingsPage = () => {
         throw new Error(response.data?.message || 'Failed to send link');
       }
     } catch (err) {
-      console.error('Error sending meeting link:', err);
       setNotification({ type: 'error', message: err.message || 'Failed to send link.' });
     } finally {
       setIsSendingLink(false);

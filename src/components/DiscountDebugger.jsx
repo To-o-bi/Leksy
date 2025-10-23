@@ -5,11 +5,13 @@ const DiscountDebugger = () => {
   const discountContext = useDiscounts();
   
   useEffect(() => {
-    console.log('🐛 [DEBUG] Full context:', discountContext);
-    console.log('🐛 [DEBUG] Discounts:', discountContext?.discounts);
-    console.log('🐛 [DEBUG] Has discounts:', discountContext?.hasDiscounts);
-    console.log('🐛 [DEBUG] Loading:', discountContext?.loading);
-    console.log('🐛 [DEBUG] Error:', discountContext?.error);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🐛 [DEBUG] Full context:', discountContext);
+      console.log('🐛 [DEBUG] Discounts:', discountContext?.discounts);
+      console.log('🐛 [DEBUG] Has discounts:', discountContext?.hasDiscounts);
+      console.log('🐛 [DEBUG] Loading:', discountContext?.loading);
+      console.log('🐛 [DEBUG] Error:', discountContext?.error);
+    }
   }, [discountContext]);
   
   if (!discountContext) {

@@ -41,7 +41,6 @@ const ContactForm = ({
     
     // Prevent multiple submissions
     if (isSubmitting) {
-      console.log('Form already submitting, preventing duplicate submission');
       return;
     }
     

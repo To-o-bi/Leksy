@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { productService } from '../api'; // Ensure this path is correct for your project structure
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { productService } from '../api';
 import { useMessage } from './MessageContext';
 
 const STORAGE_KEY = 'leksy-shopping-cart';
@@ -20,7 +20,6 @@ export const CartProvider = ({ children }) => {
       const savedCart = localStorage.getItem(STORAGE_KEY);
       return savedCart ? JSON.parse(savedCart) : [];
     } catch (error) {
-      console.error('Error parsing cart from localStorage:', error);
       return [];
     }
   });
@@ -39,7 +38,6 @@ export const CartProvider = ({ children }) => {
 
   const addToCart = useCallback(async (productToAdd, quantityToAdd = 1) => {
     if (!productToAdd?.product_id) {
-      console.error('Cannot add product without product_id to cart', productToAdd);
       return;
     }
 
@@ -53,7 +51,6 @@ export const CartProvider = ({ children }) => {
 
       if (newTotalQuantity > availableStock) {
         info(`Oops! Only ${availableStock} pieces are left. Secure the last items before it sells out.`);
-        // Add only the remaining stock if the user tries to add too many
         const quantityToActuallyAdd = availableStock - currentQuantityInCart;
         if (quantityToActuallyAdd > 0) {
             setCart(prevCart => {
@@ -125,7 +122,6 @@ export const CartProvider = ({ children }) => {
         )
       );
     } catch (error) {
-        console.error("Failed to update quantity:", error);
         warning("Could not verify stock. Please try again.");
     }
   }, [cart, removeFromCart, success, info]);
@@ -163,7 +159,6 @@ export const CartProvider = ({ children }) => {
       }
       return { isValid: true, notifications, wasModified: cartWasModified };
     } catch (error) {
-      console.error("Cart validation failed:", error);
       return { isValid: false, notifications: [{ type: 'error', message: 'Could not verify your cart. Please check your connection.' }], wasModified: false };
     }
   }, [cart, setCart]);

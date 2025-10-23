@@ -28,7 +28,6 @@ export const useBookingData = (selectedDate = null) => {
         }
       }
     } catch (err) {
-      console.error('Error fetching booked slots:', err);
       setError(err.message || 'Failed to fetch booking data');
     } finally {
       setLoading(false);
@@ -53,7 +52,6 @@ export const useBookingData = (selectedDate = null) => {
         }));
       }
     } catch (err) {
-      console.error('Error fetching availability:', err);
       setError(err.message || 'Failed to fetch availability data');
     } finally {
       setLoading(false);
@@ -76,7 +74,6 @@ export const useBookingData = (selectedDate = null) => {
       
       return true;
     } catch (err) {
-      console.error('Error checking slot availability:', err);
       setError(err.message || 'Failed to check slot availability');
       return false;
     }
@@ -84,7 +81,6 @@ export const useBookingData = (selectedDate = null) => {
 
   // Enhanced createBooking with detailed logging
   const createBooking = useCallback(async (bookingData) => {
-    console.log('🔍 Raw booking data received:', bookingData);
     
     setLoading(true);
     setError(null);
@@ -98,7 +94,6 @@ export const useBookingData = (selectedDate = null) => {
       const email = bookingData.email || '';
       const phone = bookingData.phone || '';
       
-      console.log('📝 Extracted basic info:', { name, email, phone });
       
       // Check for missing critical fields early
       if (!name) {
@@ -131,29 +126,24 @@ export const useBookingData = (selectedDate = null) => {
         success_redirect: bookingData.success_redirect
       };
 
-      console.log('🎯 Final consultation data:', consultationData);
 
       // Validate that we have all required fields
       const requiredFields = ['name', 'email', 'phone', 'age_range', 'skin_type', 'channel', 'date', 'time_range'];
       const missingFields = requiredFields.filter(field => !consultationData[field]);
       
       if (missingFields.length > 0) {
-        console.error('❌ Missing required fields:', missingFields);
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
 
       // Validate skin_concerns separately
       if (!consultationData.skin_concerns || 
           (Array.isArray(consultationData.skin_concerns) && consultationData.skin_concerns.length === 0)) {
-        console.error('❌ Missing skin concerns');
         throw new Error('Please select at least one skin concern');
       }
 
-      console.log('✅ All validation passed, calling consultation service...');
 
       const response = await consultationService.initiateConsultation(consultationData);
       
-      console.log('📞 Consultation service response:', response);
       
       if (response.success) {
         // Refresh availability data after successful booking
@@ -175,7 +165,6 @@ export const useBookingData = (selectedDate = null) => {
         };
       }
     } catch (err) {
-      console.error('💥 Error creating booking:', err);
       const errorMessage = err.message || 'Failed to create booking';
       setError(errorMessage);
       return { 

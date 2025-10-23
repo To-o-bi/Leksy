@@ -33,7 +33,6 @@ const Newsletter = () => {
         setMessageType('error');
       }
     } catch (error) {
-      console.error('Unexpected error:', error);
       setMessage('An unexpected error occurred. Please try again.');
       setMessageType('error');
     } finally {

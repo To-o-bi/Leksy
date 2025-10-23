@@ -29,7 +29,6 @@ const WishlistPage = () => {
           setRelatedProducts(response.products);
         }
       } catch (error) {
-        console.error("Failed to fetch related products:", error);
       } finally {
         setIsLoading(false);
       }

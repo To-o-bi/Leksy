@@ -158,14 +158,13 @@ const EditProductPage = () => {
     const [errors, setErrors] = useState({});
     const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
 
-    const [formData, setFormData] = useState({ 
-        name: '', 
-        price: '', 
-        slashed_price: '', 
-        description: '', 
-        quantity: '', 
-        category: '', 
-        concern_options: [] 
+    const [formData, setFormData] = useState({
+        name: '',
+        price: '',
+        description: '',
+        quantity: '',
+        category: '',
+        concern_options: []
     });
     const [newImages, setNewImages] = useState([]);
     const [newImagePreviews, setNewImagePreviews] = useState([]);
@@ -208,7 +207,6 @@ const EditProductPage = () => {
         const changes = {
             name: formData.name !== originalData.name,
             price: parseFloat(formData.price) !== originalData.original_price,
-            slashed_price: parseFloat(formData.slashed_price || 0) !== (originalData.slashed_price || 0),
             description: formData.description !== originalData.description,
             quantity: parseInt(formData.quantity, 10) !== originalData.available_qty,
             category: formData.category !== originalData.category,
@@ -292,7 +290,6 @@ const EditProductPage = () => {
                 const newFormData = {
                     name: decodedName,
                     price: originalPrice.toString(),
-                    slashed_price: productData.slashed_price?.toString() || '',
                     category: productData.category || '',
                     quantity: productData.available_qty?.toString() || '',
                     description: decodedDescription,
@@ -376,24 +373,13 @@ const EditProductPage = () => {
 
     const validateForm = useCallback(() => {
         const newErrors = {};
-        const { name, price, slashed_price, description, quantity, category } = formData;
-        
+        const { name, price, description, quantity, category } = formData;
+
         if (!name.trim() || name.trim().length < 2) newErrors.name = 'Product name is required (min 2 chars)';
         if (!price || isNaN(price) || parseFloat(price) <= 0) newErrors.price = 'Please enter a valid price';
         if (!description.trim() || description.trim().length < 10) newErrors.description = 'Description is required (min 10 chars)';
         if (quantity === '' || isNaN(quantity) || parseInt(quantity, 10) < 0) newErrors.quantity = 'Please enter a valid quantity';
         if (!category) newErrors.category = 'Please select a category';
-        
-        if (slashed_price && slashed_price.toString().trim() !== '') {
-            const slashedPriceNum = parseFloat(slashed_price);
-            const currentPriceNum = parseFloat(price);
-            
-            if (isNaN(slashedPriceNum) || slashedPriceNum <= 0) {
-                newErrors.slashed_price = 'Please enter a valid slashed price';
-            } else if (slashedPriceNum <= currentPriceNum) {
-                newErrors.slashed_price = 'Slashed price should be greater than current price';
-            }
-        }
         
         const totalImages = existingImages.length + newImages.length;
         if (totalImages === 0) newErrors.images = 'At least one product image is required';
@@ -439,14 +425,9 @@ const EditProductPage = () => {
             }
 
             // Always send concern_options to ensure backend updates it properly
-            productData.concern_options = formData.concern_options.length === 0 
-                ? "others" 
+            productData.concern_options = formData.concern_options.length === 0
+                ? "others"
                 : formData.concern_options;
-
-            const newSlashed = formData.slashed_price ? parseFloat(formData.slashed_price) : null;
-            if (newSlashed !== (originalData.slashed_price || null)) {
-                productData.slashed_price = newSlashed;
-            }
 
             if (newImages.length > 0) {
                 productData.images = newImages;
@@ -566,28 +547,15 @@ const EditProductPage = () => {
                                     name="price" 
                                     type="number" 
                                     required 
-                                    currency 
-                                    min="0" 
-                                    step="0.01" 
-                                    value={formData.price} 
-                                    error={errors.price} 
-                                    onChange={handleChange} 
-                                    disabled={submitting} 
+                                    currency
+                                    min="0"
+                                    step="0.01"
+                                    value={formData.price}
+                                    error={errors.price}
+                                    onChange={handleChange}
+                                    disabled={submitting}
                                 />
-                                <FormField 
-                                    label="Slashed Price (Optional)" 
-                                    name="slashed_price" 
-                                    type="number" 
-                                    currency 
-                                    min="0" 
-                                    step="0.01" 
-                                    placeholder="0.00" 
-                                    value={formData.slashed_price} 
-                                    error={errors.slashed_price} 
-                                    onChange={handleChange} 
-                                    disabled={submitting} 
-                                />
-                                <FormField 
+                                <FormField
                                     label="Available Quantity" 
                                     name="quantity" 
                                     type="number" 

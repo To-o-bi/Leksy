@@ -33,7 +33,6 @@ export const initiateConsultation = async (consultationData) => {
 
     return await response.json();
   } catch (error) {
-    console.error('Consultation initiation error:', error);
     throw error;
   }
 };
@@ -53,7 +52,6 @@ export const fetchBookedTimes = async (date) => {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error fetching booked times:', error);
     throw error;
   }
 };
@@ -76,7 +74,6 @@ export const fetchConsultationDetails = async (consultationId, token) => {
 
     return await response.json();
   } catch (error) {
-    console.error('Error fetching consultation details:', error);
     throw error;
   }
 };
@@ -113,7 +110,6 @@ export const fetchAllConsultations = async (token, filters = {}) => {
 
     return await response.json();
   } catch (error) {
-    console.error('Error fetching consultations:', error);
     throw error;
   }
 };

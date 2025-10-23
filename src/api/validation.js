@@ -465,7 +465,6 @@ export const validateForm = (data, rules) => {
           break; // Stop checking other rules for this field
         }
       } catch (error) {
-        console.error(`Validation error for field ${field}:`, error);
         errors[field] = `Validation error for ${formatFieldName(field)}`;
         break;
       }

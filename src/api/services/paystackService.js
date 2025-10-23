@@ -11,7 +11,6 @@
       this.baseURL = 'https://api.paystack.co';
       
       if (!this.publicKey) {
-        console.warn('Paystack public key not found in environment variables');
       }
     }
 
@@ -63,14 +62,12 @@
             ]
           },
           callback: function(response) {
-            console.log('Paystack payment successful:', response);
             if (onSuccess) {
               onSuccess(response);
             }
             resolve(response);
           },
           onClose: function() {
-            console.log('Paystack payment modal closed');
             if (onClose) {
               onClose();
             }
@@ -89,7 +86,6 @@
     */
     async verifyPayment(reference) {
       try {
-        console.log('Verifying payment with reference:', reference);
         
         // Call your backend API to verify the payment
         // Your backend should make the actual call to Paystack's verify endpoint
@@ -103,7 +99,6 @@
           throw new Error(response.data?.message || 'Payment verification failed');
         }
       } catch (error) {
-        console.error('Payment verification error:', error);
         throw new Error(
           error.response?.data?.message || 
           error.message ||
@@ -150,11 +145,9 @@
         script.src = 'https://js.paystack.co/v1/inline.js';
         script.async = true;
         script.onload = () => {
-          console.log('Paystack script loaded successfully');
           resolve();
         };
         script.onerror = () => {
-          console.error('Failed to load Paystack script');
           reject(new Error('Failed to load Paystack script'));
         };
 
@@ -169,7 +162,6 @@
     */
     async createOrder(orderData) {
       try {
-        console.log('Creating order:', orderData);
         
         const response = await api.post('/create-order', orderData);
 
@@ -179,7 +171,6 @@
           throw new Error(response.data?.message || 'Failed to create order');
         }
       } catch (error) {
-        console.error('Order creation error:', error);
         throw new Error(
           error.response?.data?.message || 
           error.message ||

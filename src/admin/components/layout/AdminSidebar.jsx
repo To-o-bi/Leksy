@@ -122,7 +122,6 @@ const AdminSidebar = ({ isOpen, isMobile, onClose, onOpen }) => {
     try {
       await logout(navigate);
     } catch (error) {
-      console.error('Logout failed:', error);
       navigate('/login', { replace: true });
     } finally {
       setIsLoggingOut(false);

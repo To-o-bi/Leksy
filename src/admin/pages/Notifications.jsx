@@ -48,7 +48,6 @@ const NotificationsPage = () => {
           break;
         }
       } catch (e) {
-        console.error("Failed to decode HTML entities", e);
         return text; // Return original text on error
       }
       i++;

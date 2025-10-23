@@ -50,7 +50,6 @@ const ProductStockPage = () => {
           break;
         }
       } catch (e) {
-        console.error("Failed to decode HTML entities", e);
         return text;
       }
       i++;
@@ -78,7 +77,6 @@ const ProductStockPage = () => {
         throw new Error(response?.message || 'Failed to fetch products');
       }
     } catch (error) {
-      console.error('Error fetching products:', error);
       setNotification({
         type: 'error',
         message: error.message || 'Failed to load products'

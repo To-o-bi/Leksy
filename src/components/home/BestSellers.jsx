@@ -58,7 +58,6 @@ const BestSellers = () => {
             } catch (error) {
                 // Log error for debugging but don't expose to user
                 if (process.env.NODE_ENV === 'development') {
-                    console.error('Error calculating best sellers:', error);
                 }
                 setBestSellingProducts([]);
             } finally {

@@ -16,13 +16,11 @@ export const useAuthErrorHandler = () => {
       error?.message?.toLowerCase().includes('please login') ||
       error?.message?.toLowerCase().includes('re-login')
     ) {
-      console.log('Authentication error detected, handling logout...');
       
       try {
         // Try to logout properly through context
         await logout(navigate);
       } catch (logoutError) {
-        console.error('Error during forced logout:', logoutError);
         // Force redirect even if logout fails
         navigate('/login?reason=session_expired', { replace: true });
       }

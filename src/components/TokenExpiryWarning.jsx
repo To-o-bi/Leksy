@@ -20,7 +20,6 @@ const TokenExpiryWarning = () => {
       const success = await extendSession();
       if (!success) {
         // If extension fails, show error but don't dismiss warning
-        console.error('Failed to extend session');
       }
     } finally {
       setIsExtending(false);

@@ -15,7 +15,6 @@ const LogoutButton = ({ showDropdown = true, className = "" }) => {
     try {
       await logout(navigate); // Pass navigate function to logout
     } catch (error) {
-      console.error('Logout failed:', error);
       // Even if logout fails, navigate to login
       navigate('/login', { replace: true });
     } finally {

@@ -27,14 +27,12 @@ export const newsletterService = {
 
     try {
       const cleanEmail = email.trim();
-      console.log('🔄 Adding newsletter subscriber:', cleanEmail);
 
       const formData = new FormData();
       formData.append('email', cleanEmail);
       
       const response = await api.post('/newsletter-subscribers/add', formData);
       
-      console.log('✅ Newsletter subscription response:', response.data);
       
       if (response?.data?.code === 200) {
         return {
@@ -50,7 +48,6 @@ export const newsletterService = {
       };
       
     } catch (error) {
-      console.error('❌ Newsletter subscription error:', error);
       const message = error.response?.data?.message || error.message || 'Network error. Please check your connection and try again.';
       return {
         success: false,
@@ -73,14 +70,12 @@ export const newsletterService = {
 
     try {
       const cleanEmail = email.trim();
-      console.log('🔄 Attempting newsletter unsubscription for:', cleanEmail);
 
       const formData = new FormData();
       formData.append('email', cleanEmail);
       
       const response = await api.post('/newsletter-subscribers/remove', formData);
       
-      console.log('✅ Newsletter unsubscription response:', response.data);
       
       if (response?.data?.code === 200) {
         return {
@@ -95,7 +90,6 @@ export const newsletterService = {
       };
       
     } catch (error) {
-      console.error('❌ Newsletter unsubscribe error:', error);
       const message = error.response?.data?.message || error.message || 'Network error. Please check your connection and try again.';
       return {
         success: false,
@@ -115,7 +109,6 @@ export const newsletterService = {
       const params = limit ? { limit } : {};
       const response = await api.get('/admin/fetch-newsletter-subscribers', { params });
       
-      console.log('✅ Newsletter fetch subscribers response:', response.data);
       
       if (response?.data?.code === 200) {
         return {
@@ -133,7 +126,6 @@ export const newsletterService = {
       };
       
     } catch (error) {
-      console.error('❌ Newsletter fetch subscribers error:', error);
       return {
         success: false,
         subscribers: [],
@@ -169,7 +161,6 @@ export const newsletterService = {
         };
       }
 
-      console.log('🔄 Sending bulk newsletter:', newsletterData);
 
       const formData = new FormData();
       formData.append('title', newsletterData.title.trim());
@@ -192,7 +183,6 @@ export const newsletterService = {
       
       const response = await api.post('/admin/send-newsletters', formData);
       
-      console.log('✅ Bulk newsletter response:', response.data);
       
       if (response?.data?.code === 200) {
         return {
@@ -207,7 +197,6 @@ export const newsletterService = {
       };
       
     } catch (error) {
-      console.error('❌ Bulk newsletter error:', error);
       const message = error.response?.data?.message || error.message || 'Network error. Please check your connection and try again.';
       return {
         success: false,
@@ -255,7 +244,6 @@ export const newsletterService = {
         }
       }
 
-      console.log('🔄 Sending newsletter to specific recipients:', newsletterData);
 
       const formData = new FormData();
       formData.append('title', newsletterData.title.trim());
@@ -283,7 +271,6 @@ export const newsletterService = {
       
       const response = await api.post('/admin/send-newsletters', formData);
       
-      console.log('✅ Newsletter to recipients response:', response.data);
       
       if (response?.data?.code === 200) {
         const recipientCount = newsletterData.recipients?.length || 'all subscribers';
@@ -299,7 +286,6 @@ export const newsletterService = {
       };
       
     } catch (error) {
-      console.error('❌ Newsletter to recipients error:', error);
       const message = error.response?.data?.message || error.message || 'Network error. Please check your connection and try again.';
       return {
         success: false,
@@ -368,7 +354,6 @@ export const newsletterService = {
       
       return true;
     } catch (error) {
-      console.error('❌ CSV export error:', error);
       return false;
     }
   },

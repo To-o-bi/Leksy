@@ -43,7 +43,6 @@ const InventoryStatus = () => {
         setInventoryData(mockData);
         setIsLoading(false);
       } catch (error) {
-        console.error('Error fetching inventory data:', error);
         setIsLoading(false);
       }
     };
