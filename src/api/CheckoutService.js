@@ -170,55 +170,57 @@ export const fetchLGADeliveryFees = async (state, totalPrice = 0) => {
  * Fetches delivery fee for a specific LGA with discount already calculated
  * @param {string} lga - LGA name
  * @param {number} totalPrice - Current cart total for discount calculation
- * @returns {Promise<Object>} Fee object with delivery_fee, original_delivery_fee, discount_percent
+ * @returns {Promise<Object>} Fee object with delivery_fee, original_delivery_fee, discount_percent, isFirstTimePurchase
  */
 export const fetchDeliveryFeeForLGA = async (lga, totalPrice = 0) => {
   try {
     const url = `${BASE_URL}/api/fetch-delivery-fee?lga=${encodeURIComponent(lga)}&total_price_of_current_purchase=${totalPrice}`;
-    
+
     const response = await fetch(url);
     const result = await response.json();
-    
-    
+
+
     if (result.code === 200) {
       return {
         delivery_fee: parseFloat(result.delivery_fee) || 0,
         original_delivery_fee: parseFloat(result.original_delivery_fee) || parseFloat(result.delivery_fee) || 0,
-        discount_percent: parseFloat(result.discount_percent) || 0
+        discount_percent: parseFloat(result.discount_percent) || 0,
+        isFirstTimePurchase: result.isFirstTimePurchase === true || result.isFirstTimePurchase === 1
       };
     }
-    
-    return { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
+
+    return { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0, isFirstTimePurchase: false };
   } catch (error) {
-    return { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0 };
+    return { delivery_fee: 0, original_delivery_fee: 0, discount_percent: 0, isFirstTimePurchase: false };
   }
 };
 
 /**
  * Fetches bus park delivery fee with discount already calculated
  * @param {number} totalPrice - Current cart total for discount calculation
- * @returns {Promise<Object>} Fee object with delivery_fee, original_delivery_fee, discount_percent
+ * @returns {Promise<Object>} Fee object with delivery_fee, original_delivery_fee, discount_percent, isFirstTimePurchase
  */
 export const fetchBusParkDeliveryFee = async (totalPrice = 0) => {
   try {
     const url = `${BASE_URL}/api/fetch-bus-park-delivery-fee?total_price_of_current_purchase=${totalPrice}`;
-    
+
     const response = await fetch(url);
     const result = await response.json();
-    
-    
+
+
     if (result.code === 200) {
       return {
         delivery_fee: parseFloat(result.delivery_fee) || 0,
         original_delivery_fee: parseFloat(result.original_delivery_fee) || parseFloat(result.delivery_fee) || 0,
-        discount_percent: parseFloat(result.discount_percent) || 0
+        discount_percent: parseFloat(result.discount_percent) || 0,
+        isFirstTimePurchase: result.isFirstTimePurchase === true || result.isFirstTimePurchase === 1
       };
     }
-    
+
     // Fallback
-    return { delivery_fee: 2000, original_delivery_fee: 2000, discount_percent: 0 };
+    return { delivery_fee: 2000, original_delivery_fee: 2000, discount_percent: 0, isFirstTimePurchase: false };
   } catch (error) {
-    return { delivery_fee: 2000, original_delivery_fee: 2000, discount_percent: 0 };
+    return { delivery_fee: 2000, original_delivery_fee: 2000, discount_percent: 0, isFirstTimePurchase: false };
   }
 };
 
