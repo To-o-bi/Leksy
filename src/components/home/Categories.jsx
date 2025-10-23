@@ -293,10 +293,10 @@ const Categories = () => {
                           loading="lazy"
                         />
                       </div>
-                      <span className="text-xs sm:text-sm font-medium text-gray-800 text-center line-clamp-1 group-hover:text-pink-600 transition-colors duration-200 capitalize px-1">
+                      <span className="text-sm sm:text-sm font-medium text-gray-800 text-center line-clamp-1 group-hover:text-pink-600 transition-colors duration-200 capitalize px-1">
                         {category.name}
                       </span>
-                      <span className="text-[10px] sm:text-xs text-gray-500 group-hover:text-gray-600 transition-colors duration-200">
+                      <span className="text-xs sm:text-xs text-gray-500 group-hover:text-gray-600 transition-colors duration-200">
                         {category.productCount} Product{category.productCount !== 1 ? 's' : ''}
                       </span>
                     </Link>
@@ -400,10 +400,10 @@ const Categories = () => {
                           loading="lazy"
                         />
                       </div>
-                      <span className="text-xs sm:text-sm font-medium text-gray-800 text-center line-clamp-1 group-hover:text-pink-600 transition-colors duration-200 capitalize px-1">
+                      <span className="text-sm sm:text-sm font-medium text-gray-800 text-center line-clamp-1 group-hover:text-pink-600 transition-colors duration-200 capitalize px-1">
                         {category.name}
                       </span>
-                      <span className="text-[10px] sm:text-xs text-gray-500 group-hover:text-gray-600 transition-colors duration-200">
+                      <span className="text-xs sm:text-xs text-gray-500 group-hover:text-gray-600 transition-colors duration-200">
                         {category.productCount} Product{category.productCount !== 1 ? 's' : ''}
                       </span>
                     </Link>

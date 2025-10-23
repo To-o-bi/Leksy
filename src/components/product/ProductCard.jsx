@@ -195,7 +195,7 @@ const ProductCard = ({ product }) => {
           onClick={handleProductClick}
           className="block w-full text-left focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 rounded-sm mb-2"
         >
-          <h3 className="text-gray-700 font-medium text-xs sm:text-sm leading-snug hover:text-pink-500 transition-colors line-clamp-3">
+          <h3 className="text-gray-700 font-medium text-sm sm:text-sm leading-snug hover:text-pink-500 transition-colors line-clamp-3">
             {normalizedProduct.name}
           </h3>
         </button>
@@ -204,15 +204,15 @@ const ProductCard = ({ product }) => {
           <div className="flex items-center gap-2">
             {normalizedProduct.hasDiscount ? (
               <>
-                <p className="text-gray-900 font-bold text-sm sm:text-lg">
+                <p className="text-gray-900 font-bold text-base sm:text-lg">
                   {formatter.formatCurrency(normalizedProduct.price)}
                 </p>
-                <p className="text-gray-500 text-xs sm:text-sm line-through">
+                <p className="text-gray-500 text-sm sm:text-sm line-through">
                   {formatter.formatCurrency(normalizedProduct.originalPrice)}
                 </p>
               </>
             ) : (
-              <p className="text-gray-900 font-bold text-sm sm:text-lg">
+              <p className="text-gray-900 font-bold text-base sm:text-lg">
                 {formatter.formatCurrency(normalizedProduct.price)}
               </p>
             )}

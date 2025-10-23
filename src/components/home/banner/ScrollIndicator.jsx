@@ -6,7 +6,7 @@ const ScrollIndicator = () => {
   }, []);
 
   return (
-    <div className="absolute -bottom-28 sm:bottom-12 md:bottom-20 left-1/2 -translate-x-1/2 z-30 w-full text-center pointer-events-none opacity-0 animate-fade-in-up" style={{ animationDelay: '1200ms', animationFillMode: 'forwards' }}>
+    <div className="absolute -bottom-28 md:bottom-6 lg:bottom-12 left-1/2 -translate-x-1/2 z-30 w-full text-center pointer-events-none opacity-0 animate-fade-in-up" style={{ animationDelay: '1200ms', animationFillMode: 'forwards' }}>
       <div className="inline-block cursor-pointer group pointer-events-auto" onClick={handleScrollDown}>
         <div className="relative w-7 h-14 sm:w-8 sm:h-16 border-2 border-gray-300 rounded-full flex items-end justify-center pb-2 mb-2 sm:mb-3 group-hover:border-pink-400 transition-colors duration-300 bg-white/50">
           <svg
