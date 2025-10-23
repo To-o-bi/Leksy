@@ -14,22 +14,22 @@ const Card = React.memo(({
   const shouldShowVideo = activeCardIndex === index;
   
   return (
-    <div className={`group transform transition-all duration-1000 ease-out cursor-pointer hover:z-40 ${className}`} 
+    <div className={`group transform transition-all duration-1000 ease-out cursor-pointer hover:z-40 ${className}`}
          style={style}>
       <div className="relative w-full h-full rounded-3xl bg-gradient-to-br from-pink-50 to-white p-1 shadow-2xl hover:shadow-pink-200/50">
         <div className="w-full h-full rounded-3xl overflow-hidden bg-white shadow-inner relative">
-          <img 
-            src={cardImage} 
-            alt="Beauty product showcase" 
-            className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-0 ${shouldShowVideo ? 'opacity-0 scale-105' : 'opacity-100'}`}
+          <img
+            src={cardImage}
+            alt="Beauty product showcase"
+            className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-0 ${shouldShowVideo ? 'opacity-0 scale-105' : 'opacity-100'}`}
             loading="lazy"
           />
-          <video 
-            src={cardVideo} 
-            autoPlay 
-            loop 
-            muted 
-            playsInline 
+          <video
+            src={cardVideo}
+            autoPlay
+            loop
+            muted
+            playsInline
             className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-hover:opacity-100 ${shouldShowVideo ? 'opacity-100 scale-105' : 'opacity-0'}`}
             preload="none"
           />
@@ -282,7 +282,7 @@ const HeroCards = () => {
 
   // Desktop view (original fanned layout)
   return (
-    <div className="flex-grow relative flex items-start justify-center pt-2">
+    <div className="flex-grow relative flex items-start justify-center pt-8 md:pt-12 lg:pt-16">
       <div className="flex items-center justify-center space-x-[-1.5rem] xl:space-x-[-1rem]">
         {cardData.map((card, index) => (
           <Card

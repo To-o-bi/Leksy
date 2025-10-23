@@ -88,10 +88,10 @@ const SocialMediaWidget = () => {
   ];
 
   return (
-    <div className="fixed bottom-8 right-8 z-50">
+    <div className="fixed bottom-20 sm:bottom-8 md:bottom-8 right-4 sm:right-6 md:right-8 z-[9999]">
       <div className={`absolute bottom-16 right-0 flex flex-col items-end space-y-3 transition-all duration-500 ${
-        socialExpanded 
-          ? 'opacity-100 translate-y-0 pointer-events-auto' 
+        socialExpanded
+          ? 'opacity-100 translate-y-0 pointer-events-auto'
           : 'opacity-0 translate-y-8 pointer-events-none'
       }`}>
         {socialLinks.map((social, index) => (
