@@ -4,6 +4,7 @@ import PublicRoutes from './PublicRoutes';
 import ProtectedRoute from './ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
 import { RouteTransitionProvider } from './RouteTransitionLoader';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 // Import critical pages directly (no lazy loading) - SHOP PAGE ADDED HERE
 import ProductDetailPage from '../pages/public/ProductDetailPage';
@@ -61,11 +62,8 @@ const ScrollToTop = memo(() => {
 ScrollToTop.displayName = 'ScrollToTop';
 
 const LoadingFallback = memo(() => (
-  <div className="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded-lg shadow-lg">
-      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-pink-500 mx-auto" />
-      <p className="text-center text-gray-600 mt-3 text-sm">Loading...</p>
-    </div>
+  <div className="fixed inset-0 bg-white flex items-center justify-center z-50">
+    <LoadingSpinner size="default" text="Loading..." />
   </div>
 ));
 

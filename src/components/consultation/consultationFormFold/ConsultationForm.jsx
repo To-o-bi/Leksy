@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { initiateConsultation, fetchBookedTimes } from '../../../api/consultationService';
+import LoadingSpinner from '../../common/LoadingSpinner';
 import PersonalInfoStep from './PersonalInfoStep';
 import SkinConcernsStep from './SkinConcernsStep';
 import ScheduleStep from './ScheduleStep';
@@ -227,7 +228,15 @@ const ConsultationForm = () => {
   }
 
   return (
-    <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+    <>
+      {/* Full-screen loading overlay */}
+      {isSubmitting && (
+        <div className="fixed inset-0 bg-white z-[9999] flex items-center justify-center">
+          <LoadingSpinner size="large" text="Booking your consultation appointment..." />
+        </div>
+      )}
+
+      <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
       <div className="bg-gray-50 px-6 py-4 border-b">
         <div className="flex items-center justify-between max-w-md mx-auto">
           {[1, 2, 3].map((num) => (
@@ -314,7 +323,8 @@ const ConsultationForm = () => {
           )}
         </div>
       </form>
-    </div>
+      </div>
+    </>
   );
 };
 

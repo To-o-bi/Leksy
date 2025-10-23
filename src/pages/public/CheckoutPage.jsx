@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../hooks/useCart';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import Notification from '../../components/common/Notification';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 import DeliveryMethodSection from './checkout/DeliveryMethodSection';
 import CustomerInformationSection from './PolicyPages/CustomerInformationSection';
 import OrderSummarySection from './checkout/OrderSummarySection';
@@ -289,7 +290,14 @@ const CheckoutPage = () => {
   const discountBanner = getDiscountBannerMessage();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Full-screen loading overlay */}
+      {isProcessingOrder && (
+        <div className="fixed inset-0 bg-white z-[9999] flex items-center justify-center">
+          <LoadingSpinner size="large" text="Processing your order and connecting to payment gateway..." />
+        </div>
+      )}
+
       <div className="max-w-[1200px] mx-auto px-4 py-8">
         {notification && (
           <div className="mb-6">

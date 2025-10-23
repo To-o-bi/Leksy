@@ -6,6 +6,7 @@ import { formatter } from '../../utils/formatter';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import Button from '../../components/common/Button';
 import CartItem from '../../components/cart/CartItem';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { SiVisa, SiMastercard, SiPaypal } from 'react-icons/si';
 
 const CartPage = () => {
@@ -42,9 +43,8 @@ const CartPage = () => {
 
     if (isLoading) {
         return (
-            <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 text-center h-screen flex flex-col justify-center">
-                <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-pink-500 mx-auto"></div>
-                <p className="mt-4 text-sm sm:text-base text-gray-600">Verifying your cart...</p>
+            <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 h-screen flex items-center justify-center">
+                <LoadingSpinner size="default" text="Verifying your cart..." />
             </div>
         );
     }
