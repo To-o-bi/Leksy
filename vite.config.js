@@ -36,14 +36,23 @@ export default defineConfig({
   
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-        }
-      }
-    }
+          framer: ['framer-motion'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
   },
 
   // Define environment variables
